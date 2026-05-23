@@ -21,10 +21,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  let user = null;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const {
+      data: { user: fetchedUser },
+    } = await supabase.auth.getUser();
+    user = fetchedUser;
+  } catch (err) {
+    console.error("Auth getUser failed inside API accept invite:", err);
+  }
+
   if (!user) {
     return NextResponse.json(
       { error: "Harus login terlebih dahulu" },

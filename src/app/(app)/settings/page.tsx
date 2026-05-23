@@ -43,6 +43,7 @@ import {
   Loader2,
   Trash2,
   Pencil,
+  Scale,
 } from "lucide-react";
 import type { CategoryKind } from "@/lib/supabase/types";
 
@@ -202,6 +203,24 @@ export default function SettingsPage() {
               <p className="font-semibold text-sm">Transaksi Terjadwal</p>
               <p className="text-xs text-muted-foreground">
                 Catatan dengan tanggal di masa depan
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+        </Link>
+
+        <Link
+          href="/debts"
+          className="rounded-2xl border bg-card p-4 flex items-center justify-between hover:bg-muted/40 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+              <Scale className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="font-semibold text-sm">Hutang & Piutang</p>
+              <p className="text-xs text-muted-foreground">
+                Pencatatan utang-piutang keluarga
               </p>
             </div>
           </div>

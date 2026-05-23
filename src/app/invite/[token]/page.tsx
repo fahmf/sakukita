@@ -19,10 +19,16 @@ export default async function InviteAcceptPage({ params }: PageProps) {
     );
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user: fetchedUser },
+    } = await supabase.auth.getUser();
+    user = fetchedUser;
+  } catch (err) {
+    console.error("Auth check failed in invite route:", err);
+  }
 
   if (!user) {
     redirect(`/login?next=${encodeURIComponent(`/invite/${token}`)}`);

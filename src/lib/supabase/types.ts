@@ -115,6 +115,20 @@ export interface SavingsGoal {
   updated_at: string;
 }
 
+export interface Debt {
+  id: string;
+  household_id: string;
+  name: string;
+  type: "payable" | "receivable";
+  amount: number;
+  remaining_amount: number;
+  due_date: string | null;
+  is_completed: boolean;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WalletBalance {
   wallet_id: string;
   household_id: string;

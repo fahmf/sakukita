@@ -171,6 +171,38 @@ export async function pullLatest(supabase: SupabaseClient, householdId: string) 
     if (goalsToDelete.length > 0) {
       await db.savings_goals.bulkDelete(goalsToDelete);
     }
+
+    // 6. Pull Debts
+    const { data: debts, error: debtsError } = await supabase
+      .from("debts")
+      .select("*")
+      .eq("household_id", householdId);
+
+    if (debtsError) throw debtsError;
+
+    const pendingDebts = await db.debts
+      .where("syncStatus")
+      .equals("pending")
+      .toArray();
+    const pendingDebtIds = new Set(pendingDebts.map((d) => d.id));
+
+    const debtsToPut = (debts || [])
+      .filter((d) => !pendingDebtIds.has(d.id))
+      .map((d) => ({ ...d, syncStatus: "synced" as const }));
+
+    if (debtsToPut.length > 0) {
+      await db.debts.bulkPut(debtsToPut);
+    }
+
+    // Purge debts deleted remotely
+    const remoteDebtIds = new Set((debts || []).map((d) => d.id));
+    const localDebts = await db.debts.toArray();
+    const debtsToDelete = localDebts
+      .filter((d) => d.syncStatus === "synced" && !remoteDebtIds.has(d.id))
+      .map((d) => d.id);
+    if (debtsToDelete.length > 0) {
+      await db.debts.bulkDelete(debtsToDelete);
+    }
   } catch (error) {
     console.error("Failed to pull latest from remote:", error);
   }
@@ -346,6 +378,39 @@ export async function flushOutbox(supabase: SupabaseClient) {
             .eq("id", entry.entityId);
           if (error) throw error;
           await db.savings_goals.delete(entry.entityId);
+          await db.outbox.delete(entry.seq!);
+        }
+      } else if (entry.entity === "debts") {
+        if (entry.op === "create") {
+          const { syncStatus, ...payload } = entry.payload;
+          const { error } = await supabase.from("debts").insert(payload);
+          if (error) {
+            if (error.code && error.code.startsWith("23")) {
+              console.error("Constraint error during debt insert; discarding entry", error);
+              await db.outbox.delete(entry.seq!);
+              await db.debts.update(entry.entityId, { syncStatus: "synced" });
+              continue;
+            }
+            throw error;
+          }
+          await db.debts.update(entry.entityId, { syncStatus: "synced" });
+          await db.outbox.delete(entry.seq!);
+        } else if (entry.op === "update") {
+          const { syncStatus, ...payload } = entry.payload;
+          const { error } = await supabase
+            .from("debts")
+            .update(payload)
+            .eq("id", entry.entityId);
+          if (error) throw error;
+          await db.debts.update(entry.entityId, { syncStatus: "synced" });
+          await db.outbox.delete(entry.seq!);
+        } else if (entry.op === "delete") {
+          const { error } = await supabase
+            .from("debts")
+            .delete()
+            .eq("id", entry.entityId);
+          if (error) throw error;
+          await db.debts.delete(entry.entityId);
           await db.outbox.delete(entry.seq!);
         }
       }

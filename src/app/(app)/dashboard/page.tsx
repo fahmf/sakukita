@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useWalletBalances } from "@/hooks/use-wallets";
-import { useTransactions } from "@/hooks/use-transactions";
+import { useTransactions, useDeleteTransaction } from "@/hooks/use-transactions";
 import { useBudgets } from "@/hooks/use-budgets";
 import { useCategories } from "@/hooks/use-categories";
 import { formatCurrency, formatRelative } from "@/lib/format";
@@ -30,7 +30,23 @@ import {
   CreditCard,
   PiggyBank,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  Trash2,
+  Search,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
+import { toast } from "sonner";
+
 
 // Icons map for rendering categories
 const iconMap: Record<string, any> = {
@@ -48,20 +64,58 @@ const iconMap: Record<string, any> = {
 export default function DashboardPage() {
   const { openQuickAdd } = useUIStore();
   const { data: walletBalances = [], isLoading: loadingBalances } = useWalletBalances();
+
+  // Dynamic month selection state (initialized to first day of current month)
+  const [selectedMonth, setSelectedMonth] = React.useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  });
+
+  const [showAll, setShowAll] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [txToDelete, setTxToDelete] = React.useState<any>(null);
+
+  const deleteTx = useDeleteTransaction();
+  const allowed = useCanEdit();
+
+  // Helper: Prev/Next month logic
+  const handlePrevMonth = () => {
+    const [y, m] = selectedMonth.split("-").map(Number);
+    const prevDate = new Date(y, m - 2, 1);
+    setSelectedMonth(
+      `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}-01`
+    );
+  };
+
+  const handleNextMonth = () => {
+    const [y, m] = selectedMonth.split("-").map(Number);
+    const nextDate = new Date(y, m, 1);
+    setSelectedMonth(
+      `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}-01`
+    );
+  };
+
+  // Convert selectedMonth to precise ISO string ranges for useTransactions
+  const { startDate, endDate } = React.useMemo(() => {
+    const [y, m] = selectedMonth.split("-").map(Number);
+    const start = new Date(y, m - 1, 1, 0, 0, 0, 0);
+    const end = new Date(y, m, 0, 23, 59, 59, 999);
+    return {
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+    };
+  }, [selectedMonth]);
+
   const { data: transactions = [], isLoading: loadingTx } = useTransactions({
-    period: "this-month",
-    startDate: null,
-    endDate: null,
+    period: "custom",
+    startDate,
+    endDate,
     walletId: null,
     categoryId: null,
   });
-  const { data: categories = [] } = useCategories();
 
-  const activeMonthStr = React.useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-  }, []);
-  const { data: budgets = [], isLoading: loadingBudgets } = useBudgets(activeMonthStr);
+  const { data: categories = [] } = useCategories();
+  const { data: budgets = [], isLoading: loadingBudgets } = useBudgets(selectedMonth);
 
   // Calculate Net Worth based on active balances
   const totalNetWorth = React.useMemo(() => {
@@ -109,19 +163,74 @@ export default function DashboardPage() {
   }, [budgets, categories, transactions]);
 
   const activeMonthName = React.useMemo(() => {
-    return new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(new Date());
-  }, []);
+    const [y, m] = selectedMonth.split("-").map(Number);
+    const date = new Date(y, m - 1, 1);
+    return date.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+  }, [selectedMonth]);
+
+  // Handle transaction soft deletion confirmation
+  const handleDeleteConfirm = async () => {
+    if (!txToDelete) return;
+    if (!allowed) {
+      viewOnlyToast();
+      setTxToDelete(null);
+      return;
+    }
+    try {
+      await deleteTx.mutateAsync(txToDelete.id);
+      toast.success("Transaksi berhasil dihapus");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Gagal menghapus transaksi";
+      toast.error(message);
+    } finally {
+      setTxToDelete(null);
+    }
+  };
+
+  // Filter transactions based on searchQuery when showAll is true
+  const displayedTransactions = React.useMemo(() => {
+    const activeTx = transactions;
+    if (!showAll) {
+      return activeTx.slice(0, 10);
+    }
+    if (!searchQuery) {
+      return activeTx;
+    }
+    const query = searchQuery.toLowerCase().trim();
+    return activeTx.filter((t) => {
+      const noteMatch = t.note?.toLowerCase().includes(query);
+      const catMatch = t.category?.name?.toLowerCase().includes(query);
+      const walletMatch = t.wallet?.name?.toLowerCase().includes(query);
+      const toWalletMatch = t.to_wallet?.name?.toLowerCase().includes(query);
+      const amountMatch = t.amount.toString().includes(query);
+      return noteMatch || catMatch || walletMatch || toWalletMatch || amountMatch;
+    });
+  }, [transactions, showAll, searchQuery]);
 
   return (
     <div className="space-y-6">
-      {/* 1. Header & Month Selector */}
-      <div className="flex items-center justify-between">
-        <div>
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Bulan Ini
-          </span>
-          <h1 className="text-xl font-bold text-foreground">{activeMonthName}</h1>
+      {/* 1. Header & Month Navigator */}
+      <div className="flex items-center justify-between bg-card border rounded-2xl p-3 shadow-xs">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handlePrevMonth}
+          className="size-9 rounded-xl hover:bg-muted"
+        >
+          <ChevronLeft className="size-5" />
+        </Button>
+        <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
+          <Calendar className="size-4 text-mint-strong" />
+          <span>{activeMonthName}</span>
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleNextMonth}
+          className="size-9 rounded-xl hover:bg-muted"
+        >
+          <ChevronRight className="size-5" />
+        </Button>
       </div>
 
       {/* 2. Total Net Worth Monokrom Card */}
@@ -218,7 +327,7 @@ export default function DashboardPage() {
       <div className="space-y-2.5">
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Transaksi Terakhir
+            {showAll ? "Semua Transaksi" : "Transaksi Terakhir"}
           </h2>
         </div>
 
@@ -248,66 +357,146 @@ export default function DashboardPage() {
           </Card>
         ) : (
           <div className="grid gap-2.5">
-            {transactions.slice(0, 10).map((tx) => {
-              const isExpense = tx.type === "expense";
-              const isIncome = tx.type === "income";
-              const isTransfer = tx.type === "transfer";
+            {showAll && (
+              <div className="relative mb-1">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Cari berdasarkan catatan, kategori, dll..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-background border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-mint-strong focus:border-mint-strong transition-all"
+                />
+              </div>
+            )}
 
-              let bgColor = "#C4C4C4";
-              const hasMappedIcon = !isTransfer && tx.category && iconMap[tx.category.icon || ""];
-              const categoryIcon = tx.category?.icon || "🏷️";
+            {displayedTransactions.length === 0 ? (
+              <div className="text-center py-6 border border-dashed rounded-2xl bg-card">
+                <p className="text-xs text-muted-foreground">Tidak ada transaksi yang cocok.</p>
+              </div>
+            ) : (
+              displayedTransactions.map((tx) => {
+                const isExpense = tx.type === "expense";
+                const isIncome = tx.type === "income";
+                const isTransfer = tx.type === "transfer";
 
-              if (isTransfer) {
-                bgColor = "#A8A29E";
-              } else if (tx.category) {
-                bgColor = tx.category.color || "#C4C4C4";
-              }
+                let bgColor = "#C4C4C4";
+                const hasMappedIcon = !isTransfer && tx.category && iconMap[tx.category.icon || ""];
+                const categoryIcon = tx.category?.icon || "🏷️";
 
-              return (
-                <div
-                  key={tx.id}
-                  className="flex items-center justify-between rounded-2xl border bg-card p-3.5 transition-all hover:border-mint-strong/20 min-w-0"
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <span
-                      className="grid size-9 shrink-0 place-items-center rounded-xl text-white font-semibold"
-                      style={{ backgroundColor: bgColor }}
-                    >
-                      {isTransfer ? (
-                        <ArrowRightLeft className="size-4" />
-                      ) : hasMappedIcon ? (
-                        React.createElement(iconMap[tx.category!.icon || ""], { className: "size-4" })
-                      ) : (
-                        <span className="text-base select-none leading-none">{categoryIcon}</span>
-                      )}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm text-foreground truncate">
-                        {isTransfer
-                          ? `Transfer ke ${tx.to_wallet?.name}`
-                          : tx.note || tx.category?.name || "Lain-lain"}
-                      </p>
-                      <p className="text-xs text-muted-foreground font-medium">
-                        {tx.wallet?.name} · {formatRelative(tx.occurred_at)}
-                      </p>
+                if (isTransfer) {
+                  bgColor = "#A8A29E";
+                } else if (tx.category) {
+                  bgColor = tx.category.color || "#C4C4C4";
+                }
+
+                return (
+                  <div
+                    key={tx.id}
+                    className="flex items-center justify-between rounded-2xl border bg-card p-3.5 transition-all hover:border-mint-strong/20 min-w-0"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <span
+                        className="grid size-9 shrink-0 place-items-center rounded-xl text-white font-semibold"
+                        style={{ backgroundColor: bgColor }}
+                      >
+                        {isTransfer ? (
+                          <ArrowRightLeft className="size-4" />
+                        ) : hasMappedIcon ? (
+                          React.createElement(iconMap[tx.category!.icon || ""], { className: "size-4" })
+                        ) : (
+                          <span className="text-base select-none leading-none">{categoryIcon}</span>
+                        )}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm text-foreground truncate">
+                          {isTransfer
+                            ? `Transfer ke ${tx.to_wallet?.name}`
+                            : tx.note || tx.category?.name || "Lain-lain"}
+                        </p>
+                        <p className="text-xs text-muted-foreground font-medium">
+                          {tx.wallet?.name} · {formatRelative(tx.occurred_at)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0 pl-2">
+                      <div className="text-right">
+                        <p
+                          className={`font-bold text-sm tracking-tight ${
+                            isIncome ? "text-income" : isExpense ? "text-expense" : "text-foreground"
+                          }`}
+                        >
+                          {isIncome ? "+" : isExpense ? "-" : ""}
+                          {formatCurrency(tx.amount).replace("Rp", "").trim()}
+                        </p>
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setTxToDelete(tx)}
+                        className="size-8 rounded-lg text-muted-foreground hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                        aria-label="Hapus transaksi"
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0 pl-2">
-                    <p
-                      className={`font-bold text-sm tracking-tight ${
-                        isIncome ? "text-income" : isExpense ? "text-expense" : "text-foreground"
-                      }`}
-                    >
-                      {isIncome ? "+" : isExpense ? "-" : ""}
-                      {formatCurrency(tx.amount).replace("Rp", "").trim()}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
+
+            {transactions.length > 10 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowAll(!showAll);
+                  if (showAll) setSearchQuery("");
+                }}
+                className="w-full text-xs text-mint-strong hover:bg-mint-soft/50 py-2.5 mt-1 rounded-xl"
+              >
+                {showAll ? "Tampilkan Lebih Sedikit" : `Lihat Semua (${transactions.length} Transaksi)`}
+              </Button>
+            )}
           </div>
         )}
       </div>
+
+      {/* Confirmation Dialog for Transaction Deletion */}
+      <Dialog
+        open={txToDelete !== null}
+        onOpenChange={(o) => !o && setTxToDelete(null)}
+      >
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Hapus transaksi ini?</DialogTitle>
+            <DialogDescription>
+              Transaksi sebesar{" "}
+              <span className="font-semibold text-foreground">
+                {txToDelete ? formatCurrency(txToDelete.amount) : ""}
+              </span>{" "}
+              ({txToDelete?.note || txToDelete?.category?.name || "Tanpa catatan"}) akan dipindahkan ke Recycle Bin selama 30 hari.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-2">
+            <Button
+              variant="outline"
+              className="rounded-xl h-11"
+              onClick={() => setTxToDelete(null)}
+            >
+              Batal
+            </Button>
+            <Button
+              className="rounded-xl h-11 bg-expense text-white hover:bg-expense/90"
+              onClick={handleDeleteConfirm}
+              disabled={deleteTx.isPending}
+            >
+              {deleteTx.isPending ? "Menghapus..." : "Ya, Hapus"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

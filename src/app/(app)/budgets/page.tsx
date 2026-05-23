@@ -54,7 +54,7 @@ export default function BudgetsPage() {
   const [goalTargetAmount, setGoalTargetAmount] = React.useState("");
   const [goalCurrentAmount, setGoalCurrentAmount] = React.useState("");
   const [goalTargetDate, setGoalTargetDate] = React.useState("");
-  const [goalEmoji, setGoalEmoji] = React.useState("🐷");
+  const [goalEmoji, setGoalEmoji] = React.useState("🎯");
   const [goalColor, setGoalColor] = React.useState("#5FBF9A");
 
   // Quick Deposit states
@@ -280,7 +280,7 @@ export default function BudgetsPage() {
     setGoalTargetAmount("");
     setGoalCurrentAmount("0");
     setGoalTargetDate("");
-    setGoalEmoji("🐷");
+    setGoalEmoji("🎯");
     setGoalColor("#5FBF9A");
     setGoalDialogOpen(true);
   };
@@ -292,7 +292,7 @@ export default function BudgetsPage() {
     setGoalTargetAmount(String(goal.target_amount));
     setGoalCurrentAmount(String(goal.current_amount));
     setGoalTargetDate(goal.target_date || "");
-    setGoalEmoji(goal.icon || "🐷");
+    setGoalEmoji(goal.icon || "🎯");
     setGoalColor(goal.color || "#5FBF9A");
     setGoalDialogOpen(true);
   };
@@ -742,7 +742,7 @@ export default function BudgetsPage() {
                       >
                         <div className="flex items-center gap-3">
                           {/* SVG Progress Circle with Emoji */}
-                          {renderProgressCircle(goal.current_amount, goal.target_amount, goal.color || "#5FBF9A", goal.icon || "🐷")}
+                          {renderProgressCircle(goal.current_amount, goal.target_amount, goal.color || "#5FBF9A", goal.icon || "🎯")}
 
                           {/* Text Details */}
                           <div className="flex-1 min-w-0">
@@ -894,7 +894,7 @@ export default function BudgetsPage() {
         <DialogContent className="rounded-2xl max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <span className="text-xl select-none">{depositingGoal?.icon || "🐷"}</span>
+              <span className="text-xl select-none">{depositingGoal?.icon || "🎯"}</span>
               <span>Setor Dana Ke {depositingGoal?.name}</span>
             </DialogTitle>
           </DialogHeader>
@@ -1012,7 +1012,7 @@ export default function BudgetsPage() {
             <div className="flex flex-col gap-1.5">
               <Label>Pilih Ikon Emoji</Label>
               <div className="flex flex-wrap gap-2">
-                {["🐷", "🏦", "🚗", "🏠", "📈", "✈️", "💍", "💻", "💼", "💰"].map((emoji) => (
+                {["🎯", "🏦", "🚗", "🏠", "📈", "✈️", "💍", "💻", "💼", "💰"].map((emoji) => (
                   <button
                     key={emoji}
                     type="button"

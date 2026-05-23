@@ -47,6 +47,23 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <QueryProvider>{children}</QueryProvider>
         <Toaster position="top-center" />
+        
+        {/* PWA Service Worker Auto-Registration */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').then(function(reg) {
+                    console.log('Serwist SW registered: ', reg.scope);
+                  }, function(err) {
+                    console.log('Serwist SW registration failed: ', err);
+                  });
+                });
+              }
+            `
+          }}
+        />
       </body>
     </html>
   );
