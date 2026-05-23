@@ -188,6 +188,10 @@ export interface Database {
         SavingsGoal,
         "id" | "current_amount" | "target_date" | "is_completed" | "icon" | "color" | "created_at" | "updated_at"
       >;
+      debts: DbTable<
+        Debt,
+        "id" | "remaining_amount" | "due_date" | "is_completed" | "note" | "created_at" | "updated_at"
+      >;
     };
     Views: {
       v_wallet_balances: {

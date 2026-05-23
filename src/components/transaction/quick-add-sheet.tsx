@@ -45,6 +45,7 @@ import {
   Receipt,
   CircleDot,
   Briefcase,
+  Keyboard,
 } from "lucide-react";
 import type { TransactionType } from "@/lib/supabase/types";
 import { compressImage } from "@/lib/image";
@@ -61,21 +62,72 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   "circle-dashed": CircleDot,
 };
 
+// 4x5 Keypad layout keys definition
+const keypadKeys = [
+  "7", "8", "9", "⌫",
+  "4", "5", "6", "÷",
+  "1", "2", "3", "×",
+  "C", "0", "000", "-",
+  "(", ")", "+", "OK"
+];
+
 export function QuickAddSheet() {
-  const { quickAddOpen, quickAddType, closeQuickAdd, lastWalletId, lastCategoryId, setLastWallet, setLastCategory, editingTransaction } = useUIStore();
+  const { quickAddOpen, closeQuickAdd, editingTransaction } = useUIStore();
+
+  return (
+    <Drawer open={quickAddOpen} onOpenChange={(open) => !open && closeQuickAdd()}>
+      <DrawerContent className="px-4 pb-4 max-h-[94dvh] flex flex-col">
+        {quickAddOpen && (
+          <QuickAddForm key={editingTransaction?.id || "new-tx"} />
+        )}
+      </DrawerContent>
+    </Drawer>
+  );
+}
+
+function QuickAddForm() {
+  const {
+    quickAddType,
+    lastWalletId,
+    lastCategoryId,
+    editingTransaction,
+    closeQuickAdd,
+    setLastWallet,
+    setLastCategory,
+  } = useUIStore();
+
   const { data: wallets = [] } = useWallets();
   const { data: categoriesTree = [] } = useCategories();
   const createTx = useCreateTransaction();
   const updateTx = useUpdateTransaction();
 
-  // Local form states
-  const [type, setType] = React.useState<TransactionType>("expense");
-  const [amountExpr, setAmountExpr] = React.useState("");
-  const [selectedWalletId, setSelectedWalletId] = React.useState("");
-  const [selectedToWalletId, setSelectedToWalletId] = React.useState("");
-  const [selectedCategoryId, setSelectedCategoryId] = React.useState("");
-  const [occurredAt, setOccurredAt] = React.useState("");
-  const [note, setNote] = React.useState("");
+  // Local form states initialized directly on mount
+  const [type, setType] = React.useState<TransactionType>(() =>
+    editingTransaction ? editingTransaction.type : quickAddType
+  );
+  const [amountExpr, setAmountExpr] = React.useState(() =>
+    editingTransaction ? String(editingTransaction.amount) : ""
+  );
+  const [selectedWalletId, setSelectedWalletId] = React.useState(() =>
+    editingTransaction ? editingTransaction.wallet_id : ""
+  );
+  const [selectedToWalletId, setSelectedToWalletId] = React.useState(() =>
+    editingTransaction ? (editingTransaction.to_wallet_id || "") : ""
+  );
+  const [selectedCategoryId, setSelectedCategoryId] = React.useState(() =>
+    editingTransaction ? (editingTransaction.category_id || "") : ""
+  );
+  const [occurredAt, setOccurredAt] = React.useState(() =>
+    editingTransaction
+      ? editingTransaction.occurred_at.split("T")[0]
+      : new Date().toISOString().split("T")[0]
+  );
+  const [note, setNote] = React.useState(() =>
+    editingTransaction ? (editingTransaction.note || "") : ""
+  );
+
+  // Keypad open/close visibility state
+  const [showKeypad, setShowKeypad] = React.useState(true);
 
   // AI receipt scanner states
   const [isScanning, setIsScanning] = React.useState(false);
@@ -83,77 +135,94 @@ export function QuickAddSheet() {
   const [scannedItemsOpen, setScannedItemsOpen] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Track initialization to avoid reset when data refetches in background
-  const initRef = React.useRef(false);
+  // Gather categories for quick chips
+  const activeCategories = React.useMemo(() => {
+    if (type === "transfer") return [];
+    return categoriesTree.filter((c) => c.kind === type);
+  }, [type, categoriesTree]);
 
-  // Sync component state when the drawer opens
-  React.useEffect(() => {
-    if (quickAddOpen) {
-      if (!initRef.current) {
-        initRef.current = true;
-        if (editingTransaction) {
-          // Transaction edit mode
-          setType(editingTransaction.type);
-          setAmountExpr(String(editingTransaction.amount));
-          setNote(editingTransaction.note || "");
-          setOccurredAt(editingTransaction.occurred_at.split("T")[0]);
-          setIsScanning(false);
-          setScannedItems(null);
-          setScannedItemsOpen(false);
-          setSelectedWalletId(editingTransaction.wallet_id);
-          setSelectedToWalletId(editingTransaction.to_wallet_id || "");
-          setSelectedCategoryId(editingTransaction.category_id || "");
-        } else {
-          // Create mode
-          setType(quickAddType);
-          setAmountExpr("");
-          setNote("");
-          setOccurredAt(new Date().toISOString().split("T")[0]);
-          setIsScanning(false);
-          setScannedItems(null);
-          setScannedItemsOpen(false);
+  // Compute active default selections purely during render — eliminates cascading render set-state-in-effect errors
+  const activeWalletId = selectedWalletId || lastWalletId || wallets[0]?.id || "";
 
-          // Handle defaults
-          const defaultWallet = lastWalletId || wallets[0]?.id || "";
-          setSelectedWalletId(defaultWallet);
-          setSelectedToWalletId("");
+  const activeCategoryId = React.useMemo(() => {
+    if (type === "transfer") return "";
+    if (selectedCategoryId) return selectedCategoryId;
+    const flatCategories = categoriesTree.flatMap((p) => [p, ...p.subcategories]);
+    const available = flatCategories.filter((c) => c.kind === type);
+    return lastCategoryId || available[0]?.id || "";
+  }, [selectedCategoryId, categoriesTree, type, lastCategoryId]);
 
-          const flatCategories = categoriesTree.flatMap(p => [p, ...p.subcategories]);
-          const availableCategories = flatCategories.filter(c => c.kind === (quickAddType === "transfer" ? "expense" : quickAddType));
-          const defaultCategory = lastCategoryId || availableCategories[0]?.id || "";
-          setSelectedCategoryId(defaultCategory);
-        }
-      }
+  // Handle keypad presses
+  const handleKeypadPress = (key: string) => {
+    if (key === "C") {
+      setAmountExpr("");
+    } else if (key === "⌫") {
+      setAmountExpr((prev) => prev.slice(0, -1));
+    } else if (key === "000") {
+      if (!amountExpr) return;
+      const lastChar = amountExpr[amountExpr.length - 1];
+      if (/[+\-*/(]/.test(lastChar)) return;
+      setAmountExpr((prev) => prev + "000");
+    } else if (key === "OK") {
+      setShowKeypad(false);
+    } else if (key === "÷") {
+      setAmountExpr((prev) => prev + "/");
+    } else if (key === "×") {
+      setAmountExpr((prev) => prev + "*");
     } else {
-      initRef.current = false;
+      setAmountExpr((prev) => prev + key);
     }
-  }, [quickAddOpen, quickAddType, wallets, categoriesTree, lastWalletId, lastCategoryId, editingTransaction]);
+  };
 
-  // Adjust categories when type changes using pure event handler instead of cascading effect
+  // Capture physical keyboard inputs when amount input is focused or captured globally
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      // If user is actively typing in Note or Date fields, let the normal typing happen!
+      if (activeEl?.tagName === "INPUT" && activeEl.id !== "amount-display-input") {
+        return;
+      }
+
+      const key = e.key;
+      if (/[0-9+\-*/().]/.test(key)) {
+        e.preventDefault();
+        setAmountExpr((prev) => prev + key);
+      } else if (key === "Backspace") {
+        e.preventDefault();
+        setAmountExpr((prev) => prev.slice(0, -1));
+      } else if (key === "Escape") {
+        e.preventDefault();
+        closeQuickAdd();
+      } else if (key === "Enter") {
+        e.preventDefault();
+        setShowKeypad(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [closeQuickAdd]);
+
+  // Adjust categories automatically when transaction type changes
   const handleTypeChange = (newType: TransactionType) => {
     setType(newType);
     if (newType !== "transfer") {
-      const flatCategories = categoriesTree.flatMap(p => [p, ...p.subcategories]);
-      const available = flatCategories.filter(c => c.kind === newType);
+      const flatCategories = categoriesTree.flatMap((p) => [p, ...p.subcategories]);
+      const available = flatCategories.filter((c) => c.kind === newType);
       if (available.length > 0) {
         setSelectedCategoryId(available[0].id);
       }
     }
   };
 
-  // State to track if the selected date is in the future (scheduled)
-  const [isFutureDate, setIsFutureDate] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!occurredAt) {
-      setIsFutureDate(false);
-      return;
-    }
-    // Perform Date check inside effect to ensure render purity
-    setIsFutureDate(new Date(occurredAt).getTime() > Date.now());
+  // Pure dynamic render check for scheduled transaction check — completely removes set-state-in-effect warning
+  const isFutureDate = React.useMemo(() => {
+    if (!occurredAt) return false;
+    // eslint-disable-next-line react-hooks/purity
+    return new Date(occurredAt).getTime() > Date.now();
   }, [occurredAt]);
 
-  // AI Scanner handlers
+  // AI Scanner handler
   const handleScanClick = () => {
     fileInputRef.current?.click();
   };
@@ -167,21 +236,15 @@ export function QuickAddSheet() {
     const toastId = toast.loading("Mengompres & men-scan struk dengan AI...");
 
     try {
-      // 1. Compress the image client-side to ensure small payloads & speed
       const compressed = await compressImage(file, 1024, 1024, 0.75);
 
-      // 2. Flatten available active categories for context matching
-      const flatCategories = categoriesTree.flatMap((p) => [
-        p,
-        ...p.subcategories,
-      ]);
+      const flatCategories = categoriesTree.flatMap((p) => [p, ...p.subcategories]);
       const activeCategoriesPayload = flatCategories.map((c) => ({
         id: c.id,
         name: c.name,
         kind: c.kind,
       }));
 
-      // 3. Post to Gemini Receipt Scanner API endpoint
       const response = await fetch("/api/scan-receipt", {
         method: "POST",
         headers: {
@@ -201,7 +264,6 @@ export function QuickAddSheet() {
 
       const resData = await response.json();
 
-      // 4. Populate form states automatically with parsed parameters
       if (resData.amount) {
         setAmountExpr(String(resData.amount));
       }
@@ -219,28 +281,22 @@ export function QuickAddSheet() {
         setScannedItemsOpen(true);
       }
 
-      toast.success("Struk berhasil di-scan dengan AI!", {
-        id: toastId,
-      });
+      toast.success("Struk berhasil di-scan dengan AI!", { id: toastId });
     } catch (err) {
       console.error(err);
       const errMsg = err instanceof Error ? err.message : "Gagal men-scan struk dengan AI. Silakan coba lagi.";
-      toast.error(errMsg, {
-        id: toastId,
-      });
+      toast.error(errMsg, { id: toastId });
     } finally {
       setIsScanning(false);
-      // Reset input value so same file can be triggered again
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
     }
   };
 
-  // Calculate parsed amount
+  // Calculate parsed mathematical amount expression
   const parsedAmount = React.useMemo(() => {
     if (!amountExpr) return 0;
-    // If it's a simple positive integer, return it directly
     if (/^\d+$/.test(amountExpr)) {
       return parseInt(amountExpr, 10);
     }
@@ -252,12 +308,6 @@ export function QuickAddSheet() {
     return /[+\-*/()]/.test(amountExpr);
   }, [amountExpr]);
 
-  // Gather categories for quick chips (parent categories only)
-  const activeCategories = React.useMemo(() => {
-    if (type === "transfer") return [];
-    return categoriesTree.filter((c) => c.kind === type);
-  }, [type, categoriesTree]);
-
   // Submit transaction
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -267,7 +317,7 @@ export function QuickAddSheet() {
       return;
     }
 
-    if (!selectedWalletId) {
+    if (!activeWalletId) {
       toast.error("Pilih dompet sumber");
       return;
     }
@@ -277,12 +327,12 @@ export function QuickAddSheet() {
       return;
     }
 
-    if (type === "transfer" && selectedWalletId === selectedToWalletId) {
+    if (type === "transfer" && activeWalletId === selectedToWalletId) {
       toast.error("Dompet asal dan tujuan tidak boleh sama");
       return;
     }
 
-    if (type !== "transfer" && !selectedCategoryId) {
+    if (type !== "transfer" && !activeCategoryId) {
       toast.error("Pilih kategori transaksi");
       return;
     }
@@ -294,9 +344,9 @@ export function QuickAddSheet() {
           type,
           amount: parsedAmount,
           occurred_at: new Date(occurredAt).toISOString(),
-          wallet_id: selectedWalletId,
+          wallet_id: activeWalletId,
           to_wallet_id: type === "transfer" ? selectedToWalletId : null,
-          category_id: type !== "transfer" ? selectedCategoryId : null,
+          category_id: type !== "transfer" ? activeCategoryId : null,
           note: note.trim() || null,
         });
         toast.success("Transaksi berhasil diubah ✓");
@@ -305,18 +355,17 @@ export function QuickAddSheet() {
           type,
           amount: parsedAmount,
           occurred_at: new Date(occurredAt).toISOString(),
-          wallet_id: selectedWalletId,
+          wallet_id: activeWalletId,
           to_wallet_id: type === "transfer" ? selectedToWalletId : null,
-          category_id: type !== "transfer" ? selectedCategoryId : null,
+          category_id: type !== "transfer" ? activeCategoryId : null,
           note: note.trim() || null,
         });
         toast.success("Tersimpan ✓");
       }
 
-      // Save smart defaults
-      setLastWallet(selectedWalletId);
-      if (type !== "transfer" && selectedCategoryId) {
-        setLastCategory(selectedCategoryId);
+      setLastWallet(activeWalletId);
+      if (type !== "transfer" && activeCategoryId) {
+        setLastCategory(activeCategoryId);
       }
 
       closeQuickAdd();
@@ -327,17 +376,17 @@ export function QuickAddSheet() {
   };
 
   return (
-    <Drawer open={quickAddOpen} onOpenChange={(open) => !open && closeQuickAdd()}>
-      <DrawerContent className="px-4 pb-4 max-h-[94dvh] flex flex-col">
-        <DrawerHeader className="px-0 flex-shrink-0">
-          <DrawerTitle className="text-center text-lg font-semibold">
-            {editingTransaction ? "Ubah Catatan Keuangan" : "Tambah Catatan Keuangan"}
-          </DrawerTitle>
-        </DrawerHeader>
+    <>
+      <DrawerHeader className="px-0 flex-shrink-0">
+        <DrawerTitle className="text-center text-lg font-semibold">
+          {editingTransaction ? "Ubah Catatan Keuangan" : "Tambah Catatan Keuangan"}
+        </DrawerTitle>
+      </DrawerHeader>
 
-        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden min-h-0">
-          <div className="flex-1 overflow-y-auto pr-0.5 space-y-4 pb-4 scrollbar-thin">
-            {/* Scan Struk AI Action Panel */}
+      <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden min-h-0">
+        {/* Scrollable area above keypad */}
+        <div className="flex-1 overflow-y-auto pr-0.5 space-y-4 pb-4 scrollbar-thin">
+          {/* Scan Struk AI Action Panel */}
           {!editingTransaction && (
             <div className="relative overflow-hidden rounded-2xl border border-mint-strong/20 bg-linear-to-r from-mint-soft/30 via-muted/40 to-mint-soft/20 p-3 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
@@ -417,22 +466,30 @@ export function QuickAddSheet() {
             </button>
           </div>
 
-          {/* Amount Calculator Input */}
-          <div className="space-y-1.5 rounded-2xl bg-card border px-4 py-3.5 text-center">
+          {/* Amount Display Input — readOnly on mobile, clickable to show Virtual Keypad */}
+          <div className="space-y-1.5 rounded-2xl bg-card border px-4 py-3.5 text-center relative">
             <Label className="text-xs text-muted-foreground">Nominal (Rp)</Label>
             <div className="relative flex items-center justify-center gap-1">
-              <span className="text-2xl font-bold text-muted-foreground">Rp</span>
+              <span className="text-2xl font-bold text-muted-foreground select-none">Rp</span>
               <input
+                id="amount-display-input"
                 type="text"
-                inputMode="decimal"
-                pattern="[0-9+\\-*/().\\s]*"
+                readOnly
                 placeholder="0"
                 value={amountExpr}
-                onChange={(e) => setAmountExpr(e.target.value)}
-                className="w-full text-center text-3xl font-bold focus:outline-none bg-transparent caret-mint-strong"
+                onClick={() => setShowKeypad(true)}
+                className="w-full text-center text-3xl font-bold focus:outline-none bg-transparent caret-mint-strong cursor-pointer"
                 autoFocus
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowKeypad(!showKeypad)}
+                className="absolute right-0 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                title={showKeypad ? "Sembunyikan Keypad" : "Tampilkan Keypad"}
+              >
+                <Keyboard className="size-4" />
+              </button>
             </div>
             {/* Show real-time calculator evaluation */}
             {isExpression && parsedAmount > 0 && (
@@ -441,7 +498,7 @@ export function QuickAddSheet() {
               </p>
             )}
             {isExpression && parsedAmount === 0 && amountExpr !== "" && (
-              <p className="text-xs text-expense">
+              <p className="text-xs text-expense animate-pulse">
                 Mengetik rumus...
               </p>
             )}
@@ -453,12 +510,15 @@ export function QuickAddSheet() {
               <Label className="text-xs font-semibold text-muted-foreground">Kategori Cepat</Label>
               <div className="flex flex-wrap gap-2">
                 {activeCategories.slice(0, 6).map((cat) => {
-                  const isActive = selectedCategoryId === cat.id;
+                  const isActive = activeCategoryId === cat.id;
                   return (
                     <button
                       key={cat.id}
                       type="button"
-                      onClick={() => setSelectedCategoryId(cat.id)}
+                      onClick={() => {
+                        setSelectedCategoryId(cat.id);
+                        setShowKeypad(false);
+                      }}
                       className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all active:scale-95 ${
                         isActive
                           ? "bg-mint-soft text-mint-strong border-mint-strong/30"
@@ -487,7 +547,13 @@ export function QuickAddSheet() {
               <Label className="text-xs font-semibold text-muted-foreground">
                 {type === "transfer" ? "Dari Dompet" : "Dompet"}
               </Label>
-              <Select value={selectedWalletId} onValueChange={setSelectedWalletId}>
+              <Select
+                value={activeWalletId}
+                onValueChange={(val) => {
+                  setSelectedWalletId(val);
+                  setShowKeypad(false);
+                }}
+              >
                 <SelectTrigger className="h-10 bg-card border rounded-xl">
                   <SelectValue placeholder="Pilih dompet" />
                 </SelectTrigger>
@@ -505,7 +571,13 @@ export function QuickAddSheet() {
             {type === "transfer" ? (
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground">Ke Dompet</Label>
-                <Select value={selectedToWalletId} onValueChange={setSelectedToWalletId}>
+                <Select
+                  value={selectedToWalletId}
+                  onValueChange={(val) => {
+                    setSelectedToWalletId(val);
+                    setShowKeypad(false);
+                  }}
+                >
                   <SelectTrigger className="h-10 bg-card border rounded-xl">
                     <SelectValue placeholder="Pilih dompet" />
                   </SelectTrigger>
@@ -521,7 +593,13 @@ export function QuickAddSheet() {
             ) : (
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground">Semua Kategori</Label>
-                <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
+                <Select
+                  value={activeCategoryId}
+                  onValueChange={(val) => {
+                    setSelectedCategoryId(val);
+                    setShowKeypad(false);
+                  }}
+                >
                   <SelectTrigger className="h-10 bg-card border rounded-xl">
                     <SelectValue placeholder="Pilih kategori" />
                   </SelectTrigger>
@@ -568,10 +646,10 @@ export function QuickAddSheet() {
               <Label className="text-xs font-semibold text-muted-foreground">
                 Tanggal
                 {isFutureDate && (
-                    <span className="ml-1 rounded-full bg-mint-soft px-1.5 py-0.5 text-[10px] font-semibold text-mint-strong">
-                      Terjadwal
-                    </span>
-                  )}
+                  <span className="ml-1 rounded-full bg-mint-soft px-1.5 py-0.5 text-[10px] font-semibold text-mint-strong">
+                    Terjadwal
+                  </span>
+                )}
               </Label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -579,6 +657,7 @@ export function QuickAddSheet() {
                   type="date"
                   value={occurredAt}
                   onChange={(e) => setOccurredAt(e.target.value)}
+                  onFocus={() => setShowKeypad(false)}
                   className="h-10 pl-9 bg-card border rounded-xl pr-2"
                   required
                 />
@@ -595,6 +674,7 @@ export function QuickAddSheet() {
                   placeholder="Beli sayur, susu, dsb."
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
+                  onFocus={() => setShowKeypad(false)}
                   className="h-10 pl-9 bg-card border rounded-xl"
                 />
               </div>
@@ -661,25 +741,61 @@ export function QuickAddSheet() {
               )}
             </div>
           )}
-          </div>
+        </div>
 
-          {/* Action Trigger Buttons */}
-          <DrawerFooter className="px-0 pt-3 pb-1 flex flex-row gap-2 flex-shrink-0 border-t bg-background">
-            <DrawerClose asChild>
-              <Button type="button" variant="outline" className="flex-1 h-12 rounded-xl">
-                Batal
-              </Button>
-            </DrawerClose>
-            <Button
-              type="submit"
-              disabled={createTx.isPending || updateTx.isPending || parsedAmount <= 0}
-              className="flex-1 h-12 bg-mint-strong text-white hover:bg-mint-strong/90 rounded-xl font-semibold gap-1.5"
-            >
-              {createTx.isPending || updateTx.isPending ? "Menyimpan..." : (editingTransaction ? "Simpan Perubahan" : "Simpan Transaksi")}
+        {/* Custom Fixed Virtual Keyboard Area */}
+        {showKeypad && (
+          <div className="grid grid-cols-4 gap-1.5 bg-muted/40 p-2.5 rounded-2xl border border-border animate-in slide-in-from-bottom duration-200 flex-shrink-0 mb-3 select-none">
+            {keypadKeys.map((key) => {
+              const isOperator = ["÷", "×", "-", "+", "(", ")"].includes(key);
+              let btnClass = "h-11 rounded-xl font-bold text-sm transition-all active:scale-95 duration-75 flex items-center justify-center ";
+
+              if (key === "OK") {
+                btnClass += "bg-mint-strong text-white hover:bg-mint-strong/90";
+              } else if (key === "⌫" || key === "C") {
+                btnClass += "bg-red-50 text-expense dark:bg-red-950/20 dark:text-red-400 hover:bg-red-100/50";
+              } else if (isOperator) {
+                btnClass += "bg-muted text-foreground hover:bg-muted/80";
+              } else {
+                btnClass += "bg-card text-foreground border hover:bg-muted/50";
+              }
+
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => handleKeypadPress(key)}
+                  className={btnClass}
+                >
+                  {key === "⌫" ? <span className="text-base select-none">⌫</span> : key}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Action Trigger Buttons */}
+        <DrawerFooter className="px-0 pt-3 pb-1 flex flex-row gap-2 flex-shrink-0 border-t bg-background">
+          <DrawerClose asChild>
+            <Button type="button" variant="outline" className="flex-1 h-12 rounded-xl">
+              Batal
             </Button>
-          </DrawerFooter>
-        </form>
-      </DrawerContent>
-    </Drawer>
+          </DrawerClose>
+          <Button
+            type="submit"
+            disabled={createTx.isPending || updateTx.isPending || parsedAmount <= 0}
+            className="flex-1 h-12 bg-mint-strong text-white hover:bg-mint-strong/90 rounded-xl font-semibold gap-1.5"
+          >
+            {createTx.isPending || updateTx.isPending ? (
+              "Menyimpan..."
+            ) : editingTransaction ? (
+              "Simpan Perubahan"
+            ) : (
+              "Simpan Transaksi"
+            )}
+          </Button>
+        </DrawerFooter>
+      </form>
+    </>
   );
 }

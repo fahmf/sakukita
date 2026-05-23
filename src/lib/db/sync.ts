@@ -217,7 +217,7 @@ export async function flushOutbox(supabase: SupabaseClient) {
     try {
       if (entry.entity === "transactions") {
         if (entry.op === "create") {
-          const { syncStatus, ...payload } = entry.payload;
+          const { syncStatus: _syncStatus, ...payload } = entry.payload;
           const { error } = await supabase.from("transactions").insert(payload);
           if (error) {
             // Constraint errors (e.g. duplicate key) shouldn't block queue infinitely
@@ -232,7 +232,7 @@ export async function flushOutbox(supabase: SupabaseClient) {
           await db.transactions.update(entry.entityId, { syncStatus: "synced" });
           await db.outbox.delete(entry.seq!);
         } else if (entry.op === "update") {
-          const { syncStatus, ...payload } = entry.payload;
+          const { syncStatus: _syncStatus, ...payload } = entry.payload;
           const { error } = await supabase
             .from("transactions")
             .update(payload)
@@ -267,7 +267,7 @@ export async function flushOutbox(supabase: SupabaseClient) {
         }
       } else if (entry.entity === "wallets") {
         if (entry.op === "create") {
-          const { syncStatus, ...payload } = entry.payload;
+          const { syncStatus: _syncStatus, ...payload } = entry.payload;
           const { error } = await supabase.from("wallets").insert(payload);
           if (error) {
             if (error.code && error.code.startsWith("23")) {
@@ -281,7 +281,7 @@ export async function flushOutbox(supabase: SupabaseClient) {
           await db.wallets.update(entry.entityId, { syncStatus: "synced" });
           await db.outbox.delete(entry.seq!);
         } else if (entry.op === "update") {
-          const { syncStatus, ...payload } = entry.payload;
+          const { syncStatus: _syncStatus, ...payload } = entry.payload;
           const { error } = await supabase
             .from("wallets")
             .update(payload)
@@ -300,7 +300,7 @@ export async function flushOutbox(supabase: SupabaseClient) {
         }
       } else if (entry.entity === "categories") {
         if (entry.op === "create") {
-          const { syncStatus, ...payload } = entry.payload;
+          const { syncStatus: _syncStatus, ...payload } = entry.payload;
           const { error } = await supabase.from("categories").insert(payload);
           if (error) {
             if (error.code && error.code.startsWith("23")) {
@@ -314,7 +314,7 @@ export async function flushOutbox(supabase: SupabaseClient) {
           await db.categories.update(entry.entityId, { syncStatus: "synced" });
           await db.outbox.delete(entry.seq!);
         } else if (entry.op === "update") {
-          const { syncStatus, ...payload } = entry.payload;
+          const { syncStatus: _syncStatus, ...payload } = entry.payload;
           const { error } = await supabase
             .from("categories")
             .update(payload)
@@ -333,7 +333,7 @@ export async function flushOutbox(supabase: SupabaseClient) {
         }
       } else if (entry.entity === "budgets") {
         if (entry.op === "create") {
-          const { syncStatus, ...payload } = entry.payload;
+          const { syncStatus: _syncStatus, ...payload } = entry.payload;
           const { error } = await supabase.from("budgets").insert(payload);
           if (error) {
             if (error.code && error.code.startsWith("23")) {
@@ -347,7 +347,7 @@ export async function flushOutbox(supabase: SupabaseClient) {
           await db.budgets.update(entry.entityId, { syncStatus: "synced" });
           await db.outbox.delete(entry.seq!);
         } else if (entry.op === "update") {
-          const { syncStatus, ...payload } = entry.payload;
+          const { syncStatus: _syncStatus, ...payload } = entry.payload;
           const { error } = await supabase
             .from("budgets")
             .update(payload)
@@ -366,7 +366,7 @@ export async function flushOutbox(supabase: SupabaseClient) {
         }
       } else if (entry.entity === "savings_goals") {
         if (entry.op === "create") {
-          const { syncStatus, ...payload } = entry.payload;
+          const { syncStatus: _syncStatus, ...payload } = entry.payload;
           const { error } = await supabase.from("savings_goals").insert(payload);
           if (error) {
             if (error.code && error.code.startsWith("23")) {
@@ -380,7 +380,7 @@ export async function flushOutbox(supabase: SupabaseClient) {
           await db.savings_goals.update(entry.entityId, { syncStatus: "synced" });
           await db.outbox.delete(entry.seq!);
         } else if (entry.op === "update") {
-          const { syncStatus, ...payload } = entry.payload;
+          const { syncStatus: _syncStatus, ...payload } = entry.payload;
           const { error } = await supabase
             .from("savings_goals")
             .update(payload)
@@ -399,7 +399,7 @@ export async function flushOutbox(supabase: SupabaseClient) {
         }
       } else if (entry.entity === "debts") {
         if (entry.op === "create") {
-          const { syncStatus, ...payload } = entry.payload;
+          const { syncStatus: _syncStatus, ...payload } = entry.payload;
           const { error } = await supabase.from("debts").insert(payload);
           if (error) {
             if (error.code && error.code.startsWith("23")) {
@@ -413,7 +413,7 @@ export async function flushOutbox(supabase: SupabaseClient) {
           await db.debts.update(entry.entityId, { syncStatus: "synced" });
           await db.outbox.delete(entry.seq!);
         } else if (entry.op === "update") {
-          const { syncStatus, ...payload } = entry.payload;
+          const { syncStatus: _syncStatus, ...payload } = entry.payload;
           const { error } = await supabase
             .from("debts")
             .update(payload)
