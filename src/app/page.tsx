@@ -1,65 +1,63 @@
-import Image from "next/image";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Wallet, PieChart, Users, WifiOff } from "lucide-react";
 
-export default function Home() {
+const features = [
+  { icon: Wallet, title: "Catat <5 detik", desc: "Buka app, ketik nominal, simpan." },
+  { icon: Users, title: "Bareng keluarga", desc: "Sinkron real-time ke HP pasangan." },
+  { icon: PieChart, title: "Laporan jelas", desc: "Lihat ke mana uang pergi tiap bulan." },
+  { icon: WifiOff, title: "Jalan offline", desc: "Tetap bisa catat tanpa internet." },
+];
+
+export default function LandingPage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="flex min-h-dvh flex-col">
+      <header className="flex items-center justify-between px-6 py-5">
+        <div className="flex items-center gap-2">
+          <span className="grid size-8 place-items-center rounded-lg bg-mint text-base font-bold text-foreground">
+            S
+          </span>
+          <span className="font-semibold">Saku Kita</span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/login">Masuk</Link>
+        </Button>
+      </header>
+
+      <section className="flex flex-1 flex-col items-center justify-center px-6 py-12 text-center">
+        <h1 className="max-w-md text-3xl font-semibold leading-tight sm:text-4xl">
+          Pencatat keuangan keluarga, simpel banget
+        </h1>
+        <p className="mt-3 max-w-sm text-muted-foreground">
+          Saku Kita bantu kamu dan keluarga mencatat pemasukan, pengeluaran, dan
+          budget — cepat, rapi, dan bisa diakses bersama.
+        </p>
+        <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+          <Button asChild size="lg" className="h-12 px-7">
+            <Link href="/login">Mulai Gratis</Link>
+          </Button>
+          <Button asChild size="lg" variant="outline" className="h-12 px-7">
+            <Link href="/login">Masuk</Link>
+          </Button>
         </div>
-      </main>
-    </div>
+
+        <div className="mt-14 grid w-full max-w-md grid-cols-2 gap-3">
+          {features.map((f) => (
+            <div
+              key={f.title}
+              className="flex flex-col gap-1.5 rounded-xl border bg-card p-4 text-left"
+            >
+              <f.icon className="size-5 text-mint-strong" />
+              <p className="text-sm font-medium">{f.title}</p>
+              <p className="text-xs text-muted-foreground">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <footer className="px-6 py-6 text-center text-xs text-muted-foreground">
+        Gratis selamanya · Untuk keluarga · Data privat
+      </footer>
+    </main>
   );
 }

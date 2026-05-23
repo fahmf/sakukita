@@ -1,0 +1,23 @@
+# Saku Kita — Supabase project config.
+# Cloud project region: ap-southeast-1 (Singapore).
+# Link the CLI with:  supabase link --project-ref <your-project-ref>
+# Apply migrations with: supabase db push
+
+project_id = "saku-kita"
+
+[db]
+major_version = 15
+
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/auth/callback"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+
+# Google OAuth — enable in the Supabase dashboard and set the secrets there.
+# [auth.external.google]
+# enabled = true
