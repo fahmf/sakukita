@@ -2,12 +2,15 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCategories, useCreateCategory, useUpdateCategory, useArchiveCategory } from "@/hooks/use-categories";
 import { useHousehold } from "@/components/providers/household-provider";
 import { PageHeading } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { createClient } from "@/lib/supabase/client";
+import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
 import {
   Select,
   SelectContent,
@@ -61,11 +64,73 @@ const iconMap: Record<string, any> = {
 };
 
 export default function SettingsPage() {
-  const { displayName, role, householdName } = useHousehold();
+  const { displayName, role, householdName, householdId, userId } = useHousehold();
   const { data: categoriesTree = [], isLoading: loadingCategories } = useCategories();
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateCategory();
   const archiveCategory = useArchiveCategory();
+
+  const router = useRouter();
+
+  // Profile Edit States
+  const [profileOpen, setProfileOpen] = React.useState(false);
+  const [newDisplayName, setNewDisplayName] = React.useState(displayName);
+  const [savingProfile, setSavingProfile] = React.useState(false);
+
+  // Household Edit States
+  const [householdOpen, setHouseholdOpen] = React.useState(false);
+  const [newHouseholdName, setNewHouseholdName] = React.useState(householdName);
+  const [savingHousehold, setSavingHousehold] = React.useState(false);
+  const allowed = useCanEdit();
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDisplayName.trim()) return;
+    setSavingProfile(true);
+    try {
+      const supabase = createClient() as any;
+      const { error } = await supabase
+        .from("profiles")
+        .update({ display_name: newDisplayName.trim(), updated_at: new Date().toISOString() })
+        .eq("id", userId);
+      
+      if (error) throw error;
+      toast.success("Nama pengguna berhasil diubah!");
+      setProfileOpen(false);
+      router.refresh();
+    } catch (err: any) {
+      toast.error(err.message || "Gagal mengubah nama pengguna.");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleUpdateHousehold = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newHouseholdName.trim()) return;
+    if (!allowed) {
+      viewOnlyToast();
+      setHouseholdOpen(false);
+      return;
+    }
+    setSavingHousehold(true);
+    try {
+      const supabase = createClient() as any;
+      const { error } = await supabase
+        .from("households")
+        .update({ name: newHouseholdName.trim(), updated_at: new Date().toISOString() })
+        .eq("id", householdId);
+      
+      if (error) throw error;
+      toast.success("Nama keluarga berhasil diubah!");
+      setHouseholdOpen(false);
+      router.refresh();
+    } catch (err: any) {
+      toast.error(err.message || "Gagal mengubah nama keluarga.");
+    } finally {
+      setSavingHousehold(false);
+    }
+  };
 
   // Create/Edit Category States
   const [open, setOpen] = React.useState(false);
@@ -163,14 +228,28 @@ export default function SettingsPage() {
 
       {/* Profile & Household Cards */}
       <div className="grid gap-3">
-        <div className="rounded-2xl border bg-card p-4 flex items-center gap-3">
-          <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
-            <User className="size-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="font-semibold text-sm">{displayName}</p>
-            <p className="text-xs text-muted-foreground">Peran: {role === "admin" ? "Pemilik / Admin" : "Editor"}</p>
+        <div className="rounded-2xl border bg-card p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+              <User className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="font-semibold text-sm">{displayName}</p>
+              <p className="text-xs text-muted-foreground">Peran: {role === "admin" ? "Pemilik / Admin" : "Editor"}</p>
+            </div>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setNewDisplayName(displayName);
+              setProfileOpen(true);
+            }}
+            className="size-9 rounded-xl hover:bg-muted"
+            aria-label="Ubah nama pengguna"
+          >
+            <Pencil className="size-4 text-muted-foreground" />
+          </Button>
         </div>
 
         <div className="rounded-2xl border bg-card p-4 flex items-center justify-between">
@@ -180,15 +259,29 @@ export default function SettingsPage() {
             </span>
             <div className="min-w-0">
               <p className="font-semibold text-sm">{householdName}</p>
-              <p className="text-xs text-muted-foreground">1 Anggota Aktif</p>
+              <p className="text-xs text-muted-foreground">Anggota Keluarga Aktif</p>
             </div>
           </div>
-          <Link
-            href="/settings/household"
-            className="rounded-xl border px-3 py-2 text-xs font-medium hover:bg-muted transition-colors"
-          >
-            Kelola
-          </Link>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setNewHouseholdName(householdName);
+                setHouseholdOpen(true);
+              }}
+              className="size-9 rounded-xl hover:bg-muted"
+              aria-label="Ubah nama keluarga"
+            >
+              <Pencil className="size-4 text-muted-foreground" />
+            </Button>
+            <Link
+              href="/settings/household"
+              className="rounded-xl border px-3 py-2 text-xs font-medium hover:bg-muted transition-colors"
+            >
+              Kelola
+            </Link>
+          </div>
         </div>
 
         <Link
@@ -605,6 +698,68 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+
+      {/* Dialog for Profile Edit */}
+      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Ubah Nama Pengguna</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdateProfile} className="space-y-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="displayNameInput">Nama Pengguna</Label>
+              <Input
+                id="displayNameInput"
+                placeholder="Masukkan nama pengguna baru"
+                value={newDisplayName}
+                onChange={(e) => setNewDisplayName(e.target.value)}
+                className="h-11 rounded-xl"
+                required
+              />
+            </div>
+            <DialogFooter className="pt-2">
+              <Button
+                type="submit"
+                disabled={savingProfile || !newDisplayName.trim()}
+                className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold w-full"
+              >
+                {savingProfile ? "Menyimpan..." : "Simpan Perubahan"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for Household Edit */}
+      <Dialog open={householdOpen} onOpenChange={setHouseholdOpen}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Ubah Nama Keluarga</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdateHousehold} className="space-y-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="householdNameInput">Nama Keluarga</Label>
+              <Input
+                id="householdNameInput"
+                placeholder="Masukkan nama keluarga baru"
+                value={newHouseholdName}
+                onChange={(e) => setNewHouseholdName(e.target.value)}
+                className="h-11 rounded-xl"
+                required
+              />
+            </div>
+            <DialogFooter className="pt-2">
+              <Button
+                type="submit"
+                disabled={savingHousehold || !newHouseholdName.trim()}
+                className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold w-full"
+              >
+                {savingHousehold ? "Menyimpan..." : "Simpan Perubahan"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
