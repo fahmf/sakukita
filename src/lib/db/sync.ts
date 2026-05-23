@@ -31,7 +31,7 @@ export async function pullLatest(supabase: SupabaseClient, householdId: string) 
 
     // Purge wallets deleted remotely
     const remoteWalletIds = new Set((wallets || []).map((w) => w.id));
-    const localWallets = await db.wallets.toArray();
+    const localWallets = await db.wallets.where("household_id").equals(householdId).toArray();
     const walletsToDelete = localWallets
       .filter((w) => w.syncStatus === "synced" && !remoteWalletIds.has(w.id))
       .map((w) => w.id);
@@ -64,7 +64,7 @@ export async function pullLatest(supabase: SupabaseClient, householdId: string) 
 
     // Purge categories deleted remotely
     const remoteCategoryIds = new Set((categories || []).map((c) => c.id));
-    const localCategories = await db.categories.toArray();
+    const localCategories = await db.categories.where("household_id").equals(householdId).toArray();
     const categoriesToDelete = localCategories
       .filter((c) => c.syncStatus === "synced" && !remoteCategoryIds.has(c.id))
       .map((c) => c.id);
@@ -100,7 +100,7 @@ export async function pullLatest(supabase: SupabaseClient, householdId: string) 
 
     // Purge transactions soft-deleted on server
     const remoteTxIds = new Set((transactions || []).map((t) => t.id));
-    const localTxs = await db.transactions.toArray();
+    const localTxs = await db.transactions.where("household_id").equals(householdId).toArray();
     const txsToDelete = localTxs
       .filter((t) => t.syncStatus === "synced" && !remoteTxIds.has(t.id))
       .map((t) => t.id);
@@ -132,7 +132,7 @@ export async function pullLatest(supabase: SupabaseClient, householdId: string) 
 
     // Purge budgets deleted remotely
     const remoteBudgetIds = new Set((budgets || []).map((b) => b.id));
-    const localBudgets = await db.budgets.toArray();
+    const localBudgets = await db.budgets.where("household_id").equals(householdId).toArray();
     const budgetsToDelete = localBudgets
       .filter((b) => b.syncStatus === "synced" && !remoteBudgetIds.has(b.id))
       .map((b) => b.id);
@@ -164,7 +164,7 @@ export async function pullLatest(supabase: SupabaseClient, householdId: string) 
 
     // Purge goals deleted remotely
     const remoteGoalIds = new Set((goals || []).map((g) => g.id));
-    const localGoals = await db.savings_goals.toArray();
+    const localGoals = await db.savings_goals.where("household_id").equals(householdId).toArray();
     const goalsToDelete = localGoals
       .filter((g) => g.syncStatus === "synced" && !remoteGoalIds.has(g.id))
       .map((g) => g.id);
@@ -196,7 +196,7 @@ export async function pullLatest(supabase: SupabaseClient, householdId: string) 
 
     // Purge debts deleted remotely
     const remoteDebtIds = new Set((debts || []).map((d) => d.id));
-    const localDebts = await db.debts.toArray();
+    const localDebts = await db.debts.where("household_id").equals(householdId).toArray();
     const debtsToDelete = localDebts
       .filter((d) => d.syncStatus === "synced" && !remoteDebtIds.has(d.id))
       .map((d) => d.id);

@@ -700,66 +700,70 @@ export default function SettingsPage() {
       </div>
 
       {/* Dialog for Profile Edit */}
-      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Ubah Nama Pengguna</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleUpdateProfile} className="space-y-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="displayNameInput">Nama Pengguna</Label>
-              <Input
-                id="displayNameInput"
-                placeholder="Masukkan nama pengguna baru"
-                value={newDisplayName}
-                onChange={(e) => setNewDisplayName(e.target.value)}
-                className="h-11 rounded-xl"
-                required
-              />
-            </div>
-            <DialogFooter className="pt-2">
-              <Button
-                type="submit"
-                disabled={savingProfile || !newDisplayName.trim()}
-                className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold w-full"
-              >
-                {savingProfile ? "Menyimpan..." : "Simpan Perubahan"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {profileOpen && (
+        <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+          <DialogContent className="sm:max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle>Ubah Nama Pengguna</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="displayNameInput">Nama Pengguna</Label>
+                <Input
+                  id="displayNameInput"
+                  placeholder="Masukkan nama pengguna baru"
+                  value={newDisplayName}
+                  onChange={(e) => setNewDisplayName(e.target.value)}
+                  className="h-11 rounded-xl"
+                  required
+                />
+              </div>
+              <DialogFooter className="pt-2">
+                <Button
+                  type="submit"
+                  disabled={savingProfile || !newDisplayName.trim()}
+                  className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold w-full"
+                >
+                  {savingProfile ? "Menyimpan..." : "Simpan Perubahan"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Dialog for Household Edit */}
-      <Dialog open={householdOpen} onOpenChange={setHouseholdOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Ubah Nama Keluarga</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleUpdateHousehold} className="space-y-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="householdNameInput">Nama Keluarga</Label>
-              <Input
-                id="householdNameInput"
-                placeholder="Masukkan nama keluarga baru"
-                value={newHouseholdName}
-                onChange={(e) => setNewHouseholdName(e.target.value)}
-                className="h-11 rounded-xl"
-                required
-              />
-            </div>
-            <DialogFooter className="pt-2">
-              <Button
-                type="submit"
-                disabled={savingHousehold || !newHouseholdName.trim()}
-                className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold w-full"
-              >
-                {savingHousehold ? "Menyimpan..." : "Simpan Perubahan"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {householdOpen && (
+        <Dialog open={householdOpen} onOpenChange={setHouseholdOpen}>
+          <DialogContent className="sm:max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle>Ubah Nama Keluarga</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleUpdateHousehold} className="space-y-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="householdNameInput">Nama Keluarga</Label>
+                <Input
+                  id="householdNameInput"
+                  placeholder="Masukkan nama keluarga baru"
+                  value={newHouseholdName}
+                  onChange={(e) => setNewHouseholdName(e.target.value)}
+                  className="h-11 rounded-xl"
+                  required
+                />
+              </div>
+              <DialogFooter className="pt-2">
+                <Button
+                  type="submit"
+                  disabled={savingHousehold || !newHouseholdName.trim()}
+                  className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold w-full"
+                >
+                  {savingHousehold ? "Menyimpan..." : "Simpan Perubahan"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

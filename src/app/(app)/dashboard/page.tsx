@@ -464,39 +464,41 @@ export default function DashboardPage() {
       </div>
 
       {/* Confirmation Dialog for Transaction Deletion */}
-      <Dialog
-        open={txToDelete !== null}
-        onOpenChange={(o) => !o && setTxToDelete(null)}
-      >
-        <DialogContent className="sm:max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Hapus transaksi ini?</DialogTitle>
-            <DialogDescription>
-              Transaksi sebesar{" "}
-              <span className="font-semibold text-foreground">
-                {txToDelete ? formatCurrency(txToDelete.amount) : ""}
-              </span>{" "}
-              ({txToDelete?.note || txToDelete?.category?.name || "Tanpa catatan"}) akan dipindahkan ke Recycle Bin selama 30 hari.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 pt-2">
-            <Button
-              variant="outline"
-              className="rounded-xl h-11"
-              onClick={() => setTxToDelete(null)}
-            >
-              Batal
-            </Button>
-            <Button
-              className="rounded-xl h-11 bg-expense text-white hover:bg-expense/90"
-              onClick={handleDeleteConfirm}
-              disabled={deleteTx.isPending}
-            >
-              {deleteTx.isPending ? "Menghapus..." : "Ya, Hapus"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {txToDelete !== null && (
+        <Dialog
+          open={txToDelete !== null}
+          onOpenChange={(o) => !o && setTxToDelete(null)}
+        >
+          <DialogContent className="sm:max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle>Hapus transaksi ini?</DialogTitle>
+              <DialogDescription>
+                Transaksi sebesar{" "}
+                <span className="font-semibold text-foreground">
+                  {txToDelete ? formatCurrency(txToDelete.amount) : ""}
+                </span>{" "}
+                ({txToDelete?.note || txToDelete?.category?.name || "Tanpa catatan"}) akan dipindahkan ke Recycle Bin selama 30 hari.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 pt-2">
+              <Button
+                variant="outline"
+                className="rounded-xl h-11"
+                onClick={() => setTxToDelete(null)}
+              >
+                Batal
+              </Button>
+              <Button
+                className="rounded-xl h-11 bg-expense text-white hover:bg-expense/90"
+                onClick={handleDeleteConfirm}
+                disabled={deleteTx.isPending}
+              >
+                {deleteTx.isPending ? "Menghapus..." : "Ya, Hapus"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
