@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Household, MemberRole, InviteStatus } from "@/lib/supabase/types";
 import { useHousehold } from "@/components/providers/household-provider";
+import { safeRandomUUID } from "@/lib/utils";
 
 // Supabase generated types from `gen types` are not wired up yet; use loose
 // access until that pipeline lands. Each call below preserves runtime typing
@@ -162,7 +163,7 @@ export function useCreateInvite() {
       const expiresAt = new Date(
         Date.now() + (input.expiresInDays ?? 7) * 24 * 60 * 60 * 1000
       ).toISOString();
-      const token = `${crypto.randomUUID()}${crypto.randomUUID().replace(/-/g, "")}`;
+      const token = `${safeRandomUUID()}${safeRandomUUID().replace(/-/g, "")}`;
       const { data, error } = await supabase
         .from("invites")
         .insert({

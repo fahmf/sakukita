@@ -6,6 +6,7 @@ import { useHousehold } from "@/components/providers/household-provider";
 import type { Debt } from "@/lib/supabase/types";
 import { db } from "@/lib/db/dexie";
 import { triggerSync } from "@/lib/db/sync";
+import { safeRandomUUID } from "@/lib/utils";
 
 export function useDebts() {
   const { householdId } = useHousehold();
@@ -46,7 +47,7 @@ export function useCreateDebt() {
     }) => {
       if (!householdId) throw new Error("Active household context is required");
 
-      const id = crypto.randomUUID();
+      const id = safeRandomUUID();
       const newDebt: Debt = {
         id,
         household_id: householdId,

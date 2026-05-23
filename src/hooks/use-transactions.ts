@@ -6,6 +6,7 @@ import { useHousehold } from "@/components/providers/household-provider";
 import type { Transaction, TransactionType } from "@/lib/supabase/types";
 import { db } from "@/lib/db/dexie";
 import { triggerSync } from "@/lib/db/sync";
+import { safeRandomUUID } from "@/lib/utils";
 
 export interface TransactionWithDetails extends Transaction {
   category: {
@@ -139,7 +140,7 @@ export function useCreateTransaction() {
       if (!householdId) throw new Error("Household ID context is required");
       if (!userId) throw new Error("User ID context is required");
 
-      const id = crypto.randomUUID();
+      const id = safeRandomUUID();
       const newTx: Transaction = {
         id,
         household_id: householdId,

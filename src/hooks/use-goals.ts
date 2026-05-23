@@ -6,6 +6,7 @@ import { useHousehold } from "@/components/providers/household-provider";
 import type { SavingsGoal } from "@/lib/supabase/types";
 import { db } from "@/lib/db/dexie";
 import { triggerSync } from "@/lib/db/sync";
+import { safeRandomUUID } from "@/lib/utils";
 
 export function useGoals() {
   const { householdId } = useHousehold();
@@ -42,7 +43,7 @@ export function useCreateGoal() {
     }) => {
       if (!householdId) throw new Error("Active household context is required");
 
-      const id = crypto.randomUUID();
+      const id = safeRandomUUID();
       const newGoal: SavingsGoal = {
         id,
         household_id: householdId,

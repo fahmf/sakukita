@@ -6,6 +6,7 @@ import { useHousehold } from "@/components/providers/household-provider";
 import type { Budget } from "@/lib/supabase/types";
 import { db } from "@/lib/db/dexie";
 import { triggerSync } from "@/lib/db/sync";
+import { safeRandomUUID } from "@/lib/utils";
 
 export function useBudgets(monthStr?: string) {
   const { householdId } = useHousehold();
@@ -82,7 +83,7 @@ export function useSetBudget() {
         return updatedBudget;
       } else {
         // Create operation
-        const newId = crypto.randomUUID();
+        const newId = safeRandomUUID();
         const newBudget: Budget = {
           id: newId,
           household_id: householdId,

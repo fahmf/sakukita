@@ -6,17 +6,61 @@ import { useHousehold } from "@/components/providers/household-provider";
 import type { Category, CategoryKind } from "@/lib/supabase/types";
 import { db } from "@/lib/db/dexie";
 import { triggerSync } from "@/lib/db/sync";
+import { safeRandomUUID } from "@/lib/utils";
 
 export interface HierarchicalCategory extends Category {
   subcategories: Category[];
 }
 
 export async function generateDeterministicUUID(householdId: string, stableId: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(`${householdId}:${stableId}`);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const str = `${householdId}:${stableId}`;
+  let hashBuffer: ArrayBuffer;
   
+  if (typeof crypto !== "undefined" && crypto.subtle) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(str);
+    hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  } else {
+    // Pure JS fallback: compute deterministic 16-byte array via FNV-1a hash functions
+    const hashArray = new Uint8Array(16);
+    const fnv32 = (val: string, seed = 0x811c9dc5) => {
+      let h = seed;
+      for (let i = 0; i < val.length; i++) {
+        h ^= val.charCodeAt(i);
+        h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+      }
+      return h >>> 0;
+    };
+    
+    const h1 = fnv32(str, 0x811c9dc5);
+    const h2 = fnv32(str + "-salt1", 0x12345678);
+    const h3 = fnv32(str + "-salt2", 0xabcdef01);
+    const h4 = fnv32(str + "-salt3", 0xdeadbeef);
+    
+    hashArray[0] = (h1 >> 24) & 0xff;
+    hashArray[1] = (h1 >> 16) & 0xff;
+    hashArray[2] = (h1 >> 8) & 0xff;
+    hashArray[3] = h1 & 0xff;
+    
+    hashArray[4] = (h2 >> 24) & 0xff;
+    hashArray[5] = (h2 >> 16) & 0xff;
+    hashArray[6] = (h2 >> 8) & 0xff;
+    hashArray[7] = h2 & 0xff;
+    
+    hashArray[8] = (h3 >> 24) & 0xff;
+    hashArray[9] = (h3 >> 16) & 0xff;
+    hashArray[10] = (h3 >> 8) & 0xff;
+    hashArray[11] = h3 & 0xff;
+    
+    hashArray[12] = (h4 >> 24) & 0xff;
+    hashArray[13] = (h4 >> 16) & 0xff;
+    hashArray[14] = (h4 >> 8) & 0xff;
+    hashArray[15] = h4 & 0xff;
+    
+    hashBuffer = hashArray.buffer;
+  }
+  
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hexes = hashArray.slice(0, 16).map(b => b.toString(16).padStart(2, "0"));
   const part1 = hexes.slice(0, 4).join("");
   const part2 = hexes.slice(4, 6).join("");
@@ -317,10 +361,14 @@ export async function seedStandardCategories(householdId: string) {
       }
 
       // B. Remap remote transactions on Supabase directly
-      await supabase
-        .from("transactions")
-        .update({ category_id: stableId } as any)
-        .eq("category_id", dup.id);
+      try {
+        await supabase
+          .from("transactions")
+          .update({ category_id: stableId } as any)
+          .eq("category_id", dup.id);
+      } catch (err) {
+        console.error("Failed to update remote transactions for duplicate category:", err);
+      }
 
       // C. Remap budgets
       const localBudgets = await db.budgets
@@ -349,10 +397,14 @@ export async function seedStandardCategories(householdId: string) {
           });
 
           await db.budgets.delete(b.id);
-          await supabase
-            .from("budgets")
-            .delete()
-            .eq("id", b.id);
+          try {
+            await supabase
+              .from("budgets")
+              .delete()
+              .eq("id", b.id);
+          } catch (err) {
+            console.error("Failed to delete remote budget for duplicate category:", err);
+          }
         } else {
           // Simply update the category_id
           await db.budgets.update(b.id, { category_id: stableId, syncStatus: "pending" });
@@ -363,19 +415,27 @@ export async function seedStandardCategories(householdId: string) {
             payload: { ...b, category_id: stableId },
             createdAt: Date.now(),
           });
-          await supabase
-            .from("budgets")
-            .update({ category_id: stableId } as any)
-            .eq("id", b.id);
+          try {
+            await supabase
+              .from("budgets")
+              .update({ category_id: stableId } as any)
+              .eq("id", b.id);
+          } catch (err) {
+            console.error("Failed to update remote budget for duplicate category:", err);
+          }
         }
       }
 
       // D. Delete the duplicate category locally and remotely
       await db.categories.delete(dup.id);
-      await supabase
-        .from("categories")
-        .delete()
-        .eq("id", dup.id);
+      try {
+        await supabase
+          .from("categories")
+          .delete()
+          .eq("id", dup.id);
+      } catch (err) {
+        console.error("Failed to delete duplicate category from remote:", err);
+      }
 
       // E. Clean up outbox entries referencing this duplicate category ID
       const pendingOutbox = await db.outbox
@@ -440,10 +500,14 @@ export async function seedStandardCategories(householdId: string) {
         }
 
         // B. Remap remote transactions on Supabase
-        await supabase
-          .from("transactions")
-          .update({ category_id: stableCat!.id } as any)
-          .eq("category_id", dup.id);
+        try {
+          await supabase
+            .from("transactions")
+            .update({ category_id: stableCat!.id } as any)
+            .eq("category_id", dup.id);
+        } catch (err) {
+          console.error("Self-healing: Failed to update remote transactions for duplicate:", err);
+        }
 
         // C. Remap budgets
         const localBudgets = await db.budgets
@@ -469,7 +533,11 @@ export async function seedStandardCategories(householdId: string) {
             });
 
             await db.budgets.delete(b.id);
-            await supabase.from("budgets").delete().eq("id", b.id);
+            try {
+              await supabase.from("budgets").delete().eq("id", b.id);
+            } catch (err) {
+              console.error("Self-healing: Failed to delete remote budget for duplicate:", err);
+            }
           } else {
             await db.budgets.update(b.id, { category_id: stableCat!.id, syncStatus: "pending" });
             await db.outbox.add({
@@ -479,13 +547,21 @@ export async function seedStandardCategories(householdId: string) {
               payload: { ...b, category_id: stableCat!.id },
               createdAt: Date.now(),
             });
-            await supabase.from("budgets").update({ category_id: stableCat!.id } as any).eq("id", b.id);
+            try {
+              await supabase.from("budgets").update({ category_id: stableCat!.id } as any).eq("id", b.id);
+            } catch (err) {
+              console.error("Self-healing: Failed to update remote budget for duplicate:", err);
+            }
           }
         }
 
         // D. Delete duplicate locally and remotely
         await db.categories.delete(dup.id);
-        await supabase.from("categories").delete().eq("id", dup.id);
+        try {
+          await supabase.from("categories").delete().eq("id", dup.id);
+        } catch (err) {
+          console.error("Self-healing: Failed to delete remote duplicate category:", err);
+        }
 
         // E. Clean up pending outbox entries
         const pendingOutbox = await db.outbox
@@ -512,62 +588,75 @@ export function useCategories() {
     queryFn: async () => {
       if (!householdId) return [];
 
-      // Query local Dexie database for offline-first speed and robustness
-      const data = await db.categories
-        .where("household_id")
-        .equals(householdId)
-        .toArray();
+      try {
+        // Query local Dexie database for offline-first speed and robustness
+        const data = await db.categories
+          .where("household_id")
+          .equals(householdId)
+          .toArray();
 
-      let allCategories = data.filter((c) => !c.is_archived);
+        let allCategories = data.filter((c) => !c.is_archived);
 
-      // Check if we have active duplicates by kind, parent_id, and name
-      const activeNames = new Set<string>();
-      let hasDuplicates = false;
-      for (const c of allCategories) {
-        const key = `${c.kind}:${c.parent_id || "root"}:${c.name.toLowerCase().trim()}`;
-        if (activeNames.has(key)) {
-          hasDuplicates = true;
-          break;
+        // Check if we have active duplicates by kind, parent_id, and name
+        const activeNames = new Set<string>();
+        let hasDuplicates = false;
+        for (const c of allCategories) {
+          const key = `${c.kind}:${c.parent_id || "root"}:${c.name.toLowerCase().trim()}`;
+          if (activeNames.has(key)) {
+            hasDuplicates = true;
+            break;
+          }
+          activeNames.add(key);
         }
-        activeNames.add(key);
+
+        if (hasDuplicates) {
+          console.log("Self-healing: Active duplicates detected in useCategories query. Triggering merge...");
+          try {
+            await seedStandardCategories(householdId);
+          } catch (seedErr) {
+            console.error("Self-healing seeding standard categories failed:", seedErr);
+          }
+          const freshData = await db.categories
+            .where("household_id")
+            .equals(householdId)
+            .toArray();
+          allCategories = freshData.filter((c) => !c.is_archived);
+        }
+
+        // If database is upgraded/empty and no categories exist, auto-seed standard ones
+        if (allCategories.length === 0) {
+          try {
+            await seedStandardCategories(householdId);
+          } catch (seedErr) {
+            console.error("Auto seeding standard categories failed:", seedErr);
+          }
+          const freshData = await db.categories
+            .where("household_id")
+            .equals(householdId)
+            .toArray();
+          allCategories = freshData.filter((c) => !c.is_archived);
+        }
+
+        // Sort by sort_order ascending
+        allCategories.sort((a, b) => a.sort_order - b.sort_order);
+
+        // Separate parents from subcategories
+        const parents = allCategories.filter(
+          (c) => c.parent_id === null
+        ) as HierarchicalCategory[];
+        const children = allCategories.filter((c) => c.parent_id !== null);
+
+        parents.forEach((parent) => {
+          parent.subcategories = children.filter(
+            (child) => child.parent_id === parent.id
+          );
+        });
+
+        return parents;
+      } catch (err) {
+        console.error("Critical error in useCategories queryFn:", err);
+        return [];
       }
-
-      if (hasDuplicates) {
-        console.log("Self-healing: Active duplicates detected in useCategories query. Triggering merge...");
-        await seedStandardCategories(householdId);
-        const freshData = await db.categories
-          .where("household_id")
-          .equals(householdId)
-          .toArray();
-        allCategories = freshData.filter((c) => !c.is_archived);
-      }
-
-      // If database is upgraded/empty and no categories exist, auto-seed standard ones
-      if (allCategories.length === 0) {
-        await seedStandardCategories(householdId);
-        const freshData = await db.categories
-          .where("household_id")
-          .equals(householdId)
-          .toArray();
-        allCategories = freshData.filter((c) => !c.is_archived);
-      }
-
-      // Sort by sort_order ascending
-      allCategories.sort((a, b) => a.sort_order - b.sort_order);
-
-      // Separate parents from subcategories
-      const parents = allCategories.filter(
-        (c) => c.parent_id === null
-      ) as HierarchicalCategory[];
-      const children = allCategories.filter((c) => c.parent_id !== null);
-
-      parents.forEach((parent) => {
-        parent.subcategories = children.filter(
-          (child) => child.parent_id === parent.id
-        );
-      });
-
-      return parents;
     },
   });
 }
@@ -587,7 +676,7 @@ export function useCreateCategory() {
     }) => {
       if (!householdId) throw new Error("Active household context is required");
 
-      const id = crypto.randomUUID();
+      const id = safeRandomUUID();
       const newCategory: Category = {
         id,
         household_id: householdId,
