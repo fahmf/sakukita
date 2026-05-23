@@ -118,7 +118,7 @@ export default function SettingsPage() {
       const supabase = createClient() as any;
       const { error } = await supabase
         .from("households")
-        .update({ name: newHouseholdName.trim(), updated_at: new Date().toISOString() })
+        .update({ name: newHouseholdName.trim() })
         .eq("id", householdId);
       
       if (error) throw error;
