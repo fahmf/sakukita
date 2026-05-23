@@ -9,7 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 export function SyncProvider({ children }: { children: React.ReactNode }) {
   const { householdId } = useHousehold();
-  const supabase = createClient();
+  const supabase = React.useMemo(() => createClient(), []);
   const queryClient = useQueryClient();
 
   // 1. Setup online event listeners to flush outbox on network reconnection

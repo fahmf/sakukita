@@ -10,7 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
+import { useTheme } from "next-themes";
 import {
   Select,
   SelectContent,
@@ -23,7 +25,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -34,7 +35,6 @@ import {
   ChevronDown,
   ChevronRight,
   CalendarClock,
-  FolderMinus,
   Briefcase,
   Gift,
   Heart,
@@ -47,11 +47,15 @@ import {
   Trash2,
   Pencil,
   Scale,
+  LogOut,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
-import type { CategoryKind } from "@/lib/supabase/types";
+import type { Category, CategoryKind } from "@/lib/supabase/types";
 
 // Helper icons mapping for default categories
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   utensils: Utensils,
   car: Car,
   "shopping-bag": ShoppingBag,
@@ -69,6 +73,7 @@ export default function SettingsPage() {
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateCategory();
   const archiveCategory = useArchiveCategory();
+  const { theme, setTheme } = useTheme();
 
   const router = useRouter();
 
@@ -83,12 +88,28 @@ export default function SettingsPage() {
   const [savingHousehold, setSavingHousehold] = React.useState(false);
   const allowed = useCanEdit();
 
+  const [loggingOut, setLoggingOut] = React.useState(false);
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      toast.success("Berhasil keluar akun!");
+      router.push("/login");
+    } catch (err) {
+      toast.error("Gagal keluar akun.");
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDisplayName.trim()) return;
     setSavingProfile(true);
     try {
-      const supabase = createClient() as any;
+      const supabase = createClient() as unknown as SupabaseClient;
       const { error } = await supabase
         .from("profiles")
         .update({ display_name: newDisplayName.trim(), updated_at: new Date().toISOString() })
@@ -98,8 +119,9 @@ export default function SettingsPage() {
       toast.success("Nama pengguna berhasil diubah!");
       setProfileOpen(false);
       router.refresh();
-    } catch (err: any) {
-      toast.error(err.message || "Gagal mengubah nama pengguna.");
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Gagal mengubah nama pengguna.";
+      toast.error(errMsg);
     } finally {
       setSavingProfile(false);
     }
@@ -115,7 +137,7 @@ export default function SettingsPage() {
     }
     setSavingHousehold(true);
     try {
-      const supabase = createClient() as any;
+      const supabase = createClient() as unknown as SupabaseClient;
       const { error } = await supabase
         .from("households")
         .update({ name: newHouseholdName.trim() })
@@ -125,8 +147,9 @@ export default function SettingsPage() {
       toast.success("Nama keluarga berhasil diubah!");
       setHouseholdOpen(false);
       router.refresh();
-    } catch (err: any) {
-      toast.error(err.message || "Gagal mengubah nama keluarga.");
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Gagal mengubah nama keluarga.";
+      toast.error(errMsg);
     } finally {
       setSavingHousehold(false);
     }
@@ -139,7 +162,7 @@ export default function SettingsPage() {
   const [parentId, setParentId] = React.useState<string | null>(null);
 
   // Customization States
-  const [editingCategory, setEditingCategory] = React.useState<any | null>(null);
+  const [editingCategory, setEditingCategory] = React.useState<Category | null>(null);
   const [icon, setIcon] = React.useState("");
   const [color, setColor] = React.useState("#E8A5A5");
 
@@ -160,7 +183,7 @@ export default function SettingsPage() {
     setOpen(true);
   };
 
-  const handleOpenEdit = (category: any) => {
+  const handleOpenEdit = (category: Category) => {
     setEditingCategory(category);
     setName(category.name);
     setKind(category.kind);
@@ -203,8 +226,9 @@ export default function SettingsPage() {
       setName("");
       setIcon("");
       setOpen(false);
-    } catch (err: any) {
-      toast.error(err.message || "Gagal menyimpan kategori. Coba lagi.");
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Gagal menyimpan kategori. Coba lagi.";
+      toast.error(errMsg);
     }
   };
 
@@ -217,8 +241,9 @@ export default function SettingsPage() {
     try {
       await archiveCategory.mutateAsync(id);
       toast.success("Kategori berhasil diarsipkan!");
-    } catch (err: any) {
-      toast.error(err.message || "Gagal mengarsipkan kategori.");
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Gagal mengarsipkan kategori.";
+      toast.error(errMsg);
     }
   };
 
@@ -337,6 +362,56 @@ export default function SettingsPage() {
           </div>
           <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
         </Link>
+
+        {/* Tema / Appearance Card */}
+        <div className="rounded-2xl border bg-card p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+              {theme === "dark" ? <Moon className="size-5" /> : theme === "light" ? <Sun className="size-5" /> : <Monitor className="size-5" />}
+            </span>
+            <div className="min-w-0">
+              <p className="font-semibold text-sm">Tema Aplikasi</p>
+              <p className="text-xs text-muted-foreground">
+                Pilih tema tampilan layar
+              </p>
+            </div>
+          </div>
+          <Select value={theme || "system"} onValueChange={(val) => setTheme(val)}>
+            <SelectTrigger className="w-28 h-9 rounded-xl text-xs bg-muted/40 border-none shrink-0">
+              <SelectValue placeholder="Tema" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="system">Sistem</SelectItem>
+              <SelectItem value="light">Terang</SelectItem>
+              <SelectItem value="dark">Gelap</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Logout / Signout Card */}
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className="w-full text-left rounded-2xl border border-red-200 dark:border-red-950/30 bg-card p-4 flex items-center justify-between hover:bg-red-50/30 dark:hover:bg-red-950/10 transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid size-11 place-items-center rounded-full bg-red-50 dark:bg-red-950/20 text-red-500">
+              <LogOut className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="font-semibold text-sm text-red-600 dark:text-red-400">Keluar Akun</p>
+              <p className="text-xs text-muted-foreground">
+                Keluar dari sesi Saku Kita aman
+              </p>
+            </div>
+          </div>
+          {loggingOut ? (
+            <Loader2 className="size-4 animate-spin text-red-500" />
+          ) : (
+            <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+          )}
+        </button>
       </div>
 
       {/* Category Manager Section */}
@@ -525,7 +600,7 @@ export default function SettingsPage() {
                           
                           <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                             {/* Action Buttons (visible on hover) */}
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                               <Button
                                 size="icon"
                                 variant="ghost"
@@ -565,7 +640,7 @@ export default function SettingsPage() {
                                   <span className="text-sm select-none leading-none">{sub.icon || "🏷️"}</span>
                                   <span>{sub.name}</span>
                                 </div>
-                                <div className="flex items-center gap-1 opacity-0 group-hover/sub:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover/sub:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                                   <Button
                                     size="icon"
                                     variant="ghost"
@@ -628,7 +703,7 @@ export default function SettingsPage() {
                           
                           <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                             {/* Action Buttons (visible on hover) */}
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                               <Button
                                 size="icon"
                                 variant="ghost"
@@ -668,7 +743,7 @@ export default function SettingsPage() {
                                   <span className="text-sm select-none leading-none">{sub.icon || "🏷️"}</span>
                                   <span>{sub.name}</span>
                                 </div>
-                                <div className="flex items-center gap-1 opacity-0 group-hover/sub:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover/sub:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                                   <Button
                                     size="icon"
                                     variant="ghost"

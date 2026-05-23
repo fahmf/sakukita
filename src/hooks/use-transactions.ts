@@ -235,6 +235,69 @@ export function useDeleteTransaction() {
   });
 }
 
+export function useUpdateTransaction() {
+  const supabase = createClient();
+  const { householdId } = useHousehold();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (tx: {
+      id: string;
+      type: TransactionType;
+      amount: number;
+      occurred_at: string;
+      wallet_id: string;
+      to_wallet_id?: string | null;
+      category_id?: string | null;
+      note?: string | null;
+      tags?: string[];
+    }) => {
+      if (!householdId) throw new Error("Household ID context is required");
+
+      const localTx = await db.transactions.get(tx.id);
+      if (!localTx) throw new Error("Transaction not found locally");
+
+      const updatedTx: Transaction = {
+        ...localTx,
+        type: tx.type,
+        amount: tx.amount,
+        occurred_at: tx.occurred_at,
+        is_scheduled: new Date(tx.occurred_at).getTime() > Date.now(),
+        wallet_id: tx.wallet_id,
+        to_wallet_id: tx.to_wallet_id ?? null,
+        category_id: tx.category_id ?? null,
+        note: tx.note ?? null,
+        tags: tx.tags ?? [],
+        updated_at: new Date().toISOString(),
+      };
+
+      // Write update locally to Dexie IndexedDB
+      await db.transactions.put({
+        ...updatedTx,
+        syncStatus: "pending",
+      });
+
+      // Register outbox update entry
+      await db.outbox.add({
+        entity: "transactions",
+        entityId: tx.id,
+        op: "update",
+        payload: updatedTx,
+        createdAt: Date.now(),
+      });
+
+      // Background synchronize attempt
+      triggerSync(supabase, householdId);
+
+      return updatedTx;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions", householdId] });
+      queryClient.invalidateQueries({ queryKey: ["wallet-balances", householdId] });
+    },
+  });
+}
+
 export function useTrashedTransactions() {
   const { householdId } = useHousehold();
 

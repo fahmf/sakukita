@@ -600,41 +600,38 @@ export function useCategories() {
         // Check if we have active duplicates by kind, parent_id, and name
         const activeNames = new Set<string>();
         let hasDuplicates = false;
+        const dedupedCategories: typeof allCategories = [];
+
         for (const c of allCategories) {
           const key = `${c.kind}:${c.parent_id || "root"}:${c.name.toLowerCase().trim()}`;
           if (activeNames.has(key)) {
             hasDuplicates = true;
-            break;
+          } else {
+            activeNames.add(key);
+            dedupedCategories.push(c);
           }
-          activeNames.add(key);
         }
 
         if (hasDuplicates) {
-          console.log("Self-healing: Active duplicates detected in useCategories query. Triggering merge...");
-          try {
-            await seedStandardCategories(householdId);
-          } catch (seedErr) {
-            console.error("Self-healing seeding standard categories failed:", seedErr);
-          }
-          const freshData = await db.categories
-            .where("household_id")
-            .equals(householdId)
-            .toArray();
-          allCategories = freshData.filter((c) => !c.is_archived);
+          console.log("Self-healing: Active duplicates detected in useCategories query. Triggering background merge...");
+          // Decouple side-effect database write from the read query execution context
+          setTimeout(() => {
+            seedStandardCategories(householdId).catch((seedErr) => {
+              console.error("Self-healing seeding standard categories failed in background:", seedErr);
+            });
+          }, 0);
+          
+          allCategories = dedupedCategories;
         }
 
         // If database is upgraded/empty and no categories exist, auto-seed standard ones
         if (allCategories.length === 0) {
-          try {
-            await seedStandardCategories(householdId);
-          } catch (seedErr) {
-            console.error("Auto seeding standard categories failed:", seedErr);
-          }
-          const freshData = await db.categories
-            .where("household_id")
-            .equals(householdId)
-            .toArray();
-          allCategories = freshData.filter((c) => !c.is_archived);
+          console.log("Auto-seeding: No categories exist locally. Triggering background seed standard categories...");
+          setTimeout(() => {
+            seedStandardCategories(householdId).catch((seedErr) => {
+              console.error("Auto seeding standard categories failed in background:", seedErr);
+            });
+          }, 0);
         }
 
         // Sort by sort_order ascending

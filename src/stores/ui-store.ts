@@ -9,6 +9,10 @@ interface UIState {
   openQuickAdd: (type?: TransactionType) => void;
   closeQuickAdd: () => void;
 
+  /** Transaction Editing */
+  editingTransaction: any | null;
+  openEditTransaction: (tx: any) => void;
+
   /** Smart defaults — remembered across sessions for faster re-entry */
   lastWalletId: string | null;
   lastCategoryId: string | null;
@@ -22,8 +26,12 @@ export const useUIStore = create<UIState>()(
       quickAddOpen: false,
       quickAddType: "expense",
       openQuickAdd: (type = "expense") =>
-        set({ quickAddOpen: true, quickAddType: type }),
-      closeQuickAdd: () => set({ quickAddOpen: false }),
+        set({ quickAddOpen: true, quickAddType: type, editingTransaction: null }),
+      closeQuickAdd: () => set({ quickAddOpen: false, editingTransaction: null }),
+
+      editingTransaction: null,
+      openEditTransaction: (tx) =>
+        set({ quickAddOpen: true, quickAddType: tx.type, editingTransaction: tx }),
 
       lastWalletId: null,
       lastCategoryId: null,
@@ -32,7 +40,7 @@ export const useUIStore = create<UIState>()(
     }),
     {
       name: "saku-ui",
-      // Only persist the smart-default fields, not transient UI flags.
+      // Only persist the smart-default fields, not transient UI flags or transient editing objects.
       partialize: (s) => ({
         lastWalletId: s.lastWalletId,
         lastCategoryId: s.lastCategoryId,

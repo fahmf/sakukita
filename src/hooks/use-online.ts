@@ -19,9 +19,6 @@ export function useOnline() {
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
-    // Synchronize initial state
-    setIsOnline(navigator.onLine);
-
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);

@@ -135,3 +135,106 @@ export function useCreateWallet() {
     },
   });
 }
+
+export function useUpdateWallet() {
+  const supabase = createClient();
+  const { householdId } = useHousehold();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (wallet: {
+      id: string;
+      name: string;
+      type: WalletType;
+      initial_balance: number;
+      color?: string;
+      icon?: string;
+      exclude_from_networth?: boolean;
+    }) => {
+      if (!householdId) throw new Error("Active household context is required");
+
+      const localWallet = await db.wallets.get(wallet.id);
+      if (!localWallet) throw new Error("Wallet not found locally");
+
+      const updatedWallet: Wallet = {
+        ...localWallet,
+        name: wallet.name,
+        type: wallet.type,
+        initial_balance: wallet.initial_balance,
+        color: wallet.color ?? localWallet.color,
+        icon: wallet.icon ?? localWallet.icon,
+        exclude_from_networth: wallet.exclude_from_networth !== undefined ? wallet.exclude_from_networth : localWallet.exclude_from_networth,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Write update locally to IndexedDB immediately
+      await db.wallets.put({
+        ...updatedWallet,
+        syncStatus: "pending",
+      });
+
+      // Queue action into outbox sync queue
+      await db.outbox.add({
+        entity: "wallets",
+        entityId: wallet.id,
+        op: "update",
+        payload: updatedWallet,
+        createdAt: Date.now(),
+      });
+
+      // Fire a background sync attempt
+      triggerSync(supabase, householdId);
+
+      return updatedWallet;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wallets", householdId] });
+      queryClient.invalidateQueries({ queryKey: ["wallet-balances", householdId] });
+    },
+  });
+}
+
+export function useArchiveWallet() {
+  const supabase = createClient();
+  const { householdId } = useHousehold();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (walletId: string) => {
+      if (!householdId) throw new Error("Active household context is required");
+
+      const localWallet = await db.wallets.get(walletId);
+      if (!localWallet) throw new Error("Wallet not found locally");
+
+      const archivedWallet: Wallet = {
+        ...localWallet,
+        is_archived: true,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Write update locally to IndexedDB immediately
+      await db.wallets.put({
+        ...archivedWallet,
+        syncStatus: "pending",
+      });
+
+      // Queue action into outbox sync queue
+      await db.outbox.add({
+        entity: "wallets",
+        entityId: walletId,
+        op: "delete", // Sync engine maps archive to delete op in outbox
+        payload: archivedWallet,
+        createdAt: Date.now(),
+      });
+
+      // Fire a background sync attempt
+      triggerSync(supabase, householdId);
+
+      return archivedWallet;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wallets", householdId] });
+      queryClient.invalidateQueries({ queryKey: ["wallet-balances", householdId] });
+    },
+  });
+}

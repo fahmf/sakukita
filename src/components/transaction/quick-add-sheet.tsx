@@ -4,7 +4,7 @@ import * as React from "react";
 import { useUIStore } from "@/stores/ui-store";
 import { useWallets } from "@/hooks/use-wallets";
 import { useCategories } from "@/hooks/use-categories";
-import { useCreateTransaction } from "@/hooks/use-transactions";
+import { useCreateTransaction, useUpdateTransaction } from "@/hooks/use-transactions";
 import { parseAmountExpression } from "@/lib/calculator";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "sonner";
@@ -30,7 +30,6 @@ import {
   Calendar,
   FileText,
   ArrowRightLeft,
-  Plus,
   Check,
   Camera,
   Sparkles,
@@ -50,7 +49,7 @@ import {
 import type { TransactionType } from "@/lib/supabase/types";
 import { compressImage } from "@/lib/image";
 
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   utensils: Utensils,
   car: Car,
   "shopping-bag": ShoppingBag,
@@ -63,10 +62,11 @@ const iconMap: Record<string, any> = {
 };
 
 export function QuickAddSheet() {
-  const { quickAddOpen, quickAddType, closeQuickAdd, lastWalletId, lastCategoryId, setLastWallet, setLastCategory } = useUIStore();
+  const { quickAddOpen, quickAddType, closeQuickAdd, lastWalletId, lastCategoryId, setLastWallet, setLastCategory, editingTransaction } = useUIStore();
   const { data: wallets = [] } = useWallets();
   const { data: categoriesTree = [] } = useCategories();
   const createTx = useCreateTransaction();
+  const updateTx = useUpdateTransaction();
 
   // Local form states
   const [type, setType] = React.useState<TransactionType>("expense");
@@ -79,44 +79,79 @@ export function QuickAddSheet() {
 
   // AI receipt scanner states
   const [isScanning, setIsScanning] = React.useState(false);
-  const [scannedItems, setScannedItems] = React.useState<any[] | null>(null);
+  const [scannedItems, setScannedItems] = React.useState<{ name: string; price: number }[] | null>(null);
   const [scannedItemsOpen, setScannedItemsOpen] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Track initialization to avoid reset when data refetches in background
+  const initRef = React.useRef(false);
 
   // Sync component state when the drawer opens
   React.useEffect(() => {
     if (quickAddOpen) {
-      setType(quickAddType);
-      setAmountExpr("");
-      setNote("");
-      setOccurredAt(new Date().toISOString().split("T")[0]);
-      setIsScanning(false);
-      setScannedItems(null);
-      setScannedItemsOpen(false);
+      if (!initRef.current) {
+        initRef.current = true;
+        if (editingTransaction) {
+          // Transaction edit mode
+          setType(editingTransaction.type);
+          setAmountExpr(String(editingTransaction.amount));
+          setNote(editingTransaction.note || "");
+          setOccurredAt(editingTransaction.occurred_at.split("T")[0]);
+          setIsScanning(false);
+          setScannedItems(null);
+          setScannedItemsOpen(false);
+          setSelectedWalletId(editingTransaction.wallet_id);
+          setSelectedToWalletId(editingTransaction.to_wallet_id || "");
+          setSelectedCategoryId(editingTransaction.category_id || "");
+        } else {
+          // Create mode
+          setType(quickAddType);
+          setAmountExpr("");
+          setNote("");
+          setOccurredAt(new Date().toISOString().split("T")[0]);
+          setIsScanning(false);
+          setScannedItems(null);
+          setScannedItemsOpen(false);
 
-      // Handle defaults
-      const defaultWallet = lastWalletId || wallets[0]?.id || "";
-      setSelectedWalletId(defaultWallet);
-      setSelectedToWalletId("");
+          // Handle defaults
+          const defaultWallet = lastWalletId || wallets[0]?.id || "";
+          setSelectedWalletId(defaultWallet);
+          setSelectedToWalletId("");
 
-      const flatCategories = categoriesTree.flatMap(p => [p, ...p.subcategories]);
-      const availableCategories = flatCategories.filter(c => c.kind === (quickAddType === "transfer" ? "expense" : quickAddType));
-      const defaultCategory = lastCategoryId || availableCategories[0]?.id || "";
-      setSelectedCategoryId(defaultCategory);
+          const flatCategories = categoriesTree.flatMap(p => [p, ...p.subcategories]);
+          const availableCategories = flatCategories.filter(c => c.kind === (quickAddType === "transfer" ? "expense" : quickAddType));
+          const defaultCategory = lastCategoryId || availableCategories[0]?.id || "";
+          setSelectedCategoryId(defaultCategory);
+        }
+      }
+    } else {
+      initRef.current = false;
     }
-  }, [quickAddOpen, quickAddType, wallets, categoriesTree, lastWalletId, lastCategoryId]);
+  }, [quickAddOpen, quickAddType, wallets, categoriesTree, lastWalletId, lastCategoryId, editingTransaction]);
 
-  // Adjust categories when type changes
-  React.useEffect(() => {
-    if (type !== "transfer") {
+  // Adjust categories when type changes using pure event handler instead of cascading effect
+  const handleTypeChange = (newType: TransactionType) => {
+    setType(newType);
+    if (newType !== "transfer") {
       const flatCategories = categoriesTree.flatMap(p => [p, ...p.subcategories]);
-      const available = flatCategories.filter(c => c.kind === type);
-      const isStillValid = available.some(c => c.id === selectedCategoryId);
-      if (!isStillValid && available.length > 0) {
+      const available = flatCategories.filter(c => c.kind === newType);
+      if (available.length > 0) {
         setSelectedCategoryId(available[0].id);
       }
     }
-  }, [type, categoriesTree, selectedCategoryId]);
+  };
+
+  // State to track if the selected date is in the future (scheduled)
+  const [isFutureDate, setIsFutureDate] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!occurredAt) {
+      setIsFutureDate(false);
+      return;
+    }
+    // Perform Date check inside effect to ensure render purity
+    setIsFutureDate(new Date(occurredAt).getTime() > Date.now());
+  }, [occurredAt]);
 
   // AI Scanner handlers
   const handleScanClick = () => {
@@ -187,9 +222,10 @@ export function QuickAddSheet() {
       toast.success("Struk berhasil di-scan dengan AI!", {
         id: toastId,
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      toast.error(err.message || "Gagal men-scan struk dengan AI. Silakan coba lagi.", {
+      const errMsg = err instanceof Error ? err.message : "Gagal men-scan struk dengan AI. Silakan coba lagi.";
+      toast.error(errMsg, {
         id: toastId,
       });
     } finally {
@@ -252,15 +288,30 @@ export function QuickAddSheet() {
     }
 
     try {
-      await createTx.mutateAsync({
-        type,
-        amount: parsedAmount,
-        occurred_at: new Date(occurredAt).toISOString(),
-        wallet_id: selectedWalletId,
-        to_wallet_id: type === "transfer" ? selectedToWalletId : null,
-        category_id: type !== "transfer" ? selectedCategoryId : null,
-        note: note.trim() || null,
-      });
+      if (editingTransaction) {
+        await updateTx.mutateAsync({
+          id: editingTransaction.id,
+          type,
+          amount: parsedAmount,
+          occurred_at: new Date(occurredAt).toISOString(),
+          wallet_id: selectedWalletId,
+          to_wallet_id: type === "transfer" ? selectedToWalletId : null,
+          category_id: type !== "transfer" ? selectedCategoryId : null,
+          note: note.trim() || null,
+        });
+        toast.success("Transaksi berhasil diubah ✓");
+      } else {
+        await createTx.mutateAsync({
+          type,
+          amount: parsedAmount,
+          occurred_at: new Date(occurredAt).toISOString(),
+          wallet_id: selectedWalletId,
+          to_wallet_id: type === "transfer" ? selectedToWalletId : null,
+          category_id: type !== "transfer" ? selectedCategoryId : null,
+          note: note.trim() || null,
+        });
+        toast.success("Tersimpan ✓");
+      }
 
       // Save smart defaults
       setLastWallet(selectedWalletId);
@@ -268,10 +319,10 @@ export function QuickAddSheet() {
         setLastCategory(selectedCategoryId);
       }
 
-      toast.success("Tersimpan ✓");
       closeQuickAdd();
-    } catch (err: any) {
-      toast.error(err.message || "Gagal menyimpan transaksi. Coba lagi.");
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Gagal menyimpan transaksi. Coba lagi.";
+      toast.error(errMsg);
     }
   };
 
@@ -280,57 +331,59 @@ export function QuickAddSheet() {
       <DrawerContent className="px-4 pb-4 max-h-[94dvh] flex flex-col">
         <DrawerHeader className="px-0 flex-shrink-0">
           <DrawerTitle className="text-center text-lg font-semibold">
-            Tambah Catatan Keuangan
+            {editingTransaction ? "Ubah Catatan Keuangan" : "Tambah Catatan Keuangan"}
           </DrawerTitle>
         </DrawerHeader>
 
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden min-h-0">
           <div className="flex-1 overflow-y-auto pr-0.5 space-y-4 pb-4 scrollbar-thin">
             {/* Scan Struk AI Action Panel */}
-          <div className="relative overflow-hidden rounded-2xl border border-mint-strong/20 bg-linear-to-r from-mint-soft/30 via-muted/40 to-mint-soft/20 p-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-mint-soft text-mint-strong">
-                <Sparkles className="size-4 animate-pulse" />
+          {!editingTransaction && (
+            <div className="relative overflow-hidden rounded-2xl border border-mint-strong/20 bg-linear-to-r from-mint-soft/30 via-muted/40 to-mint-soft/20 p-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-mint-soft text-mint-strong">
+                  <Sparkles className="size-4 animate-pulse" />
+                </div>
+                <div className="space-y-0.5">
+                  <h4 className="text-xs font-semibold text-foreground">Scan Struk dengan AI</h4>
+                  <p className="text-[10px] text-muted-foreground">Isi nominal, kategori & catatan otomatis</p>
+                </div>
               </div>
-              <div className="space-y-0.5">
-                <h4 className="text-xs font-semibold text-foreground">Scan Struk dengan AI</h4>
-                <p className="text-[10px] text-muted-foreground">Isi nominal, kategori & catatan otomatis</p>
-              </div>
+              <Button
+                type="button"
+                disabled={isScanning}
+                onClick={handleScanClick}
+                size="sm"
+                className="h-8.5 rounded-lg bg-mint-strong px-3 text-xs font-medium text-white hover:bg-mint-strong/90 active:scale-95 transition-transform"
+              >
+                {isScanning ? (
+                  <>
+                    <Loader2 className="mr-1.5 size-3 animate-spin" />
+                    Memproses...
+                  </>
+                ) : (
+                  <>
+                    <Camera className="mr-1.5 size-3.5" />
+                    Ambil Foto
+                  </>
+                )}
+              </Button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+              />
             </div>
-            <Button
-              type="button"
-              disabled={isScanning}
-              onClick={handleScanClick}
-              size="sm"
-              className="h-8.5 rounded-lg bg-mint-strong px-3 text-xs font-medium text-white hover:bg-mint-strong/90 active:scale-95 transition-transform"
-            >
-              {isScanning ? (
-                <>
-                  <Loader2 className="mr-1.5 size-3 animate-spin" />
-                  Memproses...
-                </>
-              ) : (
-                <>
-                  <Camera className="mr-1.5 size-3.5" />
-                  Ambil Foto
-                </>
-              )}
-            </Button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-            />
-          </div>
+          )}
 
           {/* Quick-toggle Type Buttons */}
           <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">
             <button
               type="button"
-              onClick={() => setType("expense")}
+              onClick={() => handleTypeChange("expense")}
               className={`rounded-lg py-2 text-xs font-semibold transition-all ${
                 type === "expense"
                   ? "bg-card text-expense shadow-xs"
@@ -341,7 +394,7 @@ export function QuickAddSheet() {
             </button>
             <button
               type="button"
-              onClick={() => setType("income")}
+              onClick={() => handleTypeChange("income")}
               className={`rounded-lg py-2 text-xs font-semibold transition-all ${
                 type === "income"
                   ? "bg-card text-income shadow-xs"
@@ -352,7 +405,7 @@ export function QuickAddSheet() {
             </button>
             <button
               type="button"
-              onClick={() => setType("transfer")}
+              onClick={() => handleTypeChange("transfer")}
               className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-all ${
                 type === "transfer"
                   ? "bg-card text-foreground shadow-xs"
@@ -514,8 +567,7 @@ export function QuickAddSheet() {
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs font-semibold text-muted-foreground">
                 Tanggal
-                {occurredAt &&
-                  new Date(occurredAt).getTime() > Date.now() && (
+                {isFutureDate && (
                     <span className="ml-1 rounded-full bg-mint-soft px-1.5 py-0.5 text-[10px] font-semibold text-mint-strong">
                       Terjadwal
                     </span>
@@ -620,10 +672,10 @@ export function QuickAddSheet() {
             </DrawerClose>
             <Button
               type="submit"
-              disabled={createTx.isPending || parsedAmount <= 0}
+              disabled={createTx.isPending || updateTx.isPending || parsedAmount <= 0}
               className="flex-1 h-12 bg-mint-strong text-white hover:bg-mint-strong/90 rounded-xl font-semibold gap-1.5"
             >
-              {createTx.isPending ? "Menyimpan..." : "Simpan Transaksi"}
+              {createTx.isPending || updateTx.isPending ? "Menyimpan..." : (editingTransaction ? "Simpan Perubahan" : "Simpan Transaksi")}
             </Button>
           </DrawerFooter>
         </form>

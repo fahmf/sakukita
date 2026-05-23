@@ -280,6 +280,23 @@ export async function flushOutbox(supabase: SupabaseClient) {
           }
           await db.wallets.update(entry.entityId, { syncStatus: "synced" });
           await db.outbox.delete(entry.seq!);
+        } else if (entry.op === "update") {
+          const { syncStatus, ...payload } = entry.payload;
+          const { error } = await supabase
+            .from("wallets")
+            .update(payload)
+            .eq("id", entry.entityId);
+          if (error) throw error;
+          await db.wallets.update(entry.entityId, { syncStatus: "synced" });
+          await db.outbox.delete(entry.seq!);
+        } else if (entry.op === "delete") {
+          const { error } = await supabase
+            .from("wallets")
+            .update({ is_archived: true })
+            .eq("id", entry.entityId);
+          if (error) throw error;
+          await db.wallets.delete(entry.entityId);
+          await db.outbox.delete(entry.seq!);
         }
       } else if (entry.entity === "categories") {
         if (entry.op === "create") {

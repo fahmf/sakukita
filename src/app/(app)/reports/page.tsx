@@ -94,7 +94,7 @@ export default function ReportsPage() {
         selectedWalletId === "all" ||
         t.wallet_id === selectedWalletId ||
         t.to_wallet_id === selectedWalletId;
-      return inDateRange && matchesWallet;
+      return inDateRange && matchesWallet && !t.is_deleted;
     });
   }, [transactions, periodDates, selectedWalletId]);
 

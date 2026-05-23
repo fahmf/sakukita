@@ -8,7 +8,7 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ next?: string; error?: string }>;
 }) {
-  const { next } = await searchParams;
+  const { next, error } = await searchParams;
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-6 py-10">
@@ -27,7 +27,7 @@ export default async function LoginPage({
           </p>
         </div>
 
-        <LoginForm next={next ?? "/dashboard"} />
+        <LoginForm next={next ?? "/dashboard"} error={error} />
 
         <p className="mt-8 text-center text-xs text-muted-foreground">
           Dengan masuk, kamu setuju Saku Kita menyimpan data keuanganmu secara

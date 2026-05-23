@@ -35,6 +35,7 @@ import {
   Calendar,
   Trash2,
   Search,
+  Pencil,
 } from "lucide-react";
 import {
   Dialog,
@@ -62,7 +63,7 @@ const iconMap: Record<string, any> = {
 };
 
 export default function DashboardPage() {
-  const { openQuickAdd } = useUIStore();
+  const { openQuickAdd, openEditTransaction } = useUIStore();
   const { data: walletBalances = [], isLoading: loadingBalances } = useWalletBalances();
 
   // Dynamic month selection state (initialized to first day of current month)
@@ -430,6 +431,22 @@ export default function DashboardPage() {
                           {formatCurrency(tx.amount).replace("Rp", "").trim()}
                         </p>
                       </div>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          if (!allowed) {
+                            viewOnlyToast();
+                          } else {
+                            openEditTransaction(tx);
+                          }
+                        }}
+                        className="size-8 rounded-lg text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50 transition-colors"
+                        aria-label="Ubah transaksi"
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
 
                       <Button
                         variant="ghost"

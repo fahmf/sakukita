@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Mail, CheckCircle2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 function GoogleIcon() {
   return (
@@ -30,13 +30,17 @@ function GoogleIcon() {
   );
 }
 
-export function LoginForm({ next }: { next: string }) {
-  const supabase = createClient();
+export function LoginForm({ next, error: initialError }: { next: string; error?: string }) {
+  // Memoize client to prevent new instance on every render
+  const supabase = useMemo(() => createClient(), []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [loading, setLoading] = useState<"google" | "submit" | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => 
+    initialError === "auth" ? "Autentikasi gagal. Silakan coba masuk kembali." : null
+  );
+  const [success, setSuccess] = useState<string | null>(null);
 
   const callback = (origin: string) =>
     `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
@@ -44,6 +48,7 @@ export function LoginForm({ next }: { next: string }) {
   async function signInWithGoogle() {
     setLoading("google");
     setError(null);
+    setSuccess(null);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: callback(window.location.origin) },
@@ -59,6 +64,7 @@ export function LoginForm({ next }: { next: string }) {
     if (!email || !password) return;
     setLoading("submit");
     setError(null);
+    setSuccess(null);
 
     if (mode === "login") {
       const { error } = await supabase.auth.signInWithPassword({
@@ -88,7 +94,7 @@ export function LoginForm({ next }: { next: string }) {
         setError(error.message);
         setLoading(null);
       } else if (!data.session) {
-        setError("Akun berhasil dibuat. Harap cek email untuk verifikasi.");
+        setSuccess("Akun berhasil dibuat. Harap cek email untuk verifikasi.");
         setLoading(null);
       } else {
         window.location.href = next;
@@ -159,6 +165,7 @@ export function LoginForm({ next }: { next: string }) {
       </form>
 
       {error && <p className="text-sm text-expense">{error}</p>}
+      {success && <p className="text-sm text-emerald-600 dark:text-emerald-400 font-semibold">{success}</p>}
 
       <div className="text-center text-xs mt-2">
         {mode === "login" ? (

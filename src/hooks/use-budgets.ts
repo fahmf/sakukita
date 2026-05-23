@@ -52,7 +52,7 @@ export function useSetBudget() {
         )
         .first();
 
-      let targetId = existing?.id;
+      const targetId = existing?.id;
       const now = new Date().toISOString();
 
       if (existing) {
