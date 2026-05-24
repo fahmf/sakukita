@@ -47,6 +47,7 @@ import {
   Trash2,
   Pencil,
   Scale,
+  PiggyBank,
   LogOut,
   Sun,
   Moon,
@@ -97,7 +98,7 @@ export default function SettingsPage() {
       await supabase.auth.signOut();
       toast.success("Berhasil keluar akun!");
       router.push("/login");
-    } catch (err) {
+    } catch {
       toast.error("Gagal keluar akun.");
     } finally {
       setLoggingOut(false);
@@ -169,6 +170,10 @@ export default function SettingsPage() {
   // Accordion collapsed parent categories state
   const [expandedParents, setExpandedParents] = React.useState<Record<string, boolean>>({});
 
+  // Archive Category Confirmation Dialog States
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = React.useState(false);
+  const [categoryToArchive, setCategoryToArchive] = React.useState<string | null>(null);
+
   const toggleParent = (id: string) => {
     setExpandedParents((prev) => ({ ...prev, [id]: !prev[id] }));
   };
@@ -232,18 +237,22 @@ export default function SettingsPage() {
     }
   };
 
-  const handleArchiveCategory = async (id: string) => {
-    const confirm = window.confirm(
-      "Apakah Anda yakin ingin mengarsipkan kategori ini?\nTransaksi yang menggunakan kategori ini akan tetap aman tetapi kategori ini tidak akan muncul lagi di pilihan baru."
-    );
-    if (!confirm) return;
+  const handleArchiveCategory = (id: string) => {
+    setCategoryToArchive(id);
+    setArchiveConfirmOpen(true);
+  };
 
+  const confirmArchive = async () => {
+    if (!categoryToArchive) return;
     try {
-      await archiveCategory.mutateAsync(id);
+      await archiveCategory.mutateAsync(categoryToArchive);
       toast.success("Kategori berhasil diarsipkan!");
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Gagal mengarsipkan kategori.";
       toast.error(errMsg);
+    } finally {
+      setArchiveConfirmOpen(false);
+      setCategoryToArchive(null);
     }
   };
 
@@ -339,6 +348,24 @@ export default function SettingsPage() {
               <p className="font-semibold text-sm">Hutang & Piutang</p>
               <p className="text-xs text-muted-foreground">
                 Pencatatan utang-piutang keluarga
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+        </Link>
+
+        <Link
+          href="/savings"
+          className="rounded-2xl border bg-card p-4 flex items-center justify-between hover:bg-muted/40 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+              <PiggyBank className="size-5 text-mint-strong" />
+            </span>
+            <div className="min-w-0">
+              <p className="font-semibold text-sm">Tabungan Masa Depan</p>
+              <p className="text-xs text-muted-foreground">
+                Target impian & rencana tabungan keluarga
               </p>
             </div>
           </div>
@@ -836,6 +863,38 @@ export default function SettingsPage() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Dialog for Archive Category Confirmation */}
+      {archiveConfirmOpen && (
+        <Dialog open={archiveConfirmOpen} onOpenChange={(o) => !o && setArchiveConfirmOpen(false)}>
+          <DialogContent className="sm:max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle>Arsipkan Kategori?</DialogTitle>
+            </DialogHeader>
+            <div className="py-2 text-sm text-muted-foreground">
+              Apakah Anda yakin ingin mengarsipkan kategori ini? Transaksi yang menggunakan kategori ini akan tetap aman tetapi kategori ini tidak akan muncul lagi di pilihan baru.
+            </div>
+            <DialogFooter className="gap-2 pt-2 flex flex-row justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl h-11 px-4 flex-1 md:flex-none"
+                onClick={() => setArchiveConfirmOpen(false)}
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                className="rounded-xl h-11 px-4 bg-expense text-white hover:bg-expense/90 flex-1 md:flex-none"
+                onClick={confirmArchive}
+                disabled={archiveCategory.isPending}
+              >
+                {archiveCategory.isPending ? "Mengarsipkan..." : "Ya, Arsipkan"}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}

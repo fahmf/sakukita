@@ -84,50 +84,49 @@ export function QuickAddSheet() {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Track initialization to avoid reset when data refetches in background
-  const initRef = React.useRef(false);
+  const [prevOpenId, setPrevOpenId] = React.useState<string | null>(null);
 
-  // Sync component state when the drawer opens
-  React.useEffect(() => {
+  const currentOpenId = quickAddOpen 
+    ? `${editingTransaction?.id || "new"}-${quickAddType}` 
+    : "closed";
+
+  if (currentOpenId !== prevOpenId) {
+    setPrevOpenId(currentOpenId);
     if (quickAddOpen) {
-      if (!initRef.current) {
-        initRef.current = true;
-        if (editingTransaction) {
-          // Transaction edit mode
-          setType(editingTransaction.type);
-          setAmountExpr(String(editingTransaction.amount));
-          setNote(editingTransaction.note || "");
-          setOccurredAt(editingTransaction.occurred_at.split("T")[0]);
-          setIsScanning(false);
-          setScannedItems(null);
-          setScannedItemsOpen(false);
-          setSelectedWalletId(editingTransaction.wallet_id);
-          setSelectedToWalletId(editingTransaction.to_wallet_id || "");
-          setSelectedCategoryId(editingTransaction.category_id || "");
-        } else {
-          // Create mode
-          setType(quickAddType);
-          setAmountExpr("");
-          setNote("");
-          setOccurredAt(new Date().toISOString().split("T")[0]);
-          setIsScanning(false);
-          setScannedItems(null);
-          setScannedItemsOpen(false);
+      if (editingTransaction) {
+        // Transaction edit mode
+        setType(editingTransaction.type);
+        setAmountExpr(String(editingTransaction.amount));
+        setNote(editingTransaction.note || "");
+        setOccurredAt(editingTransaction.occurred_at.split("T")[0]);
+        setIsScanning(false);
+        setScannedItems(null);
+        setScannedItemsOpen(false);
+        setSelectedWalletId(editingTransaction.wallet_id);
+        setSelectedToWalletId(editingTransaction.to_wallet_id || "");
+        setSelectedCategoryId(editingTransaction.category_id || "");
+      } else {
+        // Create mode
+        setType(quickAddType);
+        setAmountExpr("");
+        setNote("");
+        setOccurredAt(new Date().toISOString().split("T")[0]);
+        setIsScanning(false);
+        setScannedItems(null);
+        setScannedItemsOpen(false);
 
-          // Handle defaults
-          const defaultWallet = lastWalletId || wallets[0]?.id || "";
-          setSelectedWalletId(defaultWallet);
-          setSelectedToWalletId("");
+        // Handle defaults
+        const defaultWallet = lastWalletId || wallets[0]?.id || "";
+        setSelectedWalletId(defaultWallet);
+        setSelectedToWalletId("");
 
-          const flatCategories = categoriesTree.flatMap(p => [p, ...p.subcategories]);
-          const availableCategories = flatCategories.filter(c => c.kind === (quickAddType === "transfer" ? "expense" : quickAddType));
-          const defaultCategory = lastCategoryId || availableCategories[0]?.id || "";
-          setSelectedCategoryId(defaultCategory);
-        }
+        const flatCategories = categoriesTree.flatMap(p => [p, ...p.subcategories]);
+        const availableCategories = flatCategories.filter(c => c.kind === (quickAddType === "transfer" ? "expense" : quickAddType));
+        const defaultCategory = lastCategoryId || availableCategories[0]?.id || "";
+        setSelectedCategoryId(defaultCategory);
       }
-    } else {
-      initRef.current = false;
     }
-  }, [quickAddOpen, quickAddType, wallets, categoriesTree, lastWalletId, lastCategoryId, editingTransaction]);
+  }
 
   // Adjust categories when type changes using pure event handler instead of cascading effect
   const handleTypeChange = (newType: TransactionType) => {
@@ -145,12 +144,26 @@ export function QuickAddSheet() {
   const [isFutureDate, setIsFutureDate] = React.useState(false);
 
   React.useEffect(() => {
+    let active = true;
     if (!occurredAt) {
-      setIsFutureDate(false);
-      return;
+      const reset = () => {
+        if (active) setIsFutureDate(false);
+      };
+      const frame = requestAnimationFrame(reset);
+      return () => {
+        active = false;
+        cancelAnimationFrame(frame);
+      };
     }
-    // Perform Date check inside effect to ensure render purity
-    setIsFutureDate(new Date(occurredAt).getTime() > Date.now());
+    const checkFuture = () => {
+      if (!active) return;
+      setIsFutureDate(new Date(occurredAt).getTime() > Date.now());
+    };
+    const frame = requestAnimationFrame(checkFuture);
+    return () => {
+      active = false;
+      cancelAnimationFrame(frame);
+    };
   }, [occurredAt]);
 
   // AI Scanner handlers

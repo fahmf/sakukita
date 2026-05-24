@@ -46,6 +46,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
+import { TransactionDetailDialog } from "@/components/transaction/transaction-detail-dialog";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 
@@ -78,6 +80,8 @@ export default function DashboardPage() {
 
   const deleteTx = useDeleteTransaction();
   const allowed = useCanEdit();
+  const router = useRouter();
+  const [selectedTxForDetail, setSelectedTxForDetail] = React.useState<any>(null);
 
   // Helper: Prev/Next month logic
   const handlePrevMonth = () => {
@@ -396,7 +400,10 @@ export default function DashboardPage() {
                     key={tx.id}
                     className="flex items-center justify-between rounded-2xl border bg-card p-3.5 transition-all hover:border-mint-strong/20 min-w-0"
                   >
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div 
+                      onClick={() => setSelectedTxForDetail(tx)}
+                      className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer select-none active:opacity-70 transition-opacity"
+                    >
                       <span
                         className="grid size-9 shrink-0 place-items-center rounded-xl text-white font-semibold"
                         style={{ backgroundColor: bgColor }}
@@ -421,7 +428,10 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0 pl-2">
-                      <div className="text-right">
+                      <div 
+                        onClick={() => setSelectedTxForDetail(tx)}
+                        className="text-right cursor-pointer select-none pr-1 active:opacity-70 transition-opacity"
+                      >
                         <p
                           className={`font-bold text-sm tracking-tight ${
                             isIncome ? "text-income" : isExpense ? "text-expense" : "text-foreground"
@@ -467,18 +477,24 @@ export default function DashboardPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  setShowAll(!showAll);
-                  if (showAll) setSearchQuery("");
-                }}
-                className="w-full text-xs text-mint-strong hover:bg-mint-soft/50 py-2.5 mt-1 rounded-xl"
+                onClick={() => router.push("/transactions")}
+                className="w-full text-xs text-mint-strong hover:bg-mint-soft/50 py-2.5 mt-1 rounded-xl font-semibold"
               >
-                {showAll ? "Tampilkan Lebih Sedikit" : `Lihat Semua (${transactions.length} Transaksi)`}
+                Lihat Semua ({transactions.length} Transaksi)
               </Button>
             )}
           </div>
         )}
       </div>
+
+      {/* Transaction Detail Dialog */}
+      <TransactionDetailDialog
+        tx={selectedTxForDetail}
+        open={selectedTxForDetail !== null}
+        onOpenChange={(o) => !o && setSelectedTxForDetail(null)}
+        onEdit={openEditTransaction}
+        onDelete={setTxToDelete}
+      />
 
       {/* Confirmation Dialog for Transaction Deletion */}
       {txToDelete !== null && (
