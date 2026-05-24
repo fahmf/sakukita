@@ -104,14 +104,15 @@ export default function AllTransactionsPage() {
     return date.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
   }, [selectedMonth]);
 
-  // Convert selectedMonth to precise ISO string ranges for useTransactions
+  // Convert selectedMonth to precise YYYY-MM-DD date string ranges for useTransactions
   const { startDate, endDate } = React.useMemo(() => {
     const [y, m] = selectedMonth.split("-").map(Number);
-    const start = new Date(y, m - 1, 1, 0, 0, 0, 0);
-    const end = new Date(y, m, 0, 23, 59, 59, 999);
+    const firstDay = `${y}-${String(m).padStart(2, "0")}-01`;
+    const lastDayNum = new Date(y, m, 0).getDate();
+    const lastDay = `${y}-${String(m).padStart(2, "0")}-${String(lastDayNum).padStart(2, "0")}`;
     return {
-      startDate: start.toISOString(),
-      endDate: end.toISOString(),
+      startDate: firstDay,
+      endDate: lastDay,
     };
   }, [selectedMonth]);
 
