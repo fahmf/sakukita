@@ -169,3 +169,43 @@
     @apply font-sans;
   }
 }
+
+/* Saku Kita — High-contrast premium A4 print & PDF stylesheet */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 12pt !important;
+  }
+
+  /* Hide interactive shell UI controls */
+  header, footer, nav, button, .no-print, [data-slot="tabs-list"], .bg-card border, .sync-badge {
+    display: none !important;
+  }
+
+  /* Force full width and remove device viewport fits */
+  main, .print-container {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Display print-only custom report statement header */
+  .print-only {
+    display: block !important;
+  }
+  
+  /* Prevent chart or key containers breaking mid-page */
+  .card, section, table, tr {
+    page-break-inside: avoid !important;
+  }
+}
+
+/* Class helper to hide on print media */
+.print-only {
+  display: none;
+}
+

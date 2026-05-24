@@ -29,20 +29,44 @@ import {
   Info,
 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  LineChart,
-  Line,
-} from "recharts";
+import dynamic from "next/dynamic";
+
+const ExpenseDonut = dynamic(
+  () => import("@/components/shared/report-charts").then((mod) => mod.ExpenseDonut),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[200px] w-full bg-muted/40 animate-pulse rounded-2xl flex items-center justify-center text-xs text-muted-foreground">
+        Memuat grafik...
+      </div>
+    ),
+  }
+);
+
+const CumulativeCashflow = dynamic(
+  () => import("@/components/shared/report-charts").then((mod) => mod.CumulativeCashflow),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[200px] w-full bg-muted/40 animate-pulse rounded-2xl flex items-center justify-center text-xs text-muted-foreground">
+        Memuat grafik...
+      </div>
+    ),
+  }
+);
+
+const NetWorthTrend = dynamic(
+  () => import("@/components/shared/report-charts").then((mod) => mod.NetWorthTrend),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[200px] w-full bg-muted/40 animate-pulse rounded-2xl flex items-center justify-center text-xs text-muted-foreground">
+        Memuat grafik...
+      </div>
+    ),
+  }
+);
+
 
 type PeriodFilter = "this-month" | "last-month" | "last-6-months" | "last-12-months";
 
@@ -113,7 +137,7 @@ export default function ReportsPage() {
 
     const today = new Date();
     const start = new Date(today);
-    start.setDate(today.getDate() - 364 - today.getDay()); // Exactly 52 weeks ago Sunday
+    start.setDate(today.getDate() - 181 - today.getDay()); // ~6 months ago, aligned to Sunday
     
     const end = new Date(today);
     end.setDate(today.getDate() + (6 - today.getDay())); // Saturday of this week
@@ -445,7 +469,36 @@ export default function ReportsPage() {
   const isLoading = loadingCategories || loadingWallets || loadingTxs;
 
   return (
-    <div className="max-w-md mx-auto min-h-dvh flex flex-col space-y-5 pb-20">
+    <div className="max-w-md mx-auto min-h-dvh flex flex-col space-y-5 pb-20 print-container">
+      {/* Printable Statement Header (Only visible on paper / PDF print) */}
+      <div className="print-only hidden space-y-6 pb-6 border-b-2 border-stone-850">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-stone-900">LAPORAN KEUANGAN SAKUKITA</h1>
+            <p className="text-xs font-semibold text-stone-500 uppercase mt-0.5">Pencatatan Keuangan Rumah Tangga</p>
+          </div>
+          <div className="text-right text-xs text-stone-500">
+            <p className="font-bold text-stone-850">SakuKita PWA</p>
+            <p>Tanggal Cetak: {new Date().toLocaleDateString("id-ID", { dateStyle: "long" })}</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-3 gap-4 rounded-xl border border-stone-200 bg-stone-50 p-4 text-xs">
+          <div>
+            <span className="text-[10px] font-bold text-stone-500 uppercase block">Total Pemasukan</span>
+            <p className="text-sm font-bold text-emerald-600 mt-0.5">{formatCurrency(stats.income)}</p>
+          </div>
+          <div>
+            <span className="text-[10px] font-bold text-stone-500 uppercase block">Total Pengeluaran</span>
+            <p className="text-sm font-bold text-red-600 mt-0.5">{formatCurrency(stats.expense)}</p>
+          </div>
+          <div>
+            <span className="text-[10px] font-bold text-stone-500 uppercase block">Arus Kas Bersih</span>
+            <p className={`text-sm font-bold mt-0.5 ${stats.net >= 0 ? "text-emerald-600" : "text-red-600"}`}>{formatCurrency(stats.net)}</p>
+          </div>
+        </div>
+      </div>
+
       <PageHeading
         title="Laporan Keuangan"
         subtitle="Analisis arus kas dan kekayaan bersih"
@@ -493,15 +546,28 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* CSV Download Button */}
-        <Button
-          onClick={handleExportCSV}
-          disabled={isLoading || filteredTxs.length === 0}
-          className="w-full h-10 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 gap-2 text-xs font-semibold"
-        >
-          <Download className="size-4" />
-          Ekspor CSV Transaksi (Offline)
-        </Button>
+        {/* Export Buttons Grid */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* CSV Download Button */}
+          <Button
+            onClick={handleExportCSV}
+            disabled={isLoading || filteredTxs.length === 0}
+            className="h-10 rounded-xl bg-muted/65 hover:bg-muted text-foreground border gap-2 text-xs font-semibold"
+          >
+            <Download className="size-4" />
+            Ekspor CSV
+          </Button>
+
+          {/* PDF/Print Button */}
+          <Button
+            onClick={() => window.print()}
+            disabled={isLoading || filteredTxs.length === 0}
+            className="h-10 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 gap-2 text-xs font-semibold"
+          >
+            <PieIcon className="size-4" />
+            Cetak PDF
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -546,7 +612,7 @@ export default function ReportsPage() {
                 <Calendar className="size-4 text-mint-strong" /> Kerapatan Pengeluaran Harian
               </h3>
               <span className="text-[10px] text-muted-foreground font-semibold bg-muted px-2 py-0.5 rounded-lg">
-                12 Bulan Terakhir
+                6 Bulan Terakhir
               </span>
             </div>
 
@@ -564,7 +630,7 @@ export default function ReportsPage() {
 
               {/* Grid with Month Labels */}
               <div className="flex-1 overflow-x-auto pb-1 scrollbar-none">
-                <div className="min-w-[690px] flex flex-col space-y-1">
+                <div className="min-w-[345px] flex flex-col space-y-1">
                   {/* Months row */}
                   <div className="h-4 relative text-[9px] text-muted-foreground/80 font-bold select-none">
                     {monthLabels.map((lbl) => (
@@ -697,58 +763,12 @@ export default function ReportsPage() {
             ) : (
               <div className="space-y-4">
                 {/* Recharts Pie Donut Container */}
-                <div className="h-[200px] w-full relative">
-                  {!mounted ? (
-                    <div className="h-[200px] w-full bg-muted/40 animate-pulse rounded-2xl flex items-center justify-center text-xs text-muted-foreground">
-                      Memuat grafik...
-                    </div>
-                  ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={expenseDonutData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={75}
-                          paddingAngle={2}
-                          dataKey="value"
-                          onClick={(data: any) => {
-                            const clickedId = data?.payload?.id || data?.id;
-                            if (clickedId) setSelectedParentCategoryId(clickedId);
-                          }}
-                        >
-                          {expenseDonutData.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={entry.color}
-                              className="cursor-pointer hover:opacity-85 transition-opacity outline-none"
-                              style={{
-                                filter: selectedParentCategoryId === entry.id ? "drop-shadow(0px 0px 4px rgba(0,0,0,0.25))" : "none",
-                              }}
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value) => [formatCurrency(Number(value)), "Jumlah"]}
-                          contentStyle={{
-                            background: "hsl(var(--card))",
-                            borderColor: "hsl(var(--border))",
-                            borderRadius: "12px",
-                            fontSize: "12px",
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  )}
-                  {/* Center Total Spent Balance */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-[10px] text-muted-foreground font-semibold uppercase">Total</span>
-                    <span className="text-xs font-bold text-foreground truncate max-w-[100px]">
-                      {formatCurrency(stats.expense)}
-                    </span>
-                  </div>
-                </div>
+                <ExpenseDonut
+                  data={expenseDonutData}
+                  selectedParentCategoryId={selectedParentCategoryId}
+                  onSelectCategory={setSelectedParentCategoryId}
+                  totalSpent={stats.expense}
+                />
 
                 {/* Parent Categories interactive listing */}
                 <div className="grid grid-cols-2 gap-2">
@@ -812,59 +832,7 @@ export default function ReportsPage() {
               </div>
             ) : (
               <div className="h-[200px] w-full">
-                {!mounted ? (
-                  <div className="h-[200px] w-full bg-muted/40 animate-pulse rounded-2xl flex items-center justify-center text-xs text-muted-foreground">
-                    Memuat grafik...
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={dailyCashflowData}>
-                      <defs>
-                        <linearGradient id="colorInc" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#5FBF9A" stopOpacity={0.2} />
-                          <stop offset="95%" stopColor="#5FBF9A" stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="colorExp" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#E8A5A5" stopOpacity={0.2} />
-                          <stop offset="95%" stopColor="#E8A5A5" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-                      <XAxis dataKey="date" fontSize={9} tickLine={false} />
-                      <YAxis
-                        fontSize={9}
-                        tickLine={false}
-                        axisLine={false}
-                        tickFormatter={(v) => `Rp ${v >= 1000000 ? (v / 1000000).toFixed(1) + "M" : v}`}
-                      />
-                      <Tooltip
-                        formatter={(value) => [formatCurrency(Number(value)), ""]}
-                        contentStyle={{
-                          background: "hsl(var(--card))",
-                          borderColor: "hsl(var(--border))",
-                          borderRadius: "12px",
-                          fontSize: "11px",
-                        }}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="Pemasukan Kumulatif"
-                        stroke="#5FBF9A"
-                        fillOpacity={1}
-                        fill="url(#colorInc)"
-                        strokeWidth={2}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="Pengeluaran Kumulatif"
-                        stroke="#E8A5A5"
-                        fillOpacity={1}
-                        fill="url(#colorExp)"
-                        strokeWidth={2}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
+                <CumulativeCashflow data={dailyCashflowData} />
               </div>
             )}
           </div>
@@ -881,41 +849,7 @@ export default function ReportsPage() {
               </div>
             ) : (
               <div className="h-[200px] w-full">
-                {!mounted ? (
-                  <div className="h-[200px] w-full bg-muted/40 animate-pulse rounded-2xl flex items-center justify-center text-xs text-muted-foreground">
-                    Memuat grafik...
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={netWorthTrendData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-                      <XAxis dataKey="month" fontSize={9} tickLine={false} />
-                      <YAxis
-                        fontSize={9}
-                        tickLine={false}
-                        axisLine={false}
-                        tickFormatter={(v) => `Rp ${v >= 1000000 ? (v / 1000000).toFixed(1) + "M" : v}`}
-                      />
-                      <Tooltip
-                        formatter={(value) => [formatCurrency(Number(value)), "Kekayaan Bersih"]}
-                        contentStyle={{
-                          background: "hsl(var(--card))",
-                          borderColor: "hsl(var(--border))",
-                          borderRadius: "12px",
-                          fontSize: "11px",
-                        }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="Kekayaan Bersih"
-                        stroke="#5FBF9A"
-                        strokeWidth={3}
-                        dot={{ r: 4, strokeWidth: 1 }}
-                        activeDot={{ r: 6 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                )}
+                <NetWorthTrend data={netWorthTrendData} />
               </div>
             )}
           </div>

@@ -13,6 +13,7 @@ export function useWallets() {
 
   return useQuery<Wallet[]>({
     queryKey: ["wallets", householdId],
+    enabled: !!householdId,
     queryFn: async () => {
       if (!householdId) return [];
 
@@ -33,6 +34,7 @@ export function useWalletBalances() {
 
   return useQuery<WalletBalance[]>({
     queryKey: ["wallet-balances", householdId],
+    enabled: !!householdId,
     queryFn: async () => {
       if (!householdId) return [];
 

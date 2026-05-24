@@ -49,20 +49,8 @@ import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
 import { TransactionDetailDialog } from "@/components/transaction/transaction-detail-dialog";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-
-
-// Icons map for rendering categories
-const iconMap: Record<string, any> = {
-  utensils: Utensils,
-  car: Car,
-  "shopping-bag": ShoppingBag,
-  "party-popper": Gift,
-  "heart-pulse": Heart,
-  receipt: Receipt,
-  wallet: Briefcase,
-  gift: Gift,
-  "circle-dashed": CircleDot,
-};
+import { iconMap } from "@/lib/icons";
+import { TransactionListSkeleton, BudgetCardSkeleton, NetWorthSkeleton } from "@/components/shared/skeletons";
 
 export default function DashboardPage() {
   const { openQuickAdd, openEditTransaction } = useUIStore();
@@ -244,9 +232,7 @@ export default function DashboardPage() {
         <Card className="rounded-2xl border bg-card p-5 text-center space-y-1 hover:border-mint-strong/40 transition-all cursor-pointer">
           <span className="text-xs text-muted-foreground font-medium">Saldo Total Keluarga</span>
           {loadingBalances ? (
-            <div className="h-8 flex items-center justify-center">
-              <Loader2 className="size-4 animate-spin text-muted-foreground" />
-            </div>
+            <NetWorthSkeleton />
           ) : (
             <p className="text-3xl font-extrabold text-foreground tracking-tight">
               {formatCurrency(totalNetWorth)}
@@ -295,7 +281,10 @@ export default function DashboardPage() {
 
         <Card className="rounded-2xl border bg-card p-4 space-y-3.5">
           {loadingBudgets ? (
-             <div className="h-10 bg-muted animate-pulse rounded-full w-full" />
+            <div className="space-y-3.5 py-1">
+              <BudgetCardSkeleton />
+              <BudgetCardSkeleton />
+            </div>
           ) : budgetProgress.length === 0 ? (
             <div className="text-center py-2 space-y-2">
               <p className="text-xs text-muted-foreground">Belum ada budget untuk bulan ini.</p>
@@ -338,10 +327,7 @@ export default function DashboardPage() {
         </div>
 
         {loadingTx ? (
-          <div className="space-y-3">
-            <div className="h-16 bg-muted animate-pulse rounded-2xl" />
-            <div className="h-16 bg-muted animate-pulse rounded-2xl" />
-          </div>
+          <TransactionListSkeleton count={3} />
         ) : transactions.length === 0 ? (
           <Card className="flex flex-col items-center justify-center p-8 text-center border-dashed rounded-2xl space-y-2.5">
             <span className="grid size-11 place-items-center rounded-full bg-mint-soft text-mint-strong">

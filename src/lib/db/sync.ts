@@ -2,6 +2,18 @@ import { db } from "./dexie";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useSyncStore } from "@/stores/sync-store";
 
+// Mutex to prevent concurrent triggerSync executions
+let _syncLock = false;
+
+// Track consecutive failures per outbox entry for dead-letter handling
+const _outboxRetries = new Map<number, number>();
+
+// Post-sync callback — lets SyncProvider register QueryClient invalidation
+let _onSyncComplete: (() => void) | null = null;
+export function registerSyncCallback(cb: () => void) {
+  _onSyncComplete = cb;
+}
+
 export async function pullLatest(supabase: SupabaseClient, householdId: string) {
   if (!householdId) return;
 
@@ -203,6 +215,38 @@ export async function pullLatest(supabase: SupabaseClient, householdId: string) 
       .map((d) => d.id);
     if (debtsToDelete.length > 0) {
       await db.debts.bulkDelete(debtsToDelete);
+    }
+
+    // 7. Pull Recurring Transactions
+    const { data: recurrings, error: recurringsError } = await supabase
+      .from("recurring_transactions")
+      .select("*")
+      .eq("household_id", householdId);
+
+    if (recurringsError) throw recurringsError;
+
+    const pendingRecurrings = await db.recurring_transactions
+      .where("syncStatus")
+      .equals("pending")
+      .toArray();
+    const pendingRecurringIds = new Set(pendingRecurrings.map((r) => r.id));
+
+    const recurringsToPut = (recurrings || [])
+      .filter((r) => !pendingRecurringIds.has(r.id))
+      .map((r) => ({ ...r, syncStatus: "synced" as const }));
+
+    if (recurringsToPut.length > 0) {
+      await db.recurring_transactions.bulkPut(recurringsToPut);
+    }
+
+    // Purge recurrings deleted remotely
+    const remoteRecurringIds = new Set((recurrings || []).map((r) => r.id));
+    const localRecurrings = await db.recurring_transactions.where("household_id").equals(householdId).toArray();
+    const recurringsToDelete = localRecurrings
+      .filter((r) => r.syncStatus === "synced" && !remoteRecurringIds.has(r.id))
+      .map((r) => r.id);
+    if (recurringsToDelete.length > 0) {
+      await db.recurring_transactions.bulkDelete(recurringsToDelete);
     }
   } catch (error) {
     console.error("Failed to pull latest from remote:", error);
@@ -433,10 +477,53 @@ export async function flushOutbox(supabase: SupabaseClient) {
           await db.debts.delete(entry.entityId);
           await db.outbox.delete(entry.seq!);
         }
+      } else if (entry.entity === "recurring_transactions") {
+        if (entry.op === "create") {
+          const payload = { ...entry.payload }; delete (payload as Record<string, unknown>).syncStatus;
+          const { error } = await supabase.from("recurring_transactions").insert(payload);
+          if (error) {
+            if (error.code && error.code.startsWith("23")) {
+              console.error("Constraint error during recurring insert; discarding entry", error);
+              await db.outbox.delete(entry.seq!);
+              await db.recurring_transactions.update(entry.entityId, { syncStatus: "synced" });
+              continue;
+            }
+            throw error;
+          }
+          await db.recurring_transactions.update(entry.entityId, { syncStatus: "synced" });
+          await db.outbox.delete(entry.seq!);
+        } else if (entry.op === "update") {
+          const payload = { ...entry.payload }; delete (payload as Record<string, unknown>).syncStatus;
+          const { error } = await supabase
+            .from("recurring_transactions")
+            .update(payload)
+            .eq("id", entry.entityId);
+          if (error) throw error;
+          await db.recurring_transactions.update(entry.entityId, { syncStatus: "synced" });
+          await db.outbox.delete(entry.seq!);
+        } else if (entry.op === "delete") {
+          const { error } = await supabase
+            .from("recurring_transactions")
+            .delete()
+            .eq("id", entry.entityId);
+          if (error) throw error;
+          await db.recurring_transactions.delete(entry.entityId);
+          await db.outbox.delete(entry.seq!);
+        }
       }
     } catch (err) {
       console.error(`Failed to flush outbox entry seq=${entry.seq}:`, err);
-      // Halt flushing loop on network errors to preserve ordering
+      const key = entry.seq!;
+      const count = (_outboxRetries.get(key) ?? 0) + 1;
+      _outboxRetries.set(key, count);
+      if (count >= 3) {
+        // Dead-letter: discard permanently failing entries to unblock queue
+        console.error(`Outbox entry seq=${key} failed ${count} times, discarding as dead-letter`);
+        await db.outbox.delete(key);
+        _outboxRetries.delete(key);
+        continue; // Try next entry instead of blocking queue
+      }
+      // Halt on transient errors to preserve ordering, retry on next sync
       break;
     }
   }
@@ -465,19 +552,113 @@ export async function materializePassedScheduledTransactions() {
   }
 }
 
+export function calculateNextMaterializeDate(currentDateStr: string, frequency: string, interval: number): string {
+  const date = new Date(currentDateStr);
+  if (isNaN(date.getTime())) return new Date().toISOString();
+
+  switch (frequency) {
+    case "daily":
+      date.setDate(date.getDate() + interval);
+      break;
+    case "weekly":
+      date.setDate(date.getDate() + (interval * 7));
+      break;
+    case "monthly":
+      date.setMonth(date.getMonth() + interval);
+      break;
+    case "yearly":
+      date.setFullYear(date.getFullYear() + interval);
+      break;
+    default:
+      date.setDate(date.getDate() + 1);
+  }
+  return date.toISOString();
+}
+
+export async function materializeRecurringTransactions() {
+  try {
+    const nowStr = new Date().toISOString();
+    const templates = await db.recurring_transactions.toArray();
+    const activeTemplates = templates.filter(t => t.is_active && t.next_materialize_at <= nowStr);
+
+    for (const t of activeTemplates) {
+      console.log("Materializing recurring transaction locally:", t.id);
+      
+      const txId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+      const newTx = {
+        id: txId,
+        household_id: t.household_id,
+        created_by: "system",
+        type: t.type,
+        amount: t.amount,
+        occurred_at: t.next_materialize_at,
+        is_scheduled: false,
+        wallet_id: t.wallet_id,
+        to_wallet_id: t.to_wallet_id || null,
+        category_id: t.category_id || null,
+        note: t.note || "Transaksi Berulang Otomatis",
+        tags: [],
+        receipt_url: null,
+        is_deleted: false,
+        deleted_at: null,
+        deleted_by: null,
+        client_id: "recurring-system",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      await db.transactions.put({ ...newTx, syncStatus: "pending" });
+      await db.outbox.add({
+        entity: "transactions",
+        entityId: txId,
+        op: "create",
+        payload: newTx,
+        createdAt: Date.now(),
+      });
+
+      const nextDate = calculateNextMaterializeDate(t.next_materialize_at, t.frequency, t.interval);
+      const updatedTemplate = {
+        ...t,
+        last_materialized_at: t.next_materialize_at,
+        next_materialize_at: nextDate,
+        updated_at: new Date().toISOString(),
+      };
+
+      await db.recurring_transactions.put({ ...updatedTemplate, syncStatus: "pending" });
+      await db.outbox.add({
+        entity: "recurring_transactions",
+        entityId: t.id,
+        op: "update",
+        payload: updatedTemplate,
+        createdAt: Date.now(),
+      });
+    }
+  } catch (err) {
+    console.error("Failed to materialize recurring transactions locally:", err);
+  }
+}
+
 export async function triggerSync(supabase: SupabaseClient, householdId: string) {
+  // Mutex: prevent concurrent sync executions that cause data corruption
+  if (_syncLock) return;
   if (typeof window !== "undefined" && !navigator.onLine) {
     useSyncStore.getState().setStatus("offline");
     return;
   }
+  _syncLock = true;
   useSyncStore.getState().setStatus("syncing");
   try {
     await flushOutbox(supabase);
     await pullLatest(supabase, householdId);
     await materializePassedScheduledTransactions();
+    await materializeRecurringTransactions();
     useSyncStore.getState().setLastSynced(new Date().toISOString());
+    // Notify listeners (e.g. SyncProvider) to invalidate query caches
+    _onSyncComplete?.();
   } catch (err) {
     console.error("Sync failed:", err);
     useSyncStore.getState().setStatus("error", err instanceof Error ? err.message : String(err));
+  } finally {
+    _syncLock = false;
   }
 }

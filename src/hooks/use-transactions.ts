@@ -44,6 +44,7 @@ export function useTransactions(filters?: UseTransactionsFilters) {
 
   return useQuery<TransactionWithDetails[]>({
     queryKey: ["transactions", householdId, filters],
+    enabled: !!householdId,
     queryFn: async () => {
       if (!householdId) return [];
 
@@ -303,6 +304,7 @@ export function useTrashedTransactions() {
 
   return useQuery<TransactionWithDetails[]>({
     queryKey: ["trashed-transactions", householdId],
+    enabled: !!householdId,
     queryFn: async () => {
       if (!householdId) return [];
 
@@ -404,6 +406,7 @@ export function useScheduledTransactions() {
 
   return useQuery<TransactionWithDetails[]>({
     queryKey: ["scheduled-transactions", householdId],
+    enabled: !!householdId,
     queryFn: async () => {
       if (!householdId) return [];
 

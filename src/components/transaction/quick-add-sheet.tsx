@@ -50,17 +50,7 @@ import {
 import type { TransactionType } from "@/lib/supabase/types";
 import { compressImage } from "@/lib/image";
 
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  utensils: Utensils,
-  car: Car,
-  "shopping-bag": ShoppingBag,
-  "party-popper": Gift,
-  "heart-pulse": Heart,
-  receipt: Receipt,
-  wallet: Briefcase,
-  gift: Gift,
-  "circle-dashed": CircleDot,
-};
+import { iconMap } from "@/lib/icons";
 
 // 4x5 Keypad layout keys definition
 const keypadKeys = [

@@ -13,6 +13,9 @@ import { createClient } from "@/lib/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
 import { useTheme } from "next-themes";
+import { useQueryClient } from "@tanstack/react-query";
+import { db } from "@/lib/db/dexie";
+import { triggerSync } from "@/lib/db/sync";
 import {
   Select,
   SelectContent,
@@ -52,21 +55,12 @@ import {
   Sun,
   Moon,
   Monitor,
+  Database,
+  AlertTriangle,
 } from "lucide-react";
 import type { Category, CategoryKind } from "@/lib/supabase/types";
 
-// Helper icons mapping for default categories
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  utensils: Utensils,
-  car: Car,
-  "shopping-bag": ShoppingBag,
-  "party-popper": Gift,
-  "heart-pulse": Heart,
-  receipt: Receipt,
-  wallet: Briefcase,
-  gift: Gift,
-  "circle-dashed": CircleDot,
-};
+import { iconMap } from "@/lib/icons";
 
 export default function SettingsPage() {
   const { displayName, role, householdName, householdId, userId } = useHousehold();
@@ -90,6 +84,69 @@ export default function SettingsPage() {
   const allowed = useCanEdit();
 
   const [loggingOut, setLoggingOut] = React.useState(false);
+  const [email, setEmail] = React.useState<string | null>(null);
+  const [resetDialogOpen, setResetDialogOpen] = React.useState(false);
+  const [resetting, setResetting] = React.useState(false);
+  const queryClient = useQueryClient();
+
+  React.useEffect(() => {
+    const fetchUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setEmail(user.email ?? null);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  const handleResetCache = async () => {
+    setResetting(true);
+    try {
+      const supabase = createClient();
+      
+      // 1. Clear all Dexie tables
+      await db.transaction("rw", [
+        db.transactions,
+        db.wallets,
+        db.categories,
+        db.budgets,
+        db.savings_goals,
+        db.debts,
+        db.recurring_transactions,
+        db.outbox
+      ], async () => {
+        await Promise.all([
+          db.transactions.clear(),
+          db.wallets.clear(),
+          db.categories.clear(),
+          db.budgets.clear(),
+          db.savings_goals.clear(),
+          db.debts.clear(),
+          db.recurring_transactions.clear(),
+          db.outbox.clear()
+        ]);
+      });
+
+      // 2. Invalidate react-query cache
+      await queryClient.resetQueries();
+      queryClient.clear();
+
+      // 3. Trigger sync to fetch everything fresh
+      if (householdId) {
+        await triggerSync(supabase, householdId);
+      }
+
+      toast.success("Cache berhasil diatur ulang dan data telah disinkronkan kembali!");
+      setResetDialogOpen(false);
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to reset cache:", err);
+      toast.error("Gagal mengatur ulang cache.");
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -269,7 +326,8 @@ export default function SettingsPage() {
             </span>
             <div className="min-w-0">
               <p className="font-semibold text-sm">{displayName}</p>
-              <p className="text-xs text-muted-foreground">Peran: {role === "admin" ? "Pemilik / Admin" : "Editor"}</p>
+              {email && <p className="text-xs text-muted-foreground">{email}</p>}
+              <p className="text-xs text-muted-foreground">Peran: {role === "admin" ? "Pemilik / Admin" : role === "editor" ? "Editor" : "Viewer"}</p>
             </div>
           </div>
           <Button
@@ -414,6 +472,26 @@ export default function SettingsPage() {
             </SelectContent>
           </Select>
         </div>
+
+        {/* Troubleshoot / Reset Cache Card */}
+        <button
+          type="button"
+          onClick={() => setResetDialogOpen(true)}
+          className="w-full text-left rounded-2xl border border-amber-200 dark:border-amber-950/30 bg-card p-4 flex items-center justify-between hover:bg-amber-50/30 dark:hover:bg-amber-950/10 transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid size-11 place-items-center rounded-full bg-amber-50 dark:bg-amber-950/20 text-amber-500">
+              <Database className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-sm text-amber-700 dark:text-amber-400">Atur Ulang Cache Database</p>
+              <p className="text-xs text-muted-foreground">
+                Hapus database lokal (IndexedDB) dan unduh ulang semua data dari server
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+        </button>
 
         {/* Logout / Signout Card */}
         <button
@@ -893,6 +971,53 @@ export default function SettingsPage() {
                 disabled={archiveCategory.isPending}
               >
                 {archiveCategory.isPending ? "Mengarsipkan..." : "Ya, Arsipkan"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Dialog for Reset Cache Confirmation */}
+      {resetDialogOpen && (
+        <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+          <DialogContent className="sm:max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="size-5" /> Atur Ulang Cache Database?
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-2 text-sm text-muted-foreground space-y-2">
+              <p>
+                Tindakan ini akan menghapus semua database lokal (IndexedDB) di perangkat ini dan mengunduh ulang data segar dari server Supabase.
+              </p>
+              <p className="font-semibold text-amber-600 dark:text-amber-400">
+                Peringatan: Data offline yang belum tersinkronisasi ke server (dalam antrean sync) mungkin akan hilang. Gunakan ini hanya jika aplikasi mengalami glitch atau sinkronisasi macet.
+              </p>
+            </div>
+            <DialogFooter className="gap-2 pt-2 flex flex-row justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl h-11 px-4 flex-1 md:flex-none"
+                onClick={() => setResetDialogOpen(false)}
+                disabled={resetting}
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                className="rounded-xl h-11 px-4 bg-amber-600 text-white hover:bg-amber-700 flex-1 md:flex-none flex items-center justify-center gap-2"
+                onClick={handleResetCache}
+                disabled={resetting}
+              >
+                {resetting ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Menghapus...
+                  </>
+                ) : (
+                  "Ya, Atur Ulang"
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

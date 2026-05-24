@@ -33,6 +33,7 @@ import {
 import { toast } from "sonner";
 import { parseAmountExpression } from "@/lib/calculator";
 import type { Category, SavingsGoal } from "@/lib/supabase/types";
+import { BudgetCardSkeleton, GoalListSkeleton } from "@/components/shared/skeletons";
 
 export default function BudgetsPage() {
   const now = new Date();
@@ -504,9 +505,10 @@ export default function BudgetsPage() {
           </div>
 
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20 space-y-3">
-              <Loader2 className="size-8 animate-spin text-mint-strong" />
-              <p className="text-xs text-muted-foreground">Memuat data budget offline...</p>
+            <div className="rounded-2xl border bg-card p-5 space-y-4">
+              <BudgetCardSkeleton />
+              <BudgetCardSkeleton />
+              <BudgetCardSkeleton />
             </div>
           ) : (
             <div className="space-y-6">
@@ -707,10 +709,7 @@ export default function BudgetsPage() {
           </div>
 
           {loadingGoals ? (
-            <div className="flex flex-col items-center justify-center py-20 space-y-3">
-              <Loader2 className="size-8 animate-spin text-mint-strong" />
-              <p className="text-xs text-muted-foreground">Memuat data target tabungan...</p>
-            </div>
+            <GoalListSkeleton count={3} />
           ) : (
             <div className="space-y-4">
               {goals.length === 0 ? (

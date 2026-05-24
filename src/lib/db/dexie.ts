@@ -6,11 +6,12 @@ import type {
   Budget,
   SavingsGoal,
   Debt,
+  RecurringTransaction,
 } from "@/lib/supabase/types";
 
 export interface OutboxEntry {
   seq?: number;
-  entity: "transactions" | "wallets" | "categories" | "budgets" | "savings_goals" | "debts";
+  entity: "transactions" | "wallets" | "categories" | "budgets" | "savings_goals" | "debts" | "recurring_transactions";
   entityId: string;
   op: "create" | "update" | "delete" | "purge";
   payload: any;
@@ -26,6 +27,7 @@ export class SakuDB extends Dexie {
   budgets!: Table<Syncable<Budget>, string>;
   savings_goals!: Table<Syncable<SavingsGoal>, string>;
   debts!: Table<Syncable<Debt>, string>;
+  recurring_transactions!: Table<Syncable<RecurringTransaction>, string>;
   outbox!: Table<OutboxEntry, number>;
 
   constructor() {
@@ -74,6 +76,38 @@ export class SakuDB extends Dexie {
         "id, household_id, target_date, is_completed, syncStatus, [household_id+is_completed]",
       debts:
         "id, household_id, type, is_completed, syncStatus, [household_id+is_completed]",
+      outbox: "++seq, entity, entityId, op, createdAt",
+    });
+    this.version(6).stores({
+      transactions:
+        "id, household_id, occurred_at, updated_at, syncStatus, is_deleted, category_id, [household_id+is_deleted], [household_id+occurred_at]",
+      wallets:
+        "id, household_id, updated_at, is_archived, syncStatus, [household_id+is_archived]",
+      categories:
+        "id, household_id, is_archived, syncStatus, [household_id+is_archived]",
+      budgets:
+        "id, household_id, period_month, syncStatus, category_id, [household_id+period_month]",
+      savings_goals:
+        "id, household_id, target_date, is_completed, syncStatus, [household_id+is_completed]",
+      debts:
+        "id, household_id, type, is_completed, syncStatus, [household_id+is_completed]",
+      outbox: "++seq, entity, entityId, op, createdAt",
+    });
+    this.version(7).stores({
+      transactions:
+        "id, household_id, occurred_at, updated_at, syncStatus, is_deleted, category_id, [household_id+is_deleted], [household_id+occurred_at]",
+      wallets:
+        "id, household_id, updated_at, is_archived, syncStatus, [household_id+is_archived]",
+      categories:
+        "id, household_id, is_archived, syncStatus, [household_id+is_archived]",
+      budgets:
+        "id, household_id, period_month, syncStatus, category_id, [household_id+period_month]",
+      savings_goals:
+        "id, household_id, target_date, is_completed, syncStatus, [household_id+is_completed]",
+      debts:
+        "id, household_id, type, is_completed, syncStatus, [household_id+is_completed]",
+      recurring_transactions:
+        "id, household_id, frequency, next_materialize_at, is_active, syncStatus",
       outbox: "++seq, entity, entityId, op, createdAt",
     });
   }

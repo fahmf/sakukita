@@ -48,18 +48,8 @@ import {
   FilterX,
 } from "lucide-react";
 import { TransactionDetailDialog } from "@/components/transaction/transaction-detail-dialog";
-
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  utensils: Utensils,
-  car: Car,
-  "shopping-bag": ShoppingBag,
-  "party-popper": Gift,
-  "heart-pulse": Heart,
-  receipt: Receipt,
-  "circle-dashed": CircleDot,
-  gift: Gift,
-  wallet: Briefcase,
-};
+import { iconMap } from "@/lib/icons";
+import { TransactionListSkeleton } from "@/components/shared/skeletons";
 
 export default function AllTransactionsPage() {
   const { openEditTransaction } = useUIStore();
@@ -356,10 +346,8 @@ export default function AllTransactionsPage() {
       {/* 4. Transactions Grouped List */}
       <div className="space-y-4">
         {loadingTx ? (
-          <div className="space-y-3 py-6">
-            <div className="h-16 bg-muted animate-pulse rounded-2xl" />
-            <div className="h-16 bg-muted animate-pulse rounded-2xl" />
-            <div className="h-16 bg-muted animate-pulse rounded-2xl" />
+          <div className="py-2">
+            <TransactionListSkeleton count={5} />
           </div>
         ) : filteredTransactions.length === 0 ? (
           <Card className="flex flex-col items-center justify-center p-8 text-center border-dashed rounded-2xl space-y-3 bg-card">

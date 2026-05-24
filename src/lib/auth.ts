@@ -35,7 +35,12 @@ export async function requireHousehold(): Promise<ActiveContext> {
       .maybeSingle()) as { data: { household_id: string } | null };
     householdId = firstMembership?.household_id ?? null;
   }
-  if (!householdId) redirect("/login");
+  if (!householdId) {
+    // User is authenticated but has no household membership.
+    // Sign out and redirect to prevent infinite loop.
+    await supabase.auth.signOut();
+    redirect("/login?error=no_household");
+  }
 
   const { data: household } = (await (supabase.from("households") as any)
     .select("*")

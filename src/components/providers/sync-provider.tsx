@@ -3,7 +3,7 @@
 import React, { useEffect } from "react";
 import { useHousehold } from "./household-provider";
 import { createClient } from "@/lib/supabase/client";
-import { triggerSync } from "@/lib/db/sync";
+import { triggerSync, registerSyncCallback } from "@/lib/db/sync";
 import type { Transaction, Wallet, Category, Budget } from "@/lib/supabase/types";
 import { db } from "@/lib/db/dexie";
 import { useQueryClient } from "@tanstack/react-query";
@@ -12,6 +12,13 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const { householdId } = useHousehold();
   const supabase = React.useMemo(() => createClient(), []);
   const queryClient = useQueryClient();
+
+  // Register global post-sync callback to invalidate all queries
+  React.useEffect(() => {
+    registerSyncCallback(() => {
+      queryClient.invalidateQueries();
+    });
+  }, [queryClient]);
 
   // 1. Setup online event listeners to flush outbox on network reconnection
   useEffect(() => {

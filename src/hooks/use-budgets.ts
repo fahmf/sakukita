@@ -13,6 +13,7 @@ export function useBudgets(monthStr?: string) {
 
   return useQuery<Budget[]>({
     queryKey: ["budgets", householdId, monthStr],
+    enabled: !!householdId,
     queryFn: async () => {
       if (!householdId) return [];
 

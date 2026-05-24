@@ -8,6 +8,9 @@ import { db } from "@/lib/db/dexie";
 import { triggerSync } from "@/lib/db/sync";
 import { safeRandomUUID } from "@/lib/utils";
 
+// Guard against concurrent seedStandardCategories executions
+let _seedingInProgress = false;
+
 export interface HierarchicalCategory extends Category {
   subcategories: Category[];
 }
@@ -72,6 +75,9 @@ export async function generateDeterministicUUID(householdId: string, stableId: s
 }
 
 export async function seedStandardCategories(householdId: string) {
+  if (_seedingInProgress) return;
+  _seedingInProgress = true;
+  try {
   const supabase: any = createClient();
   const now = new Date().toISOString();
 
@@ -391,7 +397,7 @@ export async function seedStandardCategories(householdId: string) {
           await db.outbox.add({
             entity: "budgets",
             entityId: existingStableBudget.id,
-            op: "create",
+            op: "update",
             payload: { ...existingStableBudget, amount: newAmount },
             createdAt: Date.now(),
           });
@@ -411,7 +417,7 @@ export async function seedStandardCategories(householdId: string) {
           await db.outbox.add({
             entity: "budgets",
             entityId: b.id,
-            op: "create",
+            op: "update",
             payload: { ...b, category_id: stableId },
             createdAt: Date.now(),
           });
@@ -527,7 +533,7 @@ export async function seedStandardCategories(householdId: string) {
             await db.outbox.add({
               entity: "budgets",
               entityId: existingStableBudget.id,
-              op: "create",
+              op: "update",
               payload: { ...existingStableBudget, amount: newAmount },
               createdAt: Date.now(),
             });
@@ -543,7 +549,7 @@ export async function seedStandardCategories(householdId: string) {
             await db.outbox.add({
               entity: "budgets",
               entityId: b.id,
-              op: "create",
+              op: "update",
               payload: { ...b, category_id: stableCat!.id },
               createdAt: Date.now(),
             });
@@ -578,6 +584,9 @@ export async function seedStandardCategories(householdId: string) {
   }
 
   triggerSync(supabase, householdId);
+  } finally {
+    _seedingInProgress = false;
+  }
 }
 
 export function useCategories() {
@@ -585,6 +594,7 @@ export function useCategories() {
 
   return useQuery<HierarchicalCategory[]>({
     queryKey: ["categories", householdId],
+    enabled: !!householdId,
     queryFn: async () => {
       if (!householdId) return [];
 

@@ -13,6 +13,7 @@ export function useGoals() {
 
   return useQuery<SavingsGoal[]>({
     queryKey: ["savings-goals", householdId],
+    enabled: !!householdId,
     queryFn: async () => {
       if (!householdId) return [];
 

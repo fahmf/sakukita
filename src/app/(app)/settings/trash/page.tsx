@@ -21,6 +21,7 @@ import {
 import { toast } from "sonner";
 import { formatCurrency, formatRelative, formatDate } from "@/lib/format";
 import { ArrowLeft, Trash2, Undo2, Loader2 } from "lucide-react";
+import { TransactionListSkeleton } from "@/components/shared/skeletons";
 
 export default function TrashPage() {
   const { data: trashed = [], isLoading } = useTrashedTransactions();
@@ -79,8 +80,8 @@ export default function TrashPage() {
       </div>
 
       {isLoading ? (
-        <div className="h-40 flex items-center justify-center">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        <div className="py-2">
+          <TransactionListSkeleton count={4} />
         </div>
       ) : trashed.length === 0 ? (
         <EmptyState

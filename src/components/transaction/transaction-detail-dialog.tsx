@@ -22,27 +22,7 @@ import type { TransactionWithDetails } from "@/hooks/use-transactions";
 import { formatCurrency } from "@/lib/format";
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
 
-// Categories icon mapping
-import {
-  Utensils,
-  Car,
-  ShoppingBag,
-  Gift,
-  Heart,
-  Receipt,
-  CircleDot,
-} from "lucide-react";
-
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  utensils: Utensils,
-  car: Car,
-  "shopping-bag": ShoppingBag,
-  "party-popper": Gift,
-  "heart-pulse": Heart,
-  receipt: Receipt,
-  "circle-dashed": CircleDot,
-  gift: Gift,
-};
+import { iconMap } from "@/lib/icons";
 
 interface TransactionDetailDialogProps {
   tx: TransactionWithDetails | null;

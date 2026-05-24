@@ -114,7 +114,6 @@ export interface SavingsGoal {
   created_at: string;
   updated_at: string;
 }
-
 export interface Debt {
   id: string;
   household_id: string;
@@ -125,6 +124,26 @@ export interface Debt {
   due_date: string | null;
   is_completed: boolean;
   note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RecurringTransaction {
+  id: string;
+  household_id: string;
+  amount: number;
+  type: TransactionType;
+  wallet_id: string;
+  to_wallet_id: string | null;
+  category_id: string | null;
+  note: string | null;
+  frequency: "daily" | "weekly" | "monthly" | "yearly";
+  interval: number;
+  start_date: string;
+  end_date: string | null;
+  last_materialized_at: string | null;
+  next_materialize_at: string;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -191,6 +210,19 @@ export interface Database {
       debts: DbTable<
         Debt,
         "id" | "remaining_amount" | "due_date" | "is_completed" | "note" | "created_at" | "updated_at"
+      >;
+      recurring_transactions: DbTable<
+        RecurringTransaction,
+        | "id"
+        | "to_wallet_id"
+        | "category_id"
+        | "note"
+        | "interval"
+        | "end_date"
+        | "last_materialized_at"
+        | "is_active"
+        | "created_at"
+        | "updated_at"
       >;
     };
     Views: {

@@ -13,6 +13,7 @@ export function useDebts() {
 
   return useQuery<Debt[]>({
     queryKey: ["debts", householdId],
+    enabled: !!householdId,
     queryFn: async () => {
       if (!householdId) return [];
 
