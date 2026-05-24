@@ -190,7 +190,7 @@ export interface Database {
       >;
       debts: DbTable<
         Debt,
-        "id" | "due_date" | "is_completed" | "note" | "created_at" | "updated_at"
+        "id" | "remaining_amount" | "due_date" | "is_completed" | "note" | "created_at" | "updated_at"
       >;
     };
     Views: {

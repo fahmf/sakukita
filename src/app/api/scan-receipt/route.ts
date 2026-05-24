@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     // Build categories formatted list for context
     const categoriesPromptText = (categories || [])
       .map(
-        (c: any) =>
+        (c: { name: string; id: string; kind: string }) =>
           `- Name: "${c.name}", ID: "${c.id}", Type (kind): "${c.kind}"`
       )
       .join("\n");
@@ -109,10 +109,11 @@ Kembalikan hasil analisis dalam format JSON terstruktur yang valid sesuai dengan
 
     const parsedResult = JSON.parse(textResult);
     return NextResponse.json(parsedResult);
-  } catch (error: any) {
+  } catch (error) {
     console.error("Scan receipt exception:", error);
+    const message = error instanceof Error ? error.message : "Failed to scan receipt";
     return NextResponse.json(
-      { error: error.message || "Failed to scan receipt" },
+      { error: message },
       { status: 500 }
     );
   }

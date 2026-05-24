@@ -35,7 +35,7 @@ import {
 import { toast } from "sonner";
 import type { WalletType } from "@/lib/supabase/types";
 
-const typeIcons: Record<WalletType, any> = {
+const typeIcons: Record<WalletType, React.ComponentType<{ className?: string }>> = {
   cash: Banknote,
   debit: Landmark,
   ewallet: Smartphone,
@@ -89,8 +89,9 @@ export default function WalletsPage() {
       setName("");
       setInitialBalance("");
       setOpen(false);
-    } catch (err: any) {
-      toast.error(err.message || "Gagal membuat dompet. Coba lagi.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Gagal membuat dompet. Coba lagi.";
+      toast.error(message);
     }
   };
 
