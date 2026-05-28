@@ -121,8 +121,12 @@ function QuickAddForm() {
 
   // AI receipt scanner states
   const [isScanning, setIsScanning] = React.useState(false);
-  const [scannedItems, setScannedItems] = React.useState<{ name: string; price: number }[] | null>(null);
-  const [scannedItemsOpen, setScannedItemsOpen] = React.useState(false);
+  const [scannedItems, setScannedItems] = React.useState<{ name: string; price: number }[] | null>(() =>
+    editingTransaction?.receipt_items ?? null
+  );
+  const [scannedItemsOpen, setScannedItemsOpen] = React.useState(() =>
+    !!(editingTransaction?.receipt_items && editingTransaction.receipt_items.length > 0)
+  );
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
 
@@ -359,6 +363,7 @@ function QuickAddForm() {
           to_wallet_id: type === "transfer" ? selectedToWalletId : null,
           category_id: type !== "transfer" ? activeCategoryId : null,
           note: note.trim() || null,
+          receipt_items: scannedItems,
         });
         toast.success("Transaksi berhasil diubah ✓");
       } else {
@@ -370,6 +375,7 @@ function QuickAddForm() {
           to_wallet_id: type === "transfer" ? selectedToWalletId : null,
           category_id: type !== "transfer" ? activeCategoryId : null,
           note: note.trim() || null,
+          receipt_items: scannedItems,
         });
         toast.success("Tersimpan ✓");
       }

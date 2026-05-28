@@ -17,6 +17,9 @@ import {
   Pencil,
   Trash2,
   Tag,
+  Receipt,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import type { TransactionWithDetails } from "@/hooks/use-transactions";
 import { formatCurrency } from "@/lib/format";
@@ -40,6 +43,7 @@ export function TransactionDetailDialog({
   onDelete,
 }: TransactionDetailDialogProps) {
   const allowed = useCanEdit();
+  const [receiptOpen, setReceiptOpen] = React.useState(false);
 
   if (!tx) return null;
 
@@ -140,6 +144,49 @@ export function TransactionDetailDialog({
               </p>
             </div>
           </div>
+
+          {/* 3b. Receipt Items (collapsible — only if receipt_items exists) */}
+          {tx.receipt_items && tx.receipt_items.length > 0 && (
+            <div className="space-y-1.5">
+              <button
+                type="button"
+                onClick={() => setReceiptOpen(!receiptOpen)}
+                className="flex items-center justify-between w-full group"
+              >
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Receipt className="size-3 text-mint-strong" />
+                  Detail Struk ({tx.receipt_items.length} item)
+                </span>
+                {receiptOpen ? (
+                  <ChevronUp className="size-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                ) : (
+                  <ChevronDown className="size-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                )}
+              </button>
+              {receiptOpen && (
+                <div className="rounded-2xl border border-border bg-muted/20 dark:bg-muted/5 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="divide-y divide-border/60 max-h-52 overflow-y-auto">
+                    {tx.receipt_items.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between px-4 py-2.5 text-xs">
+                        <span className="font-medium text-foreground truncate max-w-[65%]">
+                          {item.name}
+                        </span>
+                        <span className="font-semibold text-muted-foreground shrink-0">
+                          {formatCurrency(item.price)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-2.5 border-t bg-muted/30 dark:bg-muted/10 text-xs">
+                    <span className="font-bold text-muted-foreground uppercase tracking-wider">Total</span>
+                    <span className="font-bold text-foreground">
+                      {formatCurrency(tx.receipt_items.reduce((sum, i) => sum + i.price, 0))}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 4. Metadata Details Grid */}
           <div className="grid grid-cols-2 gap-4 text-xs border-t pt-4">

@@ -15,6 +15,11 @@ export type WalletType =
 export type CategoryKind = "income" | "expense";
 export type TransactionType = "income" | "expense" | "transfer";
 
+export interface ReceiptItem {
+  name: string;
+  price: number;
+}
+
 export interface Profile {
   id: string;
   email: string;
@@ -82,6 +87,7 @@ export interface Transaction {
   note: string | null;
   tags: string[];
   receipt_url: string | null;
+  receipt_items: ReceiptItem[] | null;
   is_deleted: boolean;
   deleted_at: string | null;
   deleted_by: string | null;
@@ -197,6 +203,7 @@ export interface Database {
         | "note"
         | "tags"
         | "receipt_url"
+        | "receipt_items"
         | "is_deleted"
         | "deleted_at"
         | "deleted_by"

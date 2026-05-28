@@ -599,6 +599,7 @@ export async function materializeRecurringTransactions() {
         note: t.note || "Transaksi Berulang Otomatis",
         tags: [],
         receipt_url: null,
+        receipt_items: null,
         is_deleted: false,
         deleted_at: null,
         deleted_by: null,

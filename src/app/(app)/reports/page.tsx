@@ -137,7 +137,7 @@ export default function ReportsPage() {
 
     const today = new Date();
     const start = new Date(today);
-    start.setDate(today.getDate() - 181 - today.getDay()); // ~6 months ago, aligned to Sunday
+    start.setDate(today.getDate() - 90 - today.getDay()); // ~3 months ago, aligned to Sunday
     
     const end = new Date(today);
     end.setDate(today.getDate() + (6 - today.getDay())); // Saturday of this week
@@ -612,7 +612,7 @@ export default function ReportsPage() {
                 <Calendar className="size-4 text-mint-strong" /> Kerapatan Pengeluaran Harian
               </h3>
               <span className="text-[10px] text-muted-foreground font-semibold bg-muted px-2 py-0.5 rounded-lg">
-                6 Bulan Terakhir
+                3 Bulan Terakhir
               </span>
             </div>
 
