@@ -72,7 +72,7 @@ export function useCreateGoal() {
         createdAt: Date.now(),
       });
 
-      triggerSync(supabase, householdId);
+      triggerSync(supabase, householdId, { pull: false });
 
       return newGoal;
     },
@@ -127,7 +127,7 @@ export function useUpdateGoal() {
         createdAt: Date.now(),
       });
 
-      triggerSync(supabase, householdId);
+      triggerSync(supabase, householdId, { pull: false });
 
       return updatedGoal;
     },
@@ -159,7 +159,7 @@ export function useDeleteGoal() {
         createdAt: Date.now(),
       });
 
-      triggerSync(supabase, householdId);
+      triggerSync(supabase, householdId, { pull: false });
 
       return goalId;
     },

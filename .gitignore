@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# serwist build artifacts (digenerate ulang saat build)
+/public/sw.js
+/public/sw.js.map
+/public/swe-worker-*.js
+
+# scratch / one-off scripts
+/scratch

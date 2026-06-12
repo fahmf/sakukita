@@ -76,7 +76,7 @@ export function useCreateDebt() {
         createdAt: Date.now(),
       });
 
-      triggerSync(supabase, householdId);
+      triggerSync(supabase, householdId, { pull: false });
 
       return newDebt;
     },
@@ -129,7 +129,7 @@ export function useUpdateDebt() {
         createdAt: Date.now(),
       });
 
-      triggerSync(supabase, householdId);
+      triggerSync(supabase, householdId, { pull: false });
 
       return updatedDebt;
     },
@@ -161,7 +161,7 @@ export function useDeleteDebt() {
         createdAt: Date.now(),
       });
 
-      triggerSync(supabase, householdId);
+      triggerSync(supabase, householdId, { pull: false });
 
       return debtId;
     },

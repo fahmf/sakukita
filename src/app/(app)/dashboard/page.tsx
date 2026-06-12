@@ -51,16 +51,20 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { iconMap } from "@/lib/icons";
 import { TransactionListSkeleton, BudgetCardSkeleton, NetWorthSkeleton } from "@/components/shared/skeletons";
+import {
+  getActivePeriodKey,
+  shiftPeriodKey,
+  getPeriodRange,
+  formatPeriodLabel,
+  formatPeriodRangeLabel,
+} from "@/lib/period";
 
 export default function DashboardPage() {
   const { openQuickAdd, openEditTransaction } = useUIStore();
   const { data: walletBalances = [], isLoading: loadingBalances } = useWalletBalances();
 
-  // Dynamic month selection state (initialized to first day of current month)
-  const [selectedMonth, setSelectedMonth] = React.useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-  });
+  // Periode keuangan aktif (siklus gajian — lihat lib/period.ts)
+  const [selectedMonth, setSelectedMonth] = React.useState(() => getActivePeriodKey());
 
   const [showAll, setShowAll] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -71,34 +75,15 @@ export default function DashboardPage() {
   const router = useRouter();
   const [selectedTxForDetail, setSelectedTxForDetail] = React.useState<any>(null);
 
-  // Helper: Prev/Next month logic
-  const handlePrevMonth = () => {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    const prevDate = new Date(y, m - 2, 1);
-    setSelectedMonth(
-      `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}-01`
-    );
-  };
+  // Helper: Prev/Next period logic
+  const handlePrevMonth = () => setSelectedMonth(shiftPeriodKey(selectedMonth, -1));
+  const handleNextMonth = () => setSelectedMonth(shiftPeriodKey(selectedMonth, 1));
 
-  const handleNextMonth = () => {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    const nextDate = new Date(y, m, 1);
-    setSelectedMonth(
-      `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}-01`
-    );
-  };
-
-  // Convert selectedMonth to precise YYYY-MM-DD date string ranges for useTransactions
-  const { startDate, endDate } = React.useMemo(() => {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    const firstDay = `${y}-${String(m).padStart(2, "0")}-01`;
-    const lastDayNum = new Date(y, m, 0).getDate();
-    const lastDay = `${y}-${String(m).padStart(2, "0")}-${String(lastDayNum).padStart(2, "0")}`;
-    return {
-      startDate: firstDay,
-      endDate: lastDay,
-    };
-  }, [selectedMonth]);
+  // Rentang tanggal periode gajian untuk useTransactions
+  const { startDate, endDate } = React.useMemo(
+    () => getPeriodRange(selectedMonth),
+    [selectedMonth]
+  );
 
   const { data: transactions = [], isLoading: loadingTx } = useTransactions({
     period: "custom",
@@ -156,11 +141,14 @@ export default function DashboardPage() {
     });
   }, [budgets, categories, transactions]);
 
-  const activeMonthName = React.useMemo(() => {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    const date = new Date(y, m - 1, 1);
-    return date.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
-  }, [selectedMonth]);
+  const activeMonthName = React.useMemo(
+    () => formatPeriodLabel(selectedMonth),
+    [selectedMonth]
+  );
+  const activePeriodRange = React.useMemo(
+    () => formatPeriodRangeLabel(selectedMonth),
+    [selectedMonth]
+  );
 
   // Handle transaction soft deletion confirmation
   const handleDeleteConfirm = async () => {
@@ -213,9 +201,16 @@ export default function DashboardPage() {
         >
           <ChevronLeft className="size-5" />
         </Button>
-        <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
-          <Calendar className="size-4 text-mint-strong" />
-          <span>{activeMonthName}</span>
+        <div className="flex flex-col items-center font-semibold text-foreground text-sm">
+          <span className="flex items-center gap-2">
+            <Calendar className="size-4 text-mint-strong" />
+            {activeMonthName}
+          </span>
+          {activePeriodRange && (
+            <span className="text-[10px] font-normal text-muted-foreground">
+              {activePeriodRange}
+            </span>
+          )}
         </div>
         <Button
           variant="ghost"

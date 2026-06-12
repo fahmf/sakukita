@@ -16,6 +16,7 @@ import { useTheme } from "next-themes";
 import { useQueryClient } from "@tanstack/react-query";
 import { db } from "@/lib/db/dexie";
 import { triggerSync } from "@/lib/db/sync";
+import { useSyncStore } from "@/stores/sync-store";
 import {
   Select,
   SelectContent,
@@ -87,6 +88,7 @@ export default function SettingsPage() {
   const [email, setEmail] = React.useState<string | null>(null);
   const [resetDialogOpen, setResetDialogOpen] = React.useState(false);
   const [resetting, setResetting] = React.useState(false);
+  const deadLetterCount = useSyncStore((s) => s.deadLetterCount);
   const queryClient = useQueryClient();
 
   React.useEffect(() => {
@@ -114,7 +116,8 @@ export default function SettingsPage() {
         db.savings_goals,
         db.debts,
         db.recurring_transactions,
-        db.outbox
+        db.outbox,
+        db.dead_letter
       ], async () => {
         await Promise.all([
           db.transactions.clear(),
@@ -124,9 +127,11 @@ export default function SettingsPage() {
           db.savings_goals.clear(),
           db.debts.clear(),
           db.recurring_transactions.clear(),
-          db.outbox.clear()
+          db.outbox.clear(),
+          db.dead_letter.clear()
         ]);
       });
+      useSyncStore.getState().setDeadLetterCount(0);
 
       // 2. Invalidate react-query cache
       await queryClient.resetQueries();
@@ -145,6 +150,33 @@ export default function SettingsPage() {
       toast.error("Gagal mengatur ulang cache.");
     } finally {
       setResetting(false);
+    }
+  };
+
+  // Kirim ulang perubahan yang gagal sinkron permanen (dead-letter):
+  // kembalikan ke outbox dengan hitungan retry nol, lalu sync.
+  const handleRetryDeadLetters = async () => {
+    try {
+      const supabase = createClient();
+      const entries = await db.dead_letter.toArray();
+      for (const e of entries) {
+        await db.outbox.add({
+          entity: e.entity,
+          entityId: e.entityId,
+          op: e.op,
+          payload: e.payload,
+          createdAt: Date.now(),
+        });
+      }
+      await db.dead_letter.clear();
+      useSyncStore.getState().setDeadLetterCount(0);
+      if (householdId) {
+        await triggerSync(supabase, householdId);
+      }
+      toast.success("Perubahan yang gagal dikirim ulang ke server.");
+    } catch (err) {
+      console.error("Failed to retry dead letters:", err);
+      toast.error("Gagal mengirim ulang perubahan.");
     }
   };
 
@@ -472,6 +504,33 @@ export default function SettingsPage() {
             </SelectContent>
           </Select>
         </div>
+
+        {/* Perubahan gagal sinkron (dead-letter) */}
+        {deadLetterCount > 0 && (
+          <div className="w-full rounded-2xl border border-red-200 dark:border-red-950/30 bg-card p-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="grid size-11 place-items-center rounded-full bg-red-50 dark:bg-red-950/20 text-red-500">
+                <AlertTriangle className="size-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-sm text-red-600 dark:text-red-400">
+                  {deadLetterCount} perubahan gagal disinkronkan
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Perubahan ini tersimpan di perangkat tapi berulang kali ditolak server.
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleRetryDeadLetters}
+              className="w-full rounded-xl h-9 text-xs"
+            >
+              Coba Kirim Ulang
+            </Button>
+          </div>
+        )}
 
         {/* Troubleshoot / Reset Cache Card */}
         <button

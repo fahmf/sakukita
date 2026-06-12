@@ -30,6 +30,18 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
+import {
+  getActivePeriodKey,
+  shiftPeriodKey,
+  getPeriodRange,
+  getPeriodKeyForDate,
+  formatPeriodShortLabel,
+} from "@/lib/period";
+
+// Kunci hari dalam zona Asia/Jakarta (toISOString memakai UTC sehingga
+// transaksi dini hari WIB tergeser ke hari sebelumnya)
+const dayKeyJakarta = (d: Date | string) =>
+  new Date(d).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 
 const ExpenseDonut = dynamic(
   () => import("@/components/shared/report-charts").then((mod) => mod.ExpenseDonut),
@@ -88,25 +100,24 @@ export default function ReportsPage() {
   const { data: wallets = [], isLoading: loadingWallets } = useWallets();
   const { data: transactions = [], isLoading: loadingTxs } = useTransactions();
 
-  // Helper: Get start and end dates based on period filter
+  // Helper: rentang periode keuangan (siklus gajian — lihat lib/period.ts)
   const periodDates = React.useMemo(() => {
-    const now = new Date();
-    let start: Date;
-    let end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999); // End of current month
+    const activeKey = getActivePeriodKey();
+    let startKey = activeKey;
+    let endKey = activeKey;
 
-    if (period === "this-month") {
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
-    } else if (period === "last-month") {
-      start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+    if (period === "last-month") {
+      startKey = shiftPeriodKey(activeKey, -1);
+      endKey = startKey;
     } else if (period === "last-6-months") {
-      start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-    } else {
-      // last-12-months
-      start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+      startKey = shiftPeriodKey(activeKey, -5);
+    } else if (period === "last-12-months") {
+      startKey = shiftPeriodKey(activeKey, -11);
     }
 
-    return { start, end };
+    const start = new Date(`${getPeriodRange(startKey).startDate}T00:00:00+07:00`);
+    const end = new Date(`${getPeriodRange(endKey).endDate}T23:59:59.999+07:00`);
+    return { start, end, startKey, endKey };
   }, [period]);
 
   // Filter transactions by date and selected wallet locally for instant responses
@@ -131,7 +142,7 @@ export default function ReportsPage() {
     const expenseMap = new Map<string, number>();
     expenses.forEach((t) => {
       const d = new Date(t.occurred_at);
-      const key = d.toISOString().slice(0, 10);
+      const key = dayKeyJakarta(d);
       expenseMap.set(key, (expenseMap.get(key) || 0) + Number(t.amount || 0));
     });
 
@@ -144,7 +155,7 @@ export default function ReportsPage() {
 
     const tempDate = new Date(start);
     while (tempDate <= end) {
-      const dateStr = tempDate.toISOString().slice(0, 10);
+      const dateStr = dayKeyJakarta(tempDate);
       const amount = expenseMap.get(dateStr) || 0;
       
       let level = 0;
@@ -204,24 +215,24 @@ export default function ReportsPage() {
 
   const selectedDayTxs = React.useMemo(() => {
     if (!selectedHeatmapDay) return [];
-    const targetStr = selectedHeatmapDay.date.toISOString().slice(0, 10);
+    const targetStr = dayKeyJakarta(selectedHeatmapDay.date);
     return transactions.filter(
       (t) =>
         t.type === "expense" &&
         !t.is_deleted &&
-        new Date(t.occurred_at).toISOString().slice(0, 10) === targetStr
+        dayKeyJakarta(t.occurred_at) === targetStr
     );
   }, [transactions, selectedHeatmapDay]);
 
   // Keep the selected heatmap day amount in sync when transactions load/change
   React.useEffect(() => {
     if (!selectedHeatmapDay) return;
-    const targetStr = selectedHeatmapDay.date.toISOString().slice(0, 10);
+    const targetStr = dayKeyJakarta(selectedHeatmapDay.date);
     const dayExpenses = transactions.filter(
       (t) =>
         t.type === "expense" &&
         !t.is_deleted &&
-        new Date(t.occurred_at).toISOString().slice(0, 10) === targetStr
+        dayKeyJakarta(t.occurred_at) === targetStr
     );
     const total = dayExpenses.reduce((sum, t) => sum + Number(t.amount || 0), 0);
     if (selectedHeatmapDay.amount !== total) {
@@ -338,10 +349,13 @@ export default function ReportsPage() {
 
     // Initialize all periods in the filter range with 0
     if (isMonthly) {
-      // Group by month
-      for (let d = new Date(start); d <= end; d.setMonth(d.getMonth() + 1)) {
-        const key = d.toLocaleDateString("id-ID", { month: "short", year: "2-digit" });
-        if (!datesMap.has(key)) datesMap.set(key, { income: 0, expense: 0 });
+      // Group by periode gajian
+      for (
+        let key = periodDates.startKey;
+        key <= periodDates.endKey;
+        key = shiftPeriodKey(key, 1)
+      ) {
+        datesMap.set(formatPeriodShortLabel(key), { income: 0, expense: 0 });
       }
     } else {
       // Group by day
@@ -353,10 +367,9 @@ export default function ReportsPage() {
 
     // Populate sums
     filteredTxs.forEach((t) => {
-      const d = new Date(t.occurred_at);
       const key = isMonthly
-        ? d.toLocaleDateString("id-ID", { month: "short", year: "2-digit" })
-        : d.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+        ? formatPeriodShortLabel(getPeriodKeyForDate(t.occurred_at))
+        : new Date(t.occurred_at).toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 
       if (datesMap.has(key)) {
         const current = datesMap.get(key)!;
@@ -388,17 +401,18 @@ export default function ReportsPage() {
     if (wallets.length === 0) return [];
 
     const list: any[] = [];
-    const now = new Date();
-    
+
     const activeWalletIds = new Set(wallets.filter(w => !w.exclude_from_networth).map(w => w.id));
     const initialBalancesSum = wallets.reduce((sum, w) => {
       return w.exclude_from_networth ? sum : sum + Number(w.initial_balance || 0);
     }, 0);
 
-    // Loop through last 6 calendar months
+    // Loop through last 6 periode gajian
+    const activeKey = getActivePeriodKey();
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
-      const monthLabel = d.toLocaleDateString("id-ID", { month: "short", year: "2-digit" });
+      const key = shiftPeriodKey(activeKey, -i);
+      const d = new Date(`${getPeriodRange(key).endDate}T23:59:59.999+07:00`);
+      const monthLabel = formatPeriodShortLabel(key);
       const targetTime = d.getTime();
 
       let netWorth = initialBalancesSum;

@@ -71,9 +71,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             if (oldTx?.id) await db.transactions.delete(oldTx.id);
           } else {
             const newTx = payload.new as unknown as Transaction;
-            if (newTx?.is_deleted) {
-              await db.transactions.delete(newTx.id);
-            } else if (newTx) {
+            if (newTx) {
+              // Soft-delete TIDAK menghapus baris lokal — disimpan dengan
+              // is_deleted=true agar Recycle Bin konsisten antar device
+              // (sama dengan perilaku pullLatest).
               const local = await db.transactions.get(newTx.id);
               if (!local || local.syncStatus !== "pending") {
                 await db.transactions.put({ ...newTx, syncStatus: "synced" });
@@ -81,6 +82,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             }
           }
           queryClient.invalidateQueries({ queryKey: ["transactions", householdId] });
+          queryClient.invalidateQueries({ queryKey: ["trashed-transactions", householdId] });
           queryClient.invalidateQueries({ queryKey: ["wallet-balances", householdId] });
         }
       )

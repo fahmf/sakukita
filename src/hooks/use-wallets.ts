@@ -126,7 +126,7 @@ export function useCreateWallet() {
       });
 
       // Fire a background sync attempt
-      triggerSync(supabase, householdId);
+      triggerSync(supabase, householdId, { pull: false });
 
       return newWallet;
     },
@@ -185,7 +185,7 @@ export function useUpdateWallet() {
       });
 
       // Fire a background sync attempt
-      triggerSync(supabase, householdId);
+      triggerSync(supabase, householdId, { pull: false });
 
       return updatedWallet;
     },
@@ -230,7 +230,7 @@ export function useArchiveWallet() {
       });
 
       // Fire a background sync attempt
-      triggerSync(supabase, householdId);
+      triggerSync(supabase, householdId, { pull: false });
 
       return archivedWallet;
     },

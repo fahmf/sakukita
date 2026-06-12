@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useHousehold } from "@/components/providers/household-provider";
 import type { RecurringTransaction, TransactionType } from "@/lib/supabase/types";
 import { db } from "@/lib/db/dexie";
-import { triggerSync, calculateNextMaterializeDate } from "@/lib/db/sync";
+import { triggerSync } from "@/lib/db/sync";
 import { safeRandomUUID } from "@/lib/utils";
 
 export function useRecurringTransactions() {
@@ -87,7 +87,7 @@ export function useCreateRecurringTransaction() {
         createdAt: Date.now(),
       });
 
-      triggerSync(supabase, householdId);
+      triggerSync(supabase, householdId, { pull: false });
 
       return newTemplate;
     },
@@ -158,7 +158,7 @@ export function useUpdateRecurringTransaction() {
         createdAt: Date.now(),
       });
 
-      triggerSync(supabase, householdId);
+      triggerSync(supabase, householdId, { pull: false });
 
       return updatedTemplate;
     },
@@ -190,7 +190,7 @@ export function useDeleteRecurringTransaction() {
         createdAt: Date.now(),
       });
 
-      triggerSync(supabase, householdId);
+      triggerSync(supabase, householdId, { pull: false });
 
       return templateId;
     },

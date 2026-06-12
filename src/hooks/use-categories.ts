@@ -583,7 +583,7 @@ export async function seedStandardCategories(householdId: string) {
     }
   }
 
-  triggerSync(supabase, householdId);
+  triggerSync(supabase, householdId, { pull: false });
   } finally {
     _seedingInProgress = false;
   }
@@ -713,7 +713,7 @@ export function useCreateCategory() {
       });
 
       // Fire a background sync attempt
-      triggerSync(supabase, householdId);
+      triggerSync(supabase, householdId, { pull: false });
 
       return newCategory;
     },
@@ -768,7 +768,7 @@ export function useUpdateCategory() {
       });
 
       // Fire a background sync attempt
-      triggerSync(supabase, householdId);
+      triggerSync(supabase, householdId, { pull: false });
 
       return updatedCategory;
     },
@@ -811,7 +811,7 @@ export function useArchiveCategory() {
       });
 
       // Fire a background sync attempt
-      triggerSync(supabase, householdId);
+      triggerSync(supabase, householdId, { pull: false });
 
       return archivedCategory;
     },

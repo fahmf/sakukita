@@ -32,15 +32,21 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { parseAmountExpression } from "@/lib/calculator";
+import {
+  getActivePeriodKey,
+  shiftPeriodKey,
+  getPeriodKeyForDate,
+  formatPeriodLabel,
+  formatPeriodRangeLabel,
+} from "@/lib/period";
 import type { Category, SavingsGoal } from "@/lib/supabase/types";
 import { BudgetCardSkeleton, GoalListSkeleton } from "@/components/shared/skeletons";
 
 export default function BudgetsPage() {
-  const now = new Date();
-  const currentMonthInitial = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-
   const [activeTab, setActiveTab] = React.useState<"budgets" | "goals">("budgets");
-  const [selectedMonth, setSelectedMonth] = React.useState(currentMonthInitial);
+  // Periode keuangan (siklus gajian — lihat lib/period.ts); kunci tetap
+  // "YYYY-MM-01" agar kompatibel dengan budgets.period_month.
+  const [selectedMonth, setSelectedMonth] = React.useState(() => getActivePeriodKey());
   
   // Budget states
   const [dialogOpen, setDialogOpen] = React.useState(false);
@@ -77,32 +83,25 @@ export default function BudgetsPage() {
   const setBudgetMutation = useSetBudget();
   const deleteBudgetMutation = useDeleteBudget();
 
-  // Helper: Prev month string
-  const prevMonthStr = React.useMemo(() => {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    const prevDate = new Date(y, m - 2, 1);
-    return `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}-01`;
-  }, [selectedMonth]);
+  // Helper: Prev period string
+  const prevMonthStr = React.useMemo(
+    () => shiftPeriodKey(selectedMonth, -1),
+    [selectedMonth]
+  );
 
   // Helpers: Format date for header Indonesian
-  const monthLabel = React.useMemo(() => {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    const date = new Date(y, m - 1, 1);
-    return date.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
-  }, [selectedMonth]);
+  const monthLabel = React.useMemo(
+    () => formatPeriodLabel(selectedMonth),
+    [selectedMonth]
+  );
+  const periodRangeLabel = React.useMemo(
+    () => formatPeriodRangeLabel(selectedMonth),
+    [selectedMonth]
+  );
 
   // Navigation handlers
-  const handlePrevMonth = () => {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    const prevDate = new Date(y, m - 2, 1);
-    setSelectedMonth(`${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}-01`);
-  };
-
-  const handleNextMonth = () => {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    const nextDate = new Date(y, m, 1);
-    setSelectedMonth(`${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}-01`);
-  };
+  const handlePrevMonth = () => setSelectedMonth(shiftPeriodKey(selectedMonth, -1));
+  const handleNextMonth = () => setSelectedMonth(shiftPeriodKey(selectedMonth, 1));
 
   // Evaluation of inline math expressions
   const parsedPreview = React.useMemo(() => {
@@ -125,8 +124,10 @@ export default function BudgetsPage() {
 
   // Calculate budgets status: limit, spent, carry over details
   const budgetsAnalysis = React.useMemo(() => {
+    // Periode gajian + zona Jakarta (perbandingan startsWith pada ISO string
+    // UTC salah menggolongkan transaksi dini hari WIB ke bulan sebelumnya)
     const isSameMonth = (dateStr: string, monthStr: string) => {
-      return dateStr.startsWith(monthStr.slice(0, 7));
+      return getPeriodKeyForDate(dateStr) === monthStr;
     };
 
     return flatCategories.map((cat) => {
@@ -490,9 +491,16 @@ export default function BudgetsPage() {
             >
               <ChevronLeft className="size-5" />
             </Button>
-            <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
-              <Calendar className="size-4 text-mint-strong" />
-              <span>{monthLabel}</span>
+            <div className="flex flex-col items-center font-semibold text-foreground text-sm">
+              <span className="flex items-center gap-2">
+                <Calendar className="size-4 text-mint-strong" />
+                {monthLabel}
+              </span>
+              {periodRangeLabel && (
+                <span className="text-[10px] font-normal text-muted-foreground">
+                  {periodRangeLabel}
+                </span>
+              )}
             </div>
             <Button
               variant="ghost"

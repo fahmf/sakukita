@@ -80,7 +80,7 @@ export function useSetBudget() {
           createdAt: Date.now(),
         });
 
-        triggerSync(supabase, householdId);
+        triggerSync(supabase, householdId, { pull: false });
         return updatedBudget;
       } else {
         // Create operation
@@ -111,7 +111,7 @@ export function useSetBudget() {
           createdAt: Date.now(),
         });
 
-        triggerSync(supabase, householdId);
+        triggerSync(supabase, householdId, { pull: false });
         return newBudget;
       }
     },
@@ -147,7 +147,7 @@ export function useDeleteBudget() {
         createdAt: Date.now(),
       });
 
-      triggerSync(supabase, householdId);
+      triggerSync(supabase, householdId, { pull: false });
       return existing.period_month;
     },
     onSuccess: (periodMonth) => {
