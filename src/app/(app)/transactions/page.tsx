@@ -418,7 +418,11 @@ export default function AllTransactionsPage() {
                             <p className="font-semibold text-sm text-foreground truncate">
                               {isTransfer
                                 ? `Transfer ke ${tx.to_wallet?.name}`
-                                : tx.note || tx.category?.name || "Lain-lain"}
+                                : tx.note ||
+                                  (tx.splits && tx.splits.length > 0
+                                    ? `${tx.splits.length} kategori (dipecah)`
+                                    : tx.category?.name) ||
+                                  "Lain-lain"}
                             </p>
                             <p className="text-xs text-muted-foreground font-medium">
                               {tx.wallet?.name} · {formatRelative(tx.occurred_at)}
