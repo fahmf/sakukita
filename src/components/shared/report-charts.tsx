@@ -24,12 +24,45 @@ interface ExpenseDonutProps {
   totalSpent: number;
 }
 
+// Renders a bold percentage label centred on each slice that is large enough
+// to fit one. White text reads clearly over the saturated palette in both
+// light and dark mode.
+function renderPercentLabel(total: number) {
+  return function PercentLabel(props: any) {
+    const { cx, cy, midAngle, innerRadius, outerRadius, value } = props;
+    const percent = total > 0 ? value / total : 0;
+    if (percent < 0.08) return null; // skip slivers — they'd overlap
+
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) / 2;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    return (
+      <text
+        x={x}
+        y={y}
+        fill="#ffffff"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={11}
+        fontWeight={700}
+        style={{ pointerEvents: "none", textShadow: "0 1px 2px rgba(0,0,0,0.35)" }}
+      >
+        {`${Math.round(percent * 100)}%`}
+      </text>
+    );
+  };
+}
+
 export function ExpenseDonut({
   data,
   selectedParentCategoryId,
   onSelectCategory,
   totalSpent,
 }: ExpenseDonutProps) {
+  const total = data.reduce((sum, d) => sum + d.value, 0);
+
   return (
     <div className="h-[200px] w-full relative">
       <ResponsiveContainer width="100%" height="100%">
@@ -38,34 +71,46 @@ export function ExpenseDonut({
             data={data}
             cx="50%"
             cy="50%"
-            innerRadius={50}
-            outerRadius={75}
+            innerRadius={52}
+            outerRadius={78}
             paddingAngle={2}
             dataKey="value"
+            stroke="hsl(var(--card))"
+            strokeWidth={2}
+            labelLine={false}
+            label={renderPercentLabel(total)}
             onClick={(clickData: any) => {
               const clickedId = clickData?.payload?.id || clickData?.id;
               if (clickedId) onSelectCategory(clickedId);
             }}
           >
-            {data.map((entry, index) => (
-              <Cell
-                key={`cell-${index}`}
-                fill={entry.color}
-                className="cursor-pointer hover:opacity-85 transition-opacity outline-none"
-                style={{
-                  filter: selectedParentCategoryId === entry.id ? "drop-shadow(0px 0px 4px rgba(0,0,0,0.25))" : "none",
-                }}
-              />
-            ))}
+            {data.map((entry, index) => {
+              const isSelected = selectedParentCategoryId === entry.id;
+              const isDimmed = selectedParentCategoryId !== null && !isSelected;
+              return (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={entry.color}
+                  className="cursor-pointer transition-opacity outline-none"
+                  style={{
+                    opacity: isDimmed ? 0.45 : 1,
+                    filter: isSelected ? "brightness(1.08)" : "none",
+                  }}
+                />
+              );
+            })}
           </Pie>
           <Tooltip
             formatter={(value) => [formatCurrency(Number(value)), "Jumlah"]}
             contentStyle={{
-              background: "hsl(var(--card))",
-              borderColor: "hsl(var(--border))",
+              background: "var(--card)",
+              borderColor: "var(--border)",
               borderRadius: "12px",
               fontSize: "12px",
+              color: "var(--foreground)",
             }}
+            itemStyle={{ color: "var(--foreground)" }}
+            labelStyle={{ color: "var(--foreground)" }}
           />
         </PieChart>
       </ResponsiveContainer>
@@ -97,22 +142,26 @@ export function CumulativeCashflow({ data }: CumulativeCashflowProps) {
             <stop offset="95%" stopColor="#E8A5A5" stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-        <XAxis dataKey="date" fontSize={9} tickLine={false} />
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+        <XAxis dataKey="date" fontSize={9} tickLine={false} stroke="var(--muted-foreground)" />
         <YAxis
           fontSize={9}
           tickLine={false}
           axisLine={false}
+          stroke="var(--muted-foreground)"
           tickFormatter={(v) => `Rp ${v >= 1000000 ? (v / 1000000).toFixed(1) + "M" : v}`}
         />
         <Tooltip
           formatter={(value) => [formatCurrency(Number(value)), ""]}
           contentStyle={{
-            background: "hsl(var(--card))",
-            borderColor: "hsl(var(--border))",
+            background: "var(--card)",
+            borderColor: "var(--border)",
             borderRadius: "12px",
             fontSize: "11px",
+            color: "var(--foreground)",
           }}
+          itemStyle={{ color: "var(--foreground)" }}
+          labelStyle={{ color: "var(--foreground)" }}
         />
         <Area
           type="monotone"
@@ -143,22 +192,26 @@ export function NetWorthTrend({ data }: NetWorthTrendProps) {
   return (
     <ResponsiveContainer width="100%" height="100%">
       <LineChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-        <XAxis dataKey="month" fontSize={9} tickLine={false} />
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+        <XAxis dataKey="month" fontSize={9} tickLine={false} stroke="var(--muted-foreground)" />
         <YAxis
           fontSize={9}
           tickLine={false}
           axisLine={false}
+          stroke="var(--muted-foreground)"
           tickFormatter={(v) => `Rp ${v >= 1000000 ? (v / 1000000).toFixed(1) + "M" : v}`}
         />
         <Tooltip
           formatter={(value) => [formatCurrency(Number(value)), "Kekayaan Bersih"]}
           contentStyle={{
-            background: "hsl(var(--card))",
-            borderColor: "hsl(var(--border))",
+            background: "var(--card)",
+            borderColor: "var(--border)",
             borderRadius: "12px",
             fontSize: "11px",
+            color: "var(--foreground)",
           }}
+          itemStyle={{ color: "var(--foreground)" }}
+          labelStyle={{ color: "var(--foreground)" }}
         />
         <Line
           type="monotone"

@@ -5,6 +5,7 @@ import { useTransactions } from "@/hooks/use-transactions";
 import { useCategories } from "@/hooks/use-categories";
 import { useWallets, useWalletBalances } from "@/hooks/use-wallets";
 import { formatCurrency } from "@/lib/format";
+import { chartColor } from "@/lib/chart-colors";
 import { PageHeading } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import {
@@ -283,12 +284,14 @@ export default function ReportsPage() {
         id,
         name: parentCat?.name || "Kategori Lain",
         value,
-        color: parentCat?.color || "#5FBF9A",
       };
     });
 
-    // Sort from highest expense to lowest
-    return data.sort((a, b) => b.value - a.value);
+    // Sort from highest expense to lowest, then assign vivid, theme-aware
+    // colours by rank so adjacent slices stay easy to tell apart in dark mode.
+    return data
+      .sort((a, b) => b.value - a.value)
+      .map((item, index) => ({ ...item, color: chartColor(index) }));
   }, [filteredTxs, flatCategoryMap, categories]);
 
   // Subcategory list breakdown for the selected parent slice
@@ -315,11 +318,12 @@ export default function ReportsPage() {
         id,
         name: details?.name || "Subkategori",
         value,
-        color: details?.color || "#B8E6D3",
       };
     });
 
-    return data.sort((a, b) => b.value - a.value);
+    return data
+      .sort((a, b) => b.value - a.value)
+      .map((item, index) => ({ ...item, color: chartColor(index) }));
   }, [selectedParentCategoryId, filteredTxs, flatCategoryMap]);
 
   // Set default selected slice once donut data loads
