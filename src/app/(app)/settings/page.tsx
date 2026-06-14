@@ -58,8 +58,11 @@ import {
   Monitor,
   Database,
   AlertTriangle,
+  Download,
+  Upload,
 } from "lucide-react";
 import type { Category, CategoryKind } from "@/lib/supabase/types";
+import { buildHouseholdBackup, downloadFile } from "@/lib/backup";
 
 import { iconMap } from "@/lib/icons";
 
@@ -177,6 +180,26 @@ export default function SettingsPage() {
     } catch (err) {
       console.error("Failed to retry dead letters:", err);
       toast.error("Gagal mengirim ulang perubahan.");
+    }
+  };
+
+  const [exporting, setExporting] = React.useState(false);
+  const handleExportBackup = async () => {
+    if (!householdId) return;
+    setExporting(true);
+    try {
+      const backup = await buildHouseholdBackup(householdId);
+      const date = new Date().toISOString().slice(0, 10);
+      downloadFile(
+        `saku-kita-backup-${date}.json`,
+        JSON.stringify(backup, null, 2)
+      );
+      toast.success("Backup data berhasil diunduh!");
+    } catch (err) {
+      console.error("Failed to export backup:", err);
+      toast.error("Gagal membuat backup data.");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -531,6 +554,50 @@ export default function SettingsPage() {
             </Button>
           </div>
         )}
+
+        {/* Import CSV Card */}
+        <Link
+          href="/settings/import"
+          className="rounded-2xl border bg-card p-4 flex items-center justify-between hover:bg-muted/40 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+              <Upload className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="font-semibold text-sm">Impor Transaksi (CSV)</p>
+              <p className="text-xs text-muted-foreground">
+                Impor mutasi dari bank atau e-wallet
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+        </Link>
+
+        {/* Export / Backup JSON Card */}
+        <button
+          type="button"
+          onClick={handleExportBackup}
+          disabled={exporting}
+          className="w-full text-left rounded-2xl border bg-card p-4 flex items-center justify-between hover:bg-muted/40 transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+              <Download className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="font-semibold text-sm">Cadangkan Data (JSON)</p>
+              <p className="text-xs text-muted-foreground">
+                Unduh seluruh data household sebagai berkas backup
+              </p>
+            </div>
+          </div>
+          {exporting ? (
+            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+          ) : (
+            <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+          )}
+        </button>
 
         {/* Troubleshoot / Reset Cache Card */}
         <button
