@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useHousehold } from "@/components/providers/household-provider";
-import type { Budget } from "@/lib/supabase/types";
+import type { Budget, BudgetPeriodType } from "@/lib/supabase/types";
 import { db } from "@/lib/db/dexie";
 import { triggerSync } from "@/lib/db/sync";
 import { safeRandomUUID } from "@/lib/utils";
@@ -37,19 +37,23 @@ export function useSetBudget() {
     mutationFn: async (budget: {
       category_id: string;
       amount: number;
-      period_month: string; // expects "YYYY-MM-01" format
+      period_month: string; // "YYYY-MM-01" (bulanan) atau "YYYY-01-01" (tahunan)
+      period_type?: BudgetPeriodType;
       carry_over: boolean;
     }) => {
       if (!householdId) throw new Error("Active household context is required");
 
-      // Search if a budget already exists for this category & month
+      const periodType: BudgetPeriodType = budget.period_type ?? "monthly";
+
+      // Search if a budget already exists for this category, period & type
       const existing = await db.budgets
         .where("household_id")
         .equals(householdId)
         .filter(
           (b) =>
             b.category_id === budget.category_id &&
-            b.period_month === budget.period_month
+            b.period_month === budget.period_month &&
+            (b.period_type ?? "monthly") === periodType
         )
         .first();
 
@@ -62,6 +66,7 @@ export function useSetBudget() {
           ...existing,
           amount: budget.amount,
           carry_over: budget.carry_over,
+          period_type: periodType,
           updated_at: now,
         };
 
@@ -91,6 +96,7 @@ export function useSetBudget() {
           category_id: budget.category_id,
           amount: budget.amount,
           period_month: budget.period_month,
+          period_type: periodType,
           carry_over: budget.carry_over,
           created_at: now,
           updated_at: now,

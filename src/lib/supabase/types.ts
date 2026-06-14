@@ -20,6 +20,15 @@ export interface ReceiptItem {
   price: number;
 }
 
+/** Satu alokasi kategori pada transaksi yang dipecah (split). */
+export interface TransactionSplit {
+  category_id: string;
+  amount: number;
+  note?: string | null;
+}
+
+export type BudgetPeriodType = "monthly" | "yearly";
+
 export interface Profile {
   id: string;
   email: string;
@@ -88,6 +97,9 @@ export interface Transaction {
   tags: string[];
   receipt_url: string | null;
   receipt_items: ReceiptItem[] | null;
+  /** Bila terisi (>=2 item), transaksi dipecah ke beberapa kategori dan
+   *  category_id = null. Jumlah seluruh split = amount. */
+  splits: TransactionSplit[] | null;
   is_deleted: boolean;
   deleted_at: string | null;
   deleted_by: string | null;
@@ -102,6 +114,8 @@ export interface Budget {
   category_id: string;
   amount: number;
   period_month: string;
+  /** "monthly" (default) atau "yearly". Periode tahunan pakai YYYY-01-01. */
+  period_type: BudgetPeriodType;
   carry_over: boolean;
   created_at: string;
   updated_at: string;
@@ -204,12 +218,13 @@ export interface Database {
         | "tags"
         | "receipt_url"
         | "receipt_items"
+        | "splits"
         | "is_deleted"
         | "deleted_at"
         | "deleted_by"
         | "client_id"
       >;
-      budgets: DbTable<Budget, "id" | "created_at" | "updated_at" | "carry_over">;
+      budgets: DbTable<Budget, "id" | "created_at" | "updated_at" | "carry_over" | "period_type">;
       savings_goals: DbTable<
         SavingsGoal,
         "id" | "current_amount" | "target_date" | "is_completed" | "icon" | "color" | "created_at" | "updated_at"

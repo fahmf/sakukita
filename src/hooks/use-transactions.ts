@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useHousehold } from "@/components/providers/household-provider";
-import type { Transaction, TransactionType, ReceiptItem } from "@/lib/supabase/types";
+import type { Transaction, TransactionType, ReceiptItem, TransactionSplit } from "@/lib/supabase/types";
 import { db } from "@/lib/db/dexie";
 import { triggerSync } from "@/lib/db/sync";
 import { safeRandomUUID } from "@/lib/utils";
@@ -139,6 +139,7 @@ export function useCreateTransaction() {
       note?: string | null;
       tags?: string[];
       receipt_items?: ReceiptItem[] | null;
+      splits?: TransactionSplit[] | null;
     }) => {
       if (!householdId) throw new Error("Household ID context is required");
       if (!userId) throw new Error("User ID context is required");
@@ -159,6 +160,7 @@ export function useCreateTransaction() {
         tags: tx.tags ?? [],
         receipt_url: null,
         receipt_items: tx.receipt_items ?? null,
+        splits: tx.splits ?? null,
         is_deleted: false,
         deleted_at: null,
         deleted_by: null,
@@ -256,6 +258,7 @@ export function useUpdateTransaction() {
       note?: string | null;
       tags?: string[];
       receipt_items?: ReceiptItem[] | null;
+      splits?: TransactionSplit[] | null;
     }) => {
       if (!householdId) throw new Error("Household ID context is required");
 
@@ -274,6 +277,7 @@ export function useUpdateTransaction() {
         note: tx.note ?? null,
         tags: tx.tags ?? [],
         receipt_items: tx.receipt_items !== undefined ? tx.receipt_items : (localTx.receipt_items ?? null),
+        splits: tx.splits !== undefined ? tx.splits : (localTx.splits ?? null),
         updated_at: new Date().toISOString(),
       };
 

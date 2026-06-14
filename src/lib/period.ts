@@ -116,6 +116,84 @@ export function formatPeriodShortLabel(key: string): string {
   });
 }
 
+// ─── Tanggal & jam (Asia/Jakarta) ────────────────────────────────────────────
+
+/** Komponen tanggal/jam "sekarang" di zona Jakarta untuk default input form. */
+export function getJakartaNowParts(): { date: string; time: string } {
+  const now = new Date();
+  const { year, month, day } = jakartaDateParts(now);
+  let time = "00:00";
+  try {
+    time = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Jakarta",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(now);
+  } catch {
+    time = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  }
+  return { date: `${year}-${pad(month)}-${pad(day)}`, time };
+}
+
+/** Komponen tanggal & jam Jakarta dari sebuah timestamp (untuk pre-fill edit). */
+export function getJakartaParts(value: string | Date): { date: string; time: string } {
+  const d = typeof value === "string" ? new Date(value) : value;
+  const { year, month, day } = jakartaDateParts(d);
+  let time = "00:00";
+  try {
+    time = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Jakarta",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(d);
+  } catch {
+    time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  return { date: `${year}-${pad(month)}-${pad(day)}`, time };
+}
+
+/** Gabungkan "YYYY-MM-DD" + "HH:mm" (waktu Jakarta) → ISO string UTC. */
+export function combineJakartaDateTime(date: string, time: string): string {
+  const t = time && /^\d{2}:\d{2}$/.test(time) ? time : "00:00";
+  return new Date(`${date}T${t}:00+07:00`).toISOString();
+}
+
+// ─── Periode tahunan (untuk budget tahunan) ──────────────────────────────────
+
+/** Tahun (number) sebuah timestamp di zona Jakarta. */
+export function getJakartaYear(value: string | Date): number {
+  const d = typeof value === "string" ? new Date(value) : value;
+  return jakartaDateParts(d).year;
+}
+
+/** Kunci tahun ("YYYY-01-01") untuk dipakai pada budgets.period_month tahunan. */
+export function getYearKey(year: number): string {
+  return `${year}-01-01`;
+}
+
+/** Kunci tahun yang sedang berjalan (Jakarta). */
+export function getActiveYearKey(): string {
+  return getYearKey(getJakartaYear(new Date()));
+}
+
+/** Geser kunci tahun maju/mundur. */
+export function shiftYearKey(key: string, delta: number): string {
+  const y = Number(key.split("-")[0]);
+  return getYearKey(y + delta);
+}
+
+/** Apakah timestamp berada di tahun (kalender Jakarta) dari kunci tahun. */
+export function isInYear(occurredAt: string, yearKey: string): boolean {
+  return getJakartaYear(occurredAt) === Number(yearKey.split("-")[0]);
+}
+
+/** Label tahun, mis. "2026". */
+export function formatYearLabel(yearKey: string): string {
+  return String(Number(yearKey.split("-")[0]));
+}
+
 /** Label rentang, mis. "25 Mei – 24 Jun". */
 export function formatPeriodRangeLabel(key: string): string {
   if (MONTH_START_DAY === 1) return "";

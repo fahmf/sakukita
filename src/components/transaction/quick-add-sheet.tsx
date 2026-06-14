@@ -46,9 +46,14 @@ import {
   CircleDot,
   Briefcase,
   Keyboard,
+  Clock,
+  Split,
+  Plus,
+  X,
 } from "lucide-react";
-import type { TransactionType } from "@/lib/supabase/types";
+import type { TransactionType, TransactionSplit } from "@/lib/supabase/types";
 import { compressImage } from "@/lib/image";
+import { getJakartaNowParts, getJakartaParts, combineJakartaDateTime } from "@/lib/period";
 
 import { iconMap } from "@/lib/icons";
 
@@ -109,11 +114,32 @@ function QuickAddForm() {
   );
   const [occurredAt, setOccurredAt] = React.useState(() =>
     editingTransaction
-      ? editingTransaction.occurred_at.split("T")[0]
-      : new Date().toISOString().split("T")[0]
+      ? getJakartaParts(editingTransaction.occurred_at).date
+      : getJakartaNowParts().date
+  );
+  const [occurredTime, setOccurredTime] = React.useState(() =>
+    editingTransaction
+      ? getJakartaParts(editingTransaction.occurred_at).time
+      : getJakartaNowParts().time
   );
   const [note, setNote] = React.useState(() =>
     editingTransaction ? (editingTransaction.note || "") : ""
+  );
+
+  // Split-ke-beberapa-kategori
+  const [splitMode, setSplitMode] = React.useState(
+    () => !!(editingTransaction?.splits && editingTransaction.splits.length > 0)
+  );
+  const [splits, setSplits] = React.useState<{ category_id: string; amount: string }[]>(() =>
+    editingTransaction?.splits && editingTransaction.splits.length > 0
+      ? editingTransaction.splits.map((s: TransactionSplit) => ({
+          category_id: s.category_id,
+          amount: String(s.amount),
+        }))
+      : [
+          { category_id: "", amount: "" },
+          { category_id: "", amount: "" },
+        ]
   );
 
   // Keypad open/close visibility state
@@ -180,6 +206,14 @@ function QuickAddForm() {
       }
 
       const key = e.key;
+      // Saat mode pecah kategori, nominal diketik per-baris — jangan bajak keypad.
+      if (splitMode) {
+        if (key === "Escape") {
+          e.preventDefault();
+          closeQuickAdd();
+        }
+        return;
+      }
       if (/[0-9+\-*/().]/.test(key)) {
         e.preventDefault();
         setAmountExpr((prev) => prev + key);
@@ -197,11 +231,14 @@ function QuickAddForm() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [closeQuickAdd]);
+  }, [closeQuickAdd, splitMode]);
 
   // Adjust categories automatically when transaction type changes
   const handleTypeChange = (newType: TransactionType) => {
     setType(newType);
+    if (newType === "transfer") {
+      setSplitMode(false);
+    }
     if (newType !== "transfer") {
       const flatCategories = categoriesTree.flatMap((p) => [p, ...p.subcategories]);
       const available = flatCategories.filter((c) => c.kind === newType);
@@ -228,14 +265,16 @@ function QuickAddForm() {
     }
     const checkFuture = () => {
       if (!active) return;
-      setIsFutureDate(new Date(occurredAt).getTime() > Date.now());
+      setIsFutureDate(
+        new Date(combineJakartaDateTime(occurredAt, occurredTime)).getTime() > Date.now()
+      );
     };
     const frame = requestAnimationFrame(checkFuture);
     return () => {
       active = false;
       cancelAnimationFrame(frame);
     };
-  }, [occurredAt]);
+  }, [occurredAt, occurredTime]);
 
   // AI Scanner handler
   const handleScanClick = () => {
@@ -323,11 +362,64 @@ function QuickAddForm() {
     return /[+\-*/()]/.test(amountExpr);
   }, [amountExpr]);
 
+  // ── Split (pecah ke beberapa kategori) ──────────────────────────────────────
+  const flatCategoriesForType = React.useMemo(() => {
+    if (type === "transfer") return [];
+    return categoriesTree
+      .flatMap((p) => [p, ...p.subcategories])
+      .filter((c) => c.kind === type);
+  }, [categoriesTree, type]);
+
+  const splitTotal = React.useMemo(() => {
+    return splits.reduce((sum, s) => {
+      const v = parseAmountExpression(s.amount);
+      return sum + (v !== null && v > 0 ? v : 0);
+    }, 0);
+  }, [splits]);
+
+  const effectiveAmount = splitMode ? splitTotal : parsedAmount;
+
+  const updateSplit = (index: number, field: "category_id" | "amount", value: string) => {
+    setSplits((prev) => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)));
+  };
+  const addSplitRow = () => setSplits((prev) => [...prev, { category_id: "", amount: "" }]);
+  const removeSplitRow = (index: number) =>
+    setSplits((prev) => (prev.length <= 2 ? prev : prev.filter((_, i) => i !== index)));
+
   // Submit transaction
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (parsedAmount <= 0) {
+    const useSplit = type !== "transfer" && splitMode;
+
+    // Validasi & susun payload kategori/split
+    let amountToSave = parsedAmount;
+    let categoryIdToSave: string | null = type !== "transfer" ? activeCategoryId : null;
+    let splitsToSave: TransactionSplit[] | null = null;
+
+    if (useSplit) {
+      const parsed = splits.map((s) => ({
+        category_id: s.category_id,
+        amount: parseAmountExpression(s.amount) ?? 0,
+      }));
+      if (parsed.length < 2) {
+        toast.error("Pecah kategori butuh minimal 2 baris");
+        return;
+      }
+      if (parsed.some((p) => !p.category_id)) {
+        toast.error("Pilih kategori di setiap baris pecahan");
+        return;
+      }
+      if (parsed.some((p) => p.amount <= 0)) {
+        toast.error("Nominal tiap pecahan harus lebih dari Rp 0");
+        return;
+      }
+      splitsToSave = parsed.map((p) => ({ category_id: p.category_id, amount: p.amount }));
+      amountToSave = splitsToSave.reduce((sum, p) => sum + p.amount, 0);
+      categoryIdToSave = null;
+    }
+
+    if (amountToSave <= 0) {
       toast.error("Nominal transaksi harus lebih dari Rp 0");
       return;
     }
@@ -347,41 +439,45 @@ function QuickAddForm() {
       return;
     }
 
-    if (type !== "transfer" && !activeCategoryId) {
+    if (type !== "transfer" && !useSplit && !activeCategoryId) {
       toast.error("Pilih kategori transaksi");
       return;
     }
+
+    const occurredIso = combineJakartaDateTime(occurredAt, occurredTime);
 
     try {
       if (editingTransaction) {
         await updateTx.mutateAsync({
           id: editingTransaction.id,
           type,
-          amount: parsedAmount,
-          occurred_at: new Date(occurredAt).toISOString(),
+          amount: amountToSave,
+          occurred_at: occurredIso,
           wallet_id: activeWalletId,
           to_wallet_id: type === "transfer" ? selectedToWalletId : null,
-          category_id: type !== "transfer" ? activeCategoryId : null,
+          category_id: categoryIdToSave,
           note: note.trim() || null,
           receipt_items: scannedItems,
+          splits: splitsToSave,
         });
         toast.success("Transaksi berhasil diubah ✓");
       } else {
         await createTx.mutateAsync({
           type,
-          amount: parsedAmount,
-          occurred_at: new Date(occurredAt).toISOString(),
+          amount: amountToSave,
+          occurred_at: occurredIso,
           wallet_id: activeWalletId,
           to_wallet_id: type === "transfer" ? selectedToWalletId : null,
-          category_id: type !== "transfer" ? activeCategoryId : null,
+          category_id: categoryIdToSave,
           note: note.trim() || null,
           receipt_items: scannedItems,
+          splits: splitsToSave,
         });
         toast.success("Tersimpan ✓");
       }
 
       setLastWallet(activeWalletId);
-      if (type !== "transfer" && activeCategoryId) {
+      if (type !== "transfer" && !useSplit && activeCategoryId) {
         setLastCategory(activeCategoryId);
       }
 
@@ -483,7 +579,41 @@ function QuickAddForm() {
             </button>
           </div>
 
+          {/* Toggle Pecah ke beberapa kategori */}
+          {type !== "transfer" && (
+            <button
+              type="button"
+              onClick={() => setSplitMode((v) => !v)}
+              className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold transition-all ${
+                splitMode
+                  ? "bg-mint-soft text-mint-strong border-mint-strong/30"
+                  : "bg-card text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Split className="size-4" />
+                Pecah ke beberapa kategori
+              </span>
+              <span
+                className={`grid h-5 w-9 place-items-center rounded-full text-[10px] font-bold ${
+                  splitMode ? "bg-mint-strong text-white" : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {splitMode ? "ON" : "OFF"}
+              </span>
+            </button>
+          )}
+
+          {/* Total otomatis saat mode pecah */}
+          {splitMode && (
+            <div className="space-y-1 rounded-2xl bg-card border px-4 py-3.5 text-center">
+              <Label className="text-xs text-muted-foreground">Total (otomatis dari pecahan)</Label>
+              <p className="text-3xl font-bold text-foreground">{formatCurrency(splitTotal)}</p>
+            </div>
+          )}
+
           {/* Amount Display Input — readOnly on mobile, clickable to show Virtual Keypad */}
+          {!splitMode && (
           <div className="space-y-1.5 rounded-2xl bg-card border px-4 py-3.5 text-center relative">
             <Label className="text-xs text-muted-foreground">Nominal (Rp)</Label>
             <div className="relative flex items-center justify-center gap-1">
@@ -520,9 +650,10 @@ function QuickAddForm() {
               </p>
             )}
           </div>
+          )}
 
           {/* Category Chips (Expense / Income only) */}
-          {type !== "transfer" && activeCategories.length > 0 && (
+          {type !== "transfer" && !splitMode && activeCategories.length > 0 && (
             <div className="space-y-2">
               <Label className="text-xs font-semibold text-muted-foreground">Kategori Cepat</Label>
               <div className="flex flex-wrap gap-2">
@@ -558,7 +689,7 @@ function QuickAddForm() {
           )}
 
           {/* Dompet Picker & Category Dropdown Grid */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className={`grid gap-3 ${type !== "transfer" && splitMode ? "grid-cols-1" : "grid-cols-2"}`}>
             {/* Wallet Source Picker */}
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs font-semibold text-muted-foreground">
@@ -607,7 +738,7 @@ function QuickAddForm() {
                   </SelectContent>
                 </Select>
               </div>
-            ) : (
+            ) : splitMode ? null : (
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground">Semua Kategori</Label>
                 <Select
@@ -656,7 +787,66 @@ function QuickAddForm() {
             )}
           </div>
 
-          {/* Date & Note Grid */}
+          {/* Split editor — rincian pecahan kategori */}
+          {type !== "transfer" && splitMode && (
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold text-muted-foreground">
+                Rincian Pecahan Kategori
+              </Label>
+              <div className="space-y-2">
+                {splits.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Select
+                      value={s.category_id}
+                      onValueChange={(val) => updateSplit(i, "category_id", val)}
+                    >
+                      <SelectTrigger className="h-10 flex-1 min-w-0 bg-card border rounded-xl text-xs">
+                        <SelectValue placeholder="Kategori" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {flatCategoriesForType.map((c) => (
+                          <SelectItem
+                            key={c.id}
+                            value={c.id}
+                            className={c.parent_id ? "pl-6 text-xs text-muted-foreground" : "font-semibold"}
+                          >
+                            {c.parent_id ? `↳ ${c.name}` : c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={s.amount}
+                      onChange={(e) => updateSplit(i, "amount", e.target.value)}
+                      onFocus={() => setShowKeypad(false)}
+                      className="h-10 w-28 shrink-0 bg-card border rounded-xl text-right text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeSplitRow(i)}
+                      disabled={splits.length <= 2}
+                      className="grid size-9 shrink-0 place-items-center rounded-xl text-muted-foreground hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                      aria-label="Hapus baris"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={addSplitRow}
+                className="flex items-center gap-1.5 rounded-xl border border-dashed px-3 py-2 text-xs font-semibold text-mint-strong hover:bg-mint-strong/5 transition-colors w-full justify-center"
+              >
+                <Plus className="size-3.5" /> Tambah baris
+              </button>
+            </div>
+          )}
+
+          {/* Date & Time Grid */}
           <div className="grid grid-cols-2 gap-3">
             {/* Occurred At Date Picker */}
             <div className="flex flex-col gap-1.5">
@@ -681,20 +871,36 @@ function QuickAddForm() {
               </div>
             </div>
 
-            {/* Note text input */}
+            {/* Occurred At Time Picker */}
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground">Catatan</Label>
+              <Label className="text-xs font-semibold text-muted-foreground">Jam</Label>
               <div className="relative">
-                <FileText className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Clock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  type="text"
-                  placeholder="Beli sayur, susu, dsb."
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
+                  type="time"
+                  value={occurredTime}
+                  onChange={(e) => setOccurredTime(e.target.value)}
                   onFocus={() => setShowKeypad(false)}
-                  className="h-10 pl-9 bg-card border rounded-xl"
+                  className="h-10 pl-9 bg-card border rounded-xl pr-2"
+                  required
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Note text input */}
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-semibold text-muted-foreground">Catatan</Label>
+            <div className="relative">
+              <FileText className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Beli sayur, susu, dsb."
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                onFocus={() => setShowKeypad(false)}
+                className="h-10 pl-9 bg-card border rounded-xl"
+              />
             </div>
           </div>
 
@@ -761,7 +967,7 @@ function QuickAddForm() {
         </div>
 
         {/* Custom Fixed Virtual Keyboard Area */}
-        {showKeypad && (
+        {showKeypad && !splitMode && (
           <div className="grid grid-cols-4 gap-1.5 bg-muted/40 p-2.5 rounded-2xl border border-border animate-in slide-in-from-bottom duration-200 flex-shrink-0 mb-3 select-none">
             {keypadKeys.map((key) => {
               const isOperator = ["÷", "×", "-", "+", "(", ")"].includes(key);
@@ -800,7 +1006,7 @@ function QuickAddForm() {
           </DrawerClose>
           <Button
             type="submit"
-            disabled={createTx.isPending || updateTx.isPending || parsedAmount <= 0}
+            disabled={createTx.isPending || updateTx.isPending || effectiveAmount <= 0}
             className="flex-1 h-12 bg-mint-strong text-white hover:bg-mint-strong/90 rounded-xl font-semibold gap-1.5"
           >
             {createTx.isPending || updateTx.isPending ? (

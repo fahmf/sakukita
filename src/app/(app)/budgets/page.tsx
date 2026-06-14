@@ -38,7 +38,12 @@ import {
   getPeriodKeyForDate,
   formatPeriodLabel,
   formatPeriodRangeLabel,
+  getActiveYearKey,
+  shiftYearKey,
+  isInYear,
+  formatYearLabel,
 } from "@/lib/period";
+import type { BudgetPeriodType } from "@/lib/supabase/types";
 import type { Category, SavingsGoal } from "@/lib/supabase/types";
 import { BudgetCardSkeleton, GoalListSkeleton } from "@/components/shared/skeletons";
 
@@ -47,6 +52,15 @@ export default function BudgetsPage() {
   // Periode keuangan (siklus gajian — lihat lib/period.ts); kunci tetap
   // "YYYY-MM-01" agar kompatibel dengan budgets.period_month.
   const [selectedMonth, setSelectedMonth] = React.useState(() => getActivePeriodKey());
+  // Budget tahunan memakai kunci "YYYY-01-01".
+  const [selectedYear, setSelectedYear] = React.useState(() => getActiveYearKey());
+  const [budgetPeriodType, setBudgetPeriodType] = React.useState<BudgetPeriodType>("monthly");
+  const isYearly = budgetPeriodType === "yearly";
+  // Kunci periode aktif & sebelumnya, tergantung mode bulanan/tahunan.
+  const periodKey = isYearly ? selectedYear : selectedMonth;
+  const prevPeriodKey = isYearly
+    ? shiftYearKey(selectedYear, -1)
+    : shiftPeriodKey(selectedMonth, -1);
   
   // Budget states
   const [dialogOpen, setDialogOpen] = React.useState(false);
@@ -83,25 +97,25 @@ export default function BudgetsPage() {
   const setBudgetMutation = useSetBudget();
   const deleteBudgetMutation = useDeleteBudget();
 
-  // Helper: Prev period string
-  const prevMonthStr = React.useMemo(
-    () => shiftPeriodKey(selectedMonth, -1),
-    [selectedMonth]
-  );
-
-  // Helpers: Format date for header Indonesian
+  // Helpers: Format header label (bulanan: "Juni 2026", tahunan: "2026")
   const monthLabel = React.useMemo(
-    () => formatPeriodLabel(selectedMonth),
-    [selectedMonth]
+    () => (isYearly ? formatYearLabel(selectedYear) : formatPeriodLabel(selectedMonth)),
+    [isYearly, selectedYear, selectedMonth]
   );
   const periodRangeLabel = React.useMemo(
-    () => formatPeriodRangeLabel(selectedMonth),
-    [selectedMonth]
+    () => (isYearly ? "Jan – Des" : formatPeriodRangeLabel(selectedMonth)),
+    [isYearly, selectedMonth]
   );
 
-  // Navigation handlers
-  const handlePrevMonth = () => setSelectedMonth(shiftPeriodKey(selectedMonth, -1));
-  const handleNextMonth = () => setSelectedMonth(shiftPeriodKey(selectedMonth, 1));
+  // Navigation handlers (mundur/maju 1 bulan atau 1 tahun)
+  const handlePrevMonth = () =>
+    isYearly
+      ? setSelectedYear(shiftYearKey(selectedYear, -1))
+      : setSelectedMonth(shiftPeriodKey(selectedMonth, -1));
+  const handleNextMonth = () =>
+    isYearly
+      ? setSelectedYear(shiftYearKey(selectedYear, 1))
+      : setSelectedMonth(shiftPeriodKey(selectedMonth, 1));
 
   // Evaluation of inline math expressions
   const parsedPreview = React.useMemo(() => {
@@ -124,50 +138,51 @@ export default function BudgetsPage() {
 
   // Calculate budgets status: limit, spent, carry over details
   const budgetsAnalysis = React.useMemo(() => {
-    // Periode gajian + zona Jakarta (perbandingan startsWith pada ISO string
-    // UTC salah menggolongkan transaksi dini hari WIB ke bulan sebelumnya)
-    const isSameMonth = (dateStr: string, monthStr: string) => {
-      return getPeriodKeyForDate(dateStr) === monthStr;
-    };
+    // Apakah transaksi termasuk periode (bulanan: siklus gajian Jakarta;
+    // tahunan: tahun kalender Jakarta).
+    const inPeriod = (dateStr: string, key: string) =>
+      isYearly ? isInYear(dateStr, key) : getPeriodKeyForDate(dateStr) === key;
 
     return flatCategories.map((cat) => {
-      // Find current budget
+      // Find current & previous budget (cocokkan tipe periode)
       const curBudget = budgets.find(
-        (b) => b.category_id === cat.id && b.period_month === selectedMonth
+        (b) =>
+          b.category_id === cat.id &&
+          b.period_month === periodKey &&
+          (b.period_type ?? "monthly") === budgetPeriodType
       );
-
-      // Find previous budget
       const prevBudget = budgets.find(
-        (b) => b.category_id === cat.id && b.period_month === prevMonthStr
+        (b) =>
+          b.category_id === cat.id &&
+          b.period_month === prevPeriodKey &&
+          (b.period_type ?? "monthly") === budgetPeriodType
       );
 
-      // Category transactions in current month
       // Sum this category and subcategories (if this is a parent category)
       const childIds = cat.parent_id === null
         ? (categories.find((c) => c.id === cat.id)?.subcategories || []).map((s) => s.id)
         : [];
       const targetIds = [cat.id, ...childIds];
 
-      const spent = transactions
-        .filter(
-          (t) =>
-            t.type === "expense" &&
-            t.category_id &&
-            targetIds.includes(t.category_id) &&
-            isSameMonth(t.occurred_at, selectedMonth)
-        )
-        .reduce((sum, t) => sum + t.amount, 0);
+      // Total pengeluaran untuk kategori (termasuk porsi transaksi yang dipecah)
+      const sumForPeriod = (key: string) => {
+        let total = 0;
+        for (const t of transactions) {
+          if (t.type !== "expense") continue;
+          if (!inPeriod(t.occurred_at, key)) continue;
+          if (t.splits && t.splits.length > 0) {
+            for (const s of t.splits) {
+              if (targetIds.includes(s.category_id)) total += s.amount;
+            }
+          } else if (t.category_id && targetIds.includes(t.category_id)) {
+            total += t.amount;
+          }
+        }
+        return total;
+      };
 
-      // Previous spent for carry over calculation
-      const prevSpent = transactions
-        .filter(
-          (t) =>
-            t.type === "expense" &&
-            t.category_id &&
-            targetIds.includes(t.category_id) &&
-            isSameMonth(t.occurred_at, prevMonthStr)
-        )
-        .reduce((sum, t) => sum + t.amount, 0);
+      const spent = sumForPeriod(periodKey);
+      const prevSpent = sumForPeriod(prevPeriodKey);
 
       // Calculate carry over limit
       let carryOverAmount = 0;
@@ -217,7 +232,7 @@ export default function BudgetsPage() {
         progressBgColor,
       };
     });
-  }, [flatCategories, budgets, selectedMonth, prevMonthStr, transactions, categories]);
+  }, [flatCategories, budgets, periodKey, prevPeriodKey, budgetPeriodType, isYearly, transactions, categories]);
 
   // Separate active budgeted items and unbudgeted items
   const { budgetedItems, unbudgetedItems } = React.useMemo(() => {
@@ -250,8 +265,9 @@ export default function BudgetsPage() {
       await setBudgetMutation.mutateAsync({
         category_id: editingCategory.id,
         amount: parsed,
-        period_month: selectedMonth,
-        carry_over: carryOver,
+        period_month: periodKey,
+        period_type: budgetPeriodType,
+        carry_over: isYearly ? false : carryOver,
       });
       toast.success(`Budget ${editingCategory.name} berhasil disimpan!`);
       setDialogOpen(false);
@@ -481,6 +497,30 @@ export default function BudgetsPage() {
 
       {activeTab === "budgets" ? (
         <>
+          {/* Period type toggle: Bulanan / Tahunan */}
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted/40 p-1 border border-muted select-none">
+            <button
+              onClick={() => setBudgetPeriodType("monthly")}
+              className={`h-8 text-xs font-semibold rounded-lg transition-all ${
+                !isYearly
+                  ? "bg-card text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Bulanan
+            </button>
+            <button
+              onClick={() => setBudgetPeriodType("yearly")}
+              className={`h-8 text-xs font-semibold rounded-lg transition-all ${
+                isYearly
+                  ? "bg-card text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Tahunan
+            </button>
+          </div>
+
           {/* Month Navigator Header */}
           <div className="flex items-center justify-between bg-card border rounded-2xl p-4 shadow-xs">
             <Button
@@ -829,7 +869,9 @@ export default function BudgetsPage() {
           {editingCategory && (
             <form onSubmit={handleSaveBudget} className="space-y-4 pt-2">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="budget_amount">Batas Pengeluaran Bulanan (Rp)</Label>
+                <Label htmlFor="budget_amount">
+                  {isYearly ? "Batas Pengeluaran Tahunan (Rp)" : "Batas Pengeluaran Bulanan (Rp)"}
+                </Label>
                 <div className="relative">
                   <Input
                     id="budget_amount"
@@ -850,7 +892,8 @@ export default function BudgetsPage() {
                 )}
               </div>
 
-              {/* Carry Over Settings */}
+              {/* Carry Over Settings (hanya untuk budget bulanan / envelope) */}
+              {!isYearly && (
               <div className="flex items-center justify-between border rounded-2xl p-4 bg-muted/30">
                 <div className="space-y-0.5 pr-2">
                   <div className="flex items-center gap-1.5">
@@ -868,6 +911,7 @@ export default function BudgetsPage() {
                   onCheckedChange={setCarryOver}
                 />
               </div>
+              )}
 
               <div className="flex flex-col gap-2 pt-2">
                 <Button

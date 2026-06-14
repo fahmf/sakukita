@@ -24,6 +24,7 @@ import {
 import type { TransactionWithDetails } from "@/hooks/use-transactions";
 import { formatCurrency } from "@/lib/format";
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
+import { useCategories } from "@/hooks/use-categories";
 
 import { iconMap } from "@/lib/icons";
 
@@ -44,12 +45,23 @@ export function TransactionDetailDialog({
 }: TransactionDetailDialogProps) {
   const allowed = useCanEdit();
   const [receiptOpen, setReceiptOpen] = React.useState(false);
+  const { data: categoriesTree = [] } = useCategories();
+
+  const catMap = React.useMemo(() => {
+    const m = new Map<string, { name: string; icon: string | null }>();
+    categoriesTree.forEach((p) => {
+      m.set(p.id, { name: p.name, icon: p.icon });
+      p.subcategories.forEach((s) => m.set(s.id, { name: s.name, icon: s.icon }));
+    });
+    return m;
+  }, [categoriesTree]);
 
   if (!tx) return null;
 
   const isExpense = tx.type === "expense";
   const isIncome = tx.type === "income";
   const isTransfer = tx.type === "transfer";
+  const hasSplits = !!(tx.splits && tx.splits.length > 0);
 
   let bgColor = "#C4C4C4";
   const hasMappedIcon = !isTransfer && tx.category && iconMap[tx.category.icon || ""];
@@ -103,7 +115,12 @@ export function TransactionDetailDialog({
 
           {/* 2. Transaction Category or Flow Pill */}
           <div className="flex justify-center">
-            {isTransfer ? (
+            {hasSplits ? (
+              <div className="flex items-center gap-2 bg-mint-soft/40 border border-mint-strong/30 px-4 py-2 rounded-2xl text-xs font-semibold text-mint-strong">
+                <Tag className="size-4" />
+                <span>{tx.splits!.length} Kategori (Dipecah)</span>
+              </div>
+            ) : isTransfer ? (
               <div className="flex items-center gap-2 bg-stone-100 dark:bg-stone-900 border px-4 py-2 rounded-2xl text-xs font-semibold text-stone-700 dark:text-stone-300">
                 <ArrowRightLeft className="size-4 text-stone-500" />
                 <span>Transfer Dana</span>
@@ -131,6 +148,31 @@ export function TransactionDetailDialog({
               </div>
             )}
           </div>
+
+          {/* 2b. Split breakdown — rincian pecahan kategori */}
+          {hasSplits && (
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                Rincian Pecahan
+              </span>
+              <div className="rounded-2xl border border-border bg-muted/20 dark:bg-muted/5 overflow-hidden divide-y divide-border/60">
+                {tx.splits!.map((s, idx) => {
+                  const c = catMap.get(s.category_id);
+                  return (
+                    <div key={idx} className="flex items-center justify-between px-4 py-2.5 text-xs">
+                      <span className="font-medium text-foreground truncate max-w-[60%] flex items-center gap-1.5">
+                        <span className="text-sm leading-none">{c?.icon || "🏷️"}</span>
+                        {c?.name || "Tanpa Kategori"}
+                      </span>
+                      <span className="font-semibold text-muted-foreground shrink-0">
+                        {formatCurrency(s.amount)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* 3. Note Container: Elegant Memo/Index-Card Style */}
           <div className="space-y-1.5">

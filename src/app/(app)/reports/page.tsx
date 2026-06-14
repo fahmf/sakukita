@@ -280,12 +280,18 @@ export default function ReportsPage() {
     const parentSums = new Map<string, number>();
 
     expenses.forEach((t) => {
-      if (!t.category_id) return;
-      const catDetails = flatCategoryMap.get(t.category_id);
-      if (!catDetails) return;
-
-      const parentId = catDetails.parent_id || t.category_id;
-      parentSums.set(parentId, (parentSums.get(parentId) || 0) + t.amount);
+      const allocations =
+        t.splits && t.splits.length > 0
+          ? t.splits.map((s) => ({ category_id: s.category_id, amount: s.amount }))
+          : t.category_id
+          ? [{ category_id: t.category_id, amount: t.amount }]
+          : [];
+      allocations.forEach(({ category_id, amount }) => {
+        const catDetails = flatCategoryMap.get(category_id);
+        if (!catDetails) return;
+        const parentId = catDetails.parent_id || category_id;
+        parentSums.set(parentId, (parentSums.get(parentId) || 0) + amount);
+      });
     });
 
     const data = Array.from(parentSums.entries()).map(([id, value]) => {
@@ -310,14 +316,20 @@ export default function ReportsPage() {
     const subSums = new Map<string, number>();
 
     expenses.forEach((t) => {
-      if (!t.category_id) return;
-      const catDetails = flatCategoryMap.get(t.category_id);
-      if (!catDetails) return;
-
-      const parentId = catDetails.parent_id || t.category_id;
-      if (parentId === selectedParentCategoryId) {
-        subSums.set(t.category_id, (subSums.get(t.category_id) || 0) + t.amount);
-      }
+      const allocations =
+        t.splits && t.splits.length > 0
+          ? t.splits.map((s) => ({ category_id: s.category_id, amount: s.amount }))
+          : t.category_id
+          ? [{ category_id: t.category_id, amount: t.amount }]
+          : [];
+      allocations.forEach(({ category_id, amount }) => {
+        const catDetails = flatCategoryMap.get(category_id);
+        if (!catDetails) return;
+        const parentId = catDetails.parent_id || category_id;
+        if (parentId === selectedParentCategoryId) {
+          subSums.set(category_id, (subSums.get(category_id) || 0) + amount);
+        }
+      });
     });
 
     const data = Array.from(subSums.entries()).map(([id, value]) => {
