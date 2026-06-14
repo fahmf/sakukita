@@ -7,6 +7,7 @@ import { triggerSync, registerSyncCallback } from "@/lib/db/sync";
 import type { Transaction, Wallet, Category, Budget } from "@/lib/supabase/types";
 import { db } from "@/lib/db/dexie";
 import { useQueryClient } from "@tanstack/react-query";
+import { useUIStore } from "@/stores/ui-store";
 
 export function SyncProvider({ children }: { children: React.ReactNode }) {
   const { householdId } = useHousehold();
@@ -78,6 +79,34 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
               const local = await db.transactions.get(newTx.id);
               if (!local || local.syncStatus !== "pending") {
                 await db.transactions.put({ ...newTx, syncStatus: "synced" });
+              }
+
+              // Deteksi konflik: transaksi yang sedang diedit user diubah
+              // anggota lain (drawer edit masih terbuka). Saat user menyimpan
+              // sendiri, drawer ditutup dulu → editingTransaction null, jadi
+              // echo perubahan sendiri tidak memicu banner.
+              const editing = useUIStore.getState().editingTransaction;
+              if (
+                editing &&
+                newTx.id === editing.id &&
+                editing.updated_at &&
+                new Date(newTx.updated_at).getTime() > new Date(editing.updated_at).getTime()
+              ) {
+                let actor = "anggota lain";
+                try {
+                  const { data } = await supabase
+                    .from("activity_logs")
+                    .select("profiles:actor_id(display_name,email)")
+                    .eq("entity_id", newTx.id)
+                    .order("created_at", { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                  const prof = (data as { profiles?: { display_name: string | null; email: string } | null } | null)?.profiles;
+                  actor = prof?.display_name || prof?.email || actor;
+                } catch {
+                  // abaikan — pakai label generik
+                }
+                useUIStore.getState().setEditConflict({ id: newTx.id, actor });
               }
             }
           }

@@ -13,6 +13,10 @@ interface UIState {
   editingTransaction: any | null;
   openEditTransaction: (tx: any) => void;
 
+  /** Konflik multi-device: transaksi yang sedang diedit diubah anggota lain */
+  editConflict: { id: string; actor: string } | null;
+  setEditConflict: (conflict: { id: string; actor: string } | null) => void;
+
   /** Smart defaults — remembered across sessions for faster re-entry */
   lastWalletId: string | null;
   lastCategoryId: string | null;
@@ -26,12 +30,15 @@ export const useUIStore = create<UIState>()(
       quickAddOpen: false,
       quickAddType: "expense",
       openQuickAdd: (type = "expense") =>
-        set({ quickAddOpen: true, quickAddType: type, editingTransaction: null }),
-      closeQuickAdd: () => set({ quickAddOpen: false, editingTransaction: null }),
+        set({ quickAddOpen: true, quickAddType: type, editingTransaction: null, editConflict: null }),
+      closeQuickAdd: () => set({ quickAddOpen: false, editingTransaction: null, editConflict: null }),
 
       editingTransaction: null,
       openEditTransaction: (tx) =>
-        set({ quickAddOpen: true, quickAddType: tx.type, editingTransaction: tx }),
+        set({ quickAddOpen: true, quickAddType: tx.type, editingTransaction: tx, editConflict: null }),
+
+      editConflict: null,
+      setEditConflict: (editConflict) => set({ editConflict }),
 
       lastWalletId: null,
       lastCategoryId: null,

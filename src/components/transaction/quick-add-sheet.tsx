@@ -50,6 +50,7 @@ import {
   Split,
   Plus,
   X,
+  AlertTriangle,
 } from "lucide-react";
 import type { TransactionType, TransactionSplit } from "@/lib/supabase/types";
 import { compressImage } from "@/lib/image";
@@ -89,6 +90,8 @@ function QuickAddForm() {
     closeQuickAdd,
     setLastWallet,
     setLastCategory,
+    editConflict,
+    setEditConflict,
   } = useUIStore();
 
   const { data: wallets = [] } = useWallets();
@@ -499,6 +502,38 @@ function QuickAddForm() {
       <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Scrollable area above keypad */}
         <div className="flex-1 overflow-y-auto pr-0.5 space-y-4 pb-4 scrollbar-thin">
+          {/* Banner konflik multi-device */}
+          {editConflict && editingTransaction && editConflict.id === editingTransaction.id && (
+            <div className="rounded-2xl border border-amber-300 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="size-4 text-amber-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
+                  Transaksi ini baru saja diubah oleh <strong>{editConflict.actor}</strong>. Menyimpan
+                  sekarang akan menimpa perubahan terbaru.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => closeQuickAdd()}
+                  className="h-8 flex-1 rounded-lg bg-amber-500 text-white hover:bg-amber-600 text-xs font-semibold"
+                >
+                  Muat Ulang Data
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEditConflict(null)}
+                  className="h-8 rounded-lg text-xs"
+                >
+                  Abaikan
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Scan Struk AI Action Panel */}
           {!editingTransaction && (
             <div className="relative overflow-hidden rounded-2xl border border-mint-strong/20 bg-linear-to-r from-mint-soft/30 via-muted/40 to-mint-soft/20 p-3 flex items-center justify-between gap-3">

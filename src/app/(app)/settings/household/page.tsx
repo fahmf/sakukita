@@ -9,6 +9,9 @@ import {
   useRevokeInvite,
   useRemoveMember,
   useUpdateMemberRole,
+  useMyHouseholds,
+  useTransferOwnership,
+  useLeaveHousehold,
 } from "@/hooks/use-households";
 import { useHousehold, canEdit } from "@/components/providers/household-provider";
 import { PageHeading, EmptyState } from "@/components/shared/empty-state";
@@ -39,29 +42,65 @@ import {
   Loader2,
   UserPlus,
   Mail,
+  Crown,
+  LogOut,
 } from "lucide-react";
 import { formatRelative } from "@/lib/format";
 import { useActivityLogs, type ActivityLog } from "@/hooks/use-activity-logs";
 import type { MemberRole } from "@/lib/supabase/types";
 
 export default function HouseholdSettingsPage() {
-  const { householdName, role, userId } = useHousehold();
+  const { householdName, role, userId, householdId } = useHousehold();
   const { data: members = [], isLoading: loadingMembers } = useHouseholdMembers();
   const { data: invites = [], isLoading: loadingInvites } = useInvites();
   const { data: logs = [], isLoading: loadingLogs } = useActivityLogs();
+  const { data: myHouseholds = [] } = useMyHouseholds();
   const createInvite = useCreateInvite();
   const revokeInvite = useRevokeInvite();
   const removeMember = useRemoveMember();
   const updateRole = useUpdateMemberRole();
+  const transferOwnership = useTransferOwnership();
+  const leaveHousehold = useLeaveHousehold();
 
   const isAdmin = role === "admin";
   const allowed = canEdit(role);
+  const isOwner = React.useMemo(
+    () => myHouseholds.some((h) => h.household_id === householdId && h.household?.owner_id === userId),
+    [myHouseholds, householdId, userId]
+  );
 
   const [inviteOpen, setInviteOpen] = React.useState(false);
   const [inviteEmail, setInviteEmail] = React.useState("");
   const [inviteRole, setInviteRole] = React.useState<MemberRole>("editor");
   const [generatedLink, setGeneratedLink] = React.useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = React.useState<string | null>(null);
+
+  // Transfer kepemilikan & keluar household
+  const [transferOpen, setTransferOpen] = React.useState(false);
+  const [transferTarget, setTransferTarget] = React.useState<string>("");
+  const [leaveOpen, setLeaveOpen] = React.useState(false);
+
+  const handleTransfer = async () => {
+    if (!transferTarget) return;
+    try {
+      await transferOwnership.mutateAsync(transferTarget);
+      toast.success("Kepemilikan household berhasil dipindahkan.");
+      setTransferOpen(false);
+      setTransferTarget("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal memindahkan kepemilikan");
+    }
+  };
+
+  const handleLeave = async () => {
+    try {
+      await leaveHousehold.mutateAsync(householdId);
+      toast.success("Kamu telah keluar dari household ini.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal keluar household");
+      setLeaveOpen(false);
+    }
+  };
 
   const handleCreateInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -349,6 +388,144 @@ export default function HouseholdSettingsPage() {
           </div>
         )}
       </section>
+
+      {/* Advanced: transfer ownership & leave household */}
+      <section className="space-y-3 pt-2">
+        <h2 className="text-sm font-semibold text-muted-foreground">Pengaturan Lanjutan</h2>
+        <div className="rounded-2xl border bg-card overflow-hidden divide-y">
+          {isOwner && (
+            <button
+              type="button"
+              onClick={() => setTransferOpen(true)}
+              disabled={members.length < 2}
+              className="flex w-full items-center justify-between gap-3 p-4 text-left hover:bg-muted/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="grid size-9 place-items-center rounded-xl bg-amber-50 dark:bg-amber-950/20 text-amber-500">
+                  <Crown className="size-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">Transfer Kepemilikan</p>
+                  <p className="text-xs text-muted-foreground">
+                    {members.length < 2
+                      ? "Butuh anggota lain untuk transfer"
+                      : "Jadikan anggota lain sebagai pemilik"}
+                  </p>
+                </div>
+              </div>
+            </button>
+          )}
+
+          {!isOwner && (
+            <button
+              type="button"
+              onClick={() => setLeaveOpen(true)}
+              className="flex w-full items-center justify-between gap-3 p-4 text-left hover:bg-red-50/40 dark:hover:bg-red-950/10 transition-colors"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="grid size-9 place-items-center rounded-xl bg-red-50 dark:bg-red-950/20 text-red-500">
+                  <LogOut className="size-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="font-medium text-sm text-red-600 dark:text-red-400">Keluar dari Household</p>
+                  <p className="text-xs text-muted-foreground">
+                    Berhenti mengakses catatan keuangan keluarga ini
+                  </p>
+                </div>
+              </div>
+            </button>
+          )}
+
+          {isOwner && (
+            <div className="p-4 flex items-center gap-3">
+              <span className="grid size-9 place-items-center rounded-xl bg-muted text-muted-foreground">
+                <Crown className="size-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="font-medium text-sm">Kamu pemilik household ini</p>
+                <p className="text-xs text-muted-foreground">
+                  Pemilik tidak bisa keluar. Transfer kepemilikan dulu jika ingin keluar.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Transfer ownership dialog */}
+      <Dialog open={transferOpen} onOpenChange={(o) => !o && setTransferOpen(false)}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Transfer Kepemilikan</DialogTitle>
+            <DialogDescription>
+              Pemilik baru akan menjadi admin penuh. Kamu tetap admin setelah transfer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex flex-col gap-1.5">
+              <Label>Pilih Pemilik Baru</Label>
+              <Select value={transferTarget} onValueChange={setTransferTarget}>
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Pilih anggota" />
+                </SelectTrigger>
+                <SelectContent>
+                  {members
+                    .filter((m) => m.user_id !== userId)
+                    .map((m) => (
+                      <SelectItem key={m.user_id} value={m.user_id}>
+                        {m.profile?.display_name || m.profile?.email || "Anggota"}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                className="rounded-xl h-11 flex-1"
+                onClick={() => setTransferOpen(false)}
+              >
+                Batal
+              </Button>
+              <Button
+                className="rounded-xl h-11 flex-1 bg-mint-strong text-white hover:bg-mint-strong/90"
+                onClick={handleTransfer}
+                disabled={!transferTarget || transferOwnership.isPending}
+              >
+                {transferOwnership.isPending ? "Memproses..." : "Transfer"}
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Leave household confirm */}
+      <Dialog open={leaveOpen} onOpenChange={(o) => !o && setLeaveOpen(false)}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Keluar dari household?</DialogTitle>
+            <DialogDescription>
+              Kamu tidak akan bisa mengakses catatan keuangan household ini lagi sampai diundang kembali.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-2">
+            <Button
+              variant="outline"
+              className="rounded-xl h-11 flex-1"
+              onClick={() => setLeaveOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              className="rounded-xl h-11 flex-1 bg-expense text-white hover:bg-expense/90"
+              onClick={handleLeave}
+              disabled={leaveHousehold.isPending}
+            >
+              {leaveHousehold.isPending ? "Keluar..." : "Ya, Keluar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Create invite dialog */}
       <Dialog open={inviteOpen} onOpenChange={(o) => (o ? setInviteOpen(o) : closeInviteDialog())}>

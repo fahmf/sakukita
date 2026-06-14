@@ -227,6 +227,51 @@ export function useRemoveMember() {
   });
 }
 
+export function useTransferOwnership() {
+  const { householdId } = useHousehold();
+  const queryClient = useQueryClient();
+  const router = useRouter();
+
+  return useMutation({
+    mutationFn: async (newOwnerUserId: string) => {
+      const supabase = createClient() as AnyClient;
+      const { error } = await supabase.rpc("transfer_household_ownership", {
+        p_household_id: householdId,
+        p_new_owner: newOwnerUserId,
+      });
+      if (error) throw error;
+      return newOwnerUserId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household-members", householdId] });
+      queryClient.invalidateQueries({ queryKey: ["my-households"] });
+      router.refresh();
+    },
+  });
+}
+
+export function useLeaveHousehold() {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+
+  return useMutation({
+    mutationFn: async (householdId: string) => {
+      const supabase = createClient() as AnyClient;
+      const { error } = await supabase.rpc("leave_household", {
+        p_household_id: householdId,
+      });
+      if (error) throw error;
+      return householdId;
+    },
+    onSuccess: () => {
+      // Active household berpindah di server → bersihkan cache & muat ulang
+      queryClient.clear();
+      router.replace("/");
+      router.refresh();
+    },
+  });
+}
+
 export function useUpdateMemberRole() {
   const { householdId } = useHousehold();
   const queryClient = useQueryClient();
