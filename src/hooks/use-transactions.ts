@@ -7,6 +7,11 @@ import type { Transaction, TransactionType, ReceiptItem } from "@/lib/supabase/t
 import { db } from "@/lib/db/dexie";
 import { triggerSync } from "@/lib/db/sync";
 import { safeRandomUUID } from "@/lib/utils";
+import {
+  currentFinancialMonth,
+  shiftMonth,
+  financialMonthDateRange,
+} from "@/lib/financial-month";
 
 export interface TransactionWithDetails extends Transaction {
   category: {
@@ -539,26 +544,23 @@ function getPeriodDates(
   customStart: string | null,
   customEnd: string | null
 ): { start: Date | null; end: Date | null } {
-  // We want boundaries in Asia/Jakarta timezone (+07:00)
+  // We want boundaries in Asia/Jakarta timezone (+07:00). "this/last month"
+  // follow the financial cycle (starts on day 25), not the calendar 1st.
   if (period === "this-month") {
-    const now = getJakartaTimeParts();
-    const startStr = `${now.year}-${String(now.month + 1).padStart(2, "0")}-01T00:00:00+07:00`;
-    const lastDay = new Date(now.year, now.month + 1, 0).getDate();
-    const endStr = `${now.year}-${String(now.month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}T23:59:59.999+07:00`;
-    return { start: new Date(startStr), end: new Date(endStr) };
+    const { startDate, endDate } = financialMonthDateRange(currentFinancialMonth());
+    return {
+      start: new Date(`${startDate}T00:00:00+07:00`),
+      end: new Date(`${endDate}T23:59:59.999+07:00`),
+    };
   }
   if (period === "last-month") {
-    const now = getJakartaTimeParts();
-    let prevYear = now.year;
-    let prevMonth = now.month - 1;
-    if (prevMonth < 0) {
-      prevMonth = 11;
-      prevYear -= 1;
-    }
-    const startStr = `${prevYear}-${String(prevMonth + 1).padStart(2, "0")}-01T00:00:00+07:00`;
-    const lastDay = new Date(prevYear, prevMonth + 1, 0).getDate();
-    const endStr = `${prevYear}-${String(prevMonth + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}T23:59:59.999+07:00`;
-    return { start: new Date(startStr), end: new Date(endStr) };
+    const { startDate, endDate } = financialMonthDateRange(
+      shiftMonth(currentFinancialMonth(), -1)
+    );
+    return {
+      start: new Date(`${startDate}T00:00:00+07:00`),
+      end: new Date(`${endDate}T23:59:59.999+07:00`),
+    };
   }
 
   let start: Date | null = null;
@@ -570,39 +572,4 @@ function getPeriodDates(
     end = new Date(`${customEnd}T23:59:59.999+07:00`);
   }
   return { start, end };
-}
-
-function getJakartaTimeParts() {
-  try {
-    const formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Jakarta",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false
-    });
-    const parts = formatter.formatToParts(new Date());
-    const partMap = new Map(parts.map(p => [p.type, p.value]));
-    return {
-      year: parseInt(partMap.get("year")!),
-      month: parseInt(partMap.get("month")!) - 1, // 0-indexed
-      day: parseInt(partMap.get("day")!),
-      hour: parseInt(partMap.get("hour")!),
-      minute: parseInt(partMap.get("minute")!),
-      second: parseInt(partMap.get("second")!)
-    };
-  } catch {
-    const now = new Date();
-    return {
-      year: now.getFullYear(),
-      month: now.getMonth(),
-      day: now.getDate(),
-      hour: now.getHours(),
-      minute: now.getMinutes(),
-      second: now.getSeconds()
-    };
-  }
 }
