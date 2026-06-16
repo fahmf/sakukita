@@ -6,6 +6,11 @@ import { useCategories } from "@/hooks/use-categories";
 import { useWallets, useWalletBalances } from "@/hooks/use-wallets";
 import { formatCurrency } from "@/lib/format";
 import { chartColor } from "@/lib/chart-colors";
+import {
+  currentFinancialMonth,
+  shiftMonth,
+  financialMonthDateRangeAsDates,
+} from "@/lib/financial-month";
 import { PageHeading } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import {
@@ -89,25 +94,30 @@ export default function ReportsPage() {
   const { data: wallets = [], isLoading: loadingWallets } = useWallets();
   const { data: transactions = [], isLoading: loadingTxs } = useTransactions();
 
-  // Helper: Get start and end dates based on period filter
+  // Helper: Get start and end dates based on period filter.
+  // Boundaries follow the financial cycle (starts on day 25), so e.g. "this
+  // month" spans the 25th of last month through the 24th of this month.
   const periodDates = React.useMemo(() => {
-    const now = new Date();
-    let start: Date;
-    let end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999); // End of current month
+    const nowLabel = currentFinancialMonth();
+    const thisMonth = financialMonthDateRangeAsDates(nowLabel);
 
     if (period === "this-month") {
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
-    } else if (period === "last-month") {
-      start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
-    } else if (period === "last-6-months") {
-      start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-    } else {
-      // last-12-months
-      start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+      return thisMonth;
     }
-
-    return { start, end };
+    if (period === "last-month") {
+      return financialMonthDateRangeAsDates(shiftMonth(nowLabel, -1));
+    }
+    if (period === "last-6-months") {
+      return {
+        start: financialMonthDateRangeAsDates(shiftMonth(nowLabel, -5)).start,
+        end: thisMonth.end,
+      };
+    }
+    // last-12-months
+    return {
+      start: financialMonthDateRangeAsDates(shiftMonth(nowLabel, -11)).start,
+      end: thisMonth.end,
+    };
   }, [period]);
 
   // Filter transactions by date and selected wallet locally for instant responses

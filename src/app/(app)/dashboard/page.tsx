@@ -7,6 +7,7 @@ import { useTransactions, useDeleteTransaction } from "@/hooks/use-transactions"
 import { useBudgets } from "@/hooks/use-budgets";
 import { useCategories } from "@/hooks/use-categories";
 import { formatCurrency, formatRelative } from "@/lib/format";
+import { currentFinancialMonth, financialMonthDateRange } from "@/lib/financial-month";
 import { useUIStore } from "@/stores/ui-store";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -56,11 +57,9 @@ export default function DashboardPage() {
   const { openQuickAdd, openEditTransaction } = useUIStore();
   const { data: walletBalances = [], isLoading: loadingBalances } = useWalletBalances();
 
-  // Dynamic month selection state (initialized to first day of current month)
-  const [selectedMonth, setSelectedMonth] = React.useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-  });
+  // Dynamic month selection state (initialized to the current financial month,
+  // whose cycle starts on day 25 of the previous calendar month)
+  const [selectedMonth, setSelectedMonth] = React.useState(() => currentFinancialMonth());
 
   const [showAll, setShowAll] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -88,17 +87,11 @@ export default function DashboardPage() {
     );
   };
 
-  // Convert selectedMonth to precise YYYY-MM-DD date string ranges for useTransactions
-  const { startDate, endDate } = React.useMemo(() => {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    const firstDay = `${y}-${String(m).padStart(2, "0")}-01`;
-    const lastDayNum = new Date(y, m, 0).getDate();
-    const lastDay = `${y}-${String(m).padStart(2, "0")}-${String(lastDayNum).padStart(2, "0")}`;
-    return {
-      startDate: firstDay,
-      endDate: lastDay,
-    };
-  }, [selectedMonth]);
+  // Convert selectedMonth to the financial-cycle date range for useTransactions
+  const { startDate, endDate } = React.useMemo(
+    () => financialMonthDateRange(selectedMonth),
+    [selectedMonth]
+  );
 
   const { data: transactions = [], isLoading: loadingTx } = useTransactions({
     period: "custom",

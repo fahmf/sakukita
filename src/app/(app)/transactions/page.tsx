@@ -6,6 +6,7 @@ import { useTransactions, useDeleteTransaction } from "@/hooks/use-transactions"
 import { useWallets } from "@/hooks/use-wallets";
 import { useCategories } from "@/hooks/use-categories";
 import { formatCurrency, formatRelative } from "@/lib/format";
+import { currentFinancialMonth, financialMonthDateRange } from "@/lib/financial-month";
 import { useUIStore } from "@/stores/ui-store";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -56,11 +57,8 @@ export default function AllTransactionsPage() {
   const allowed = useCanEdit();
   const deleteTx = useDeleteTransaction();
 
-  // Navigation states
-  const [selectedMonth, setSelectedMonth] = React.useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-  });
+  // Navigation states (initialized to the current financial month, cycle day 25)
+  const [selectedMonth, setSelectedMonth] = React.useState(() => currentFinancialMonth());
 
   // Filter and search states
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -94,17 +92,11 @@ export default function AllTransactionsPage() {
     return date.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
   }, [selectedMonth]);
 
-  // Convert selectedMonth to precise YYYY-MM-DD date string ranges for useTransactions
-  const { startDate, endDate } = React.useMemo(() => {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    const firstDay = `${y}-${String(m).padStart(2, "0")}-01`;
-    const lastDayNum = new Date(y, m, 0).getDate();
-    const lastDay = `${y}-${String(m).padStart(2, "0")}-${String(lastDayNum).padStart(2, "0")}`;
-    return {
-      startDate: firstDay,
-      endDate: lastDay,
-    };
-  }, [selectedMonth]);
+  // Convert selectedMonth to the financial-cycle date range for useTransactions
+  const { startDate, endDate } = React.useMemo(
+    () => financialMonthDateRange(selectedMonth),
+    [selectedMonth]
+  );
 
   // Fetch data
   const { data: transactions = [], isLoading: loadingTx } = useTransactions({

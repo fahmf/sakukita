@@ -6,6 +6,7 @@ import { useBudgets, useSetBudget, useDeleteBudget } from "@/hooks/use-budgets";
 import { useTransactions } from "@/hooks/use-transactions";
 import { useGoals, useCreateGoal, useUpdateGoal, useDeleteGoal } from "@/hooks/use-goals";
 import { formatCurrency } from "@/lib/format";
+import { currentFinancialMonth, shiftMonth, isInFinancialMonth } from "@/lib/financial-month";
 import { PageHeading } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,11 +37,8 @@ import type { Category, SavingsGoal } from "@/lib/supabase/types";
 import { BudgetCardSkeleton, GoalListSkeleton } from "@/components/shared/skeletons";
 
 export default function BudgetsPage() {
-  const now = new Date();
-  const currentMonthInitial = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-
   const [activeTab, setActiveTab] = React.useState<"budgets" | "goals">("budgets");
-  const [selectedMonth, setSelectedMonth] = React.useState(currentMonthInitial);
+  const [selectedMonth, setSelectedMonth] = React.useState(() => currentFinancialMonth());
   
   // Budget states
   const [dialogOpen, setDialogOpen] = React.useState(false);
@@ -78,11 +76,7 @@ export default function BudgetsPage() {
   const deleteBudgetMutation = useDeleteBudget();
 
   // Helper: Prev month string
-  const prevMonthStr = React.useMemo(() => {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    const prevDate = new Date(y, m - 2, 1);
-    return `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}-01`;
-  }, [selectedMonth]);
+  const prevMonthStr = React.useMemo(() => shiftMonth(selectedMonth, -1), [selectedMonth]);
 
   // Helpers: Format date for header Indonesian
   const monthLabel = React.useMemo(() => {
@@ -125,10 +119,6 @@ export default function BudgetsPage() {
 
   // Calculate budgets status: limit, spent, carry over details
   const budgetsAnalysis = React.useMemo(() => {
-    const isSameMonth = (dateStr: string, monthStr: string) => {
-      return dateStr.startsWith(monthStr.slice(0, 7));
-    };
-
     return flatCategories.map((cat) => {
       // Find current budget
       const curBudget = budgets.find(
@@ -153,7 +143,7 @@ export default function BudgetsPage() {
             t.type === "expense" &&
             t.category_id &&
             targetIds.includes(t.category_id) &&
-            isSameMonth(t.occurred_at, selectedMonth)
+            isInFinancialMonth(t.occurred_at, selectedMonth)
         )
         .reduce((sum, t) => sum + t.amount, 0);
 
@@ -164,7 +154,7 @@ export default function BudgetsPage() {
             t.type === "expense" &&
             t.category_id &&
             targetIds.includes(t.category_id) &&
-            isSameMonth(t.occurred_at, prevMonthStr)
+            isInFinancialMonth(t.occurred_at, prevMonthStr)
         )
         .reduce((sum, t) => sum + t.amount, 0);
 
