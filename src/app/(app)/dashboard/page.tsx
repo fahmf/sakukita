@@ -3,11 +3,18 @@
 import * as React from "react";
 import Link from "next/link";
 import { useWalletBalances } from "@/hooks/use-wallets";
-import { useTransactions, useDeleteTransaction, useRestoreTransaction, type TransactionWithDetails } from "@/hooks/use-transactions";
+import {
+  useTransactions,
+  useDeleteTransaction,
+  useRestoreTransaction,
+  useScheduledTransactions,
+  type TransactionWithDetails,
+} from "@/hooks/use-transactions";
 import { useBudgets } from "@/hooks/use-budgets";
 import { useCategories } from "@/hooks/use-categories";
-import { formatCurrency, formatRelative } from "@/lib/format";
-import { currentFinancialMonth, financialMonthDateRange } from "@/lib/financial-month";
+import { useDebts } from "@/hooks/use-debts";
+import { formatCurrency, formatRelative, formatDateShort } from "@/lib/format";
+import { currentFinancialMonth, financialMonthDateRange, shiftMonth } from "@/lib/financial-month";
 import { useUIStore } from "@/stores/ui-store";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -34,6 +41,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
+  CalendarClock,
   Trash2,
   Search,
   Pencil,
@@ -93,8 +101,23 @@ export default function DashboardPage() {
     categoryId: null,
   });
 
+  // Previous financial month — used only to compare expense month-over-month.
+  const { startDate: prevStart, endDate: prevEnd } = React.useMemo(
+    () => financialMonthDateRange(shiftMonth(selectedMonth, -1)),
+    [selectedMonth]
+  );
+  const { data: prevTransactions = [] } = useTransactions({
+    period: "custom",
+    startDate: prevStart,
+    endDate: prevEnd,
+    walletId: null,
+    categoryId: null,
+  });
+
   const { data: categories = [] } = useCategories();
   const { data: budgets = [], isLoading: loadingBudgets } = useBudgets(selectedMonth);
+  const { data: debts = [] } = useDebts();
+  const { data: scheduledTx = [] } = useScheduledTransactions();
 
   // Calculate Net Worth based on active balances
   const totalNetWorth = React.useMemo(() => {
@@ -116,6 +139,79 @@ export default function DashboardPage() {
 
     return { monthlyIncome: income, monthlyExpense: expense };
   }, [transactions]);
+
+  // Month-over-month expense change vs the previous financial month.
+  const expenseDelta = React.useMemo(() => {
+    const prevExpense = prevTransactions.reduce(
+      (sum, t) => (t.type === "expense" ? sum + t.amount : sum),
+      0
+    );
+    if (prevExpense <= 0) return null;
+    const pct = Math.round(((monthlyExpense - prevExpense) / prevExpense) * 100);
+    return { pct };
+  }, [prevTransactions, monthlyExpense]);
+
+  // Outstanding debt position (separate ledger from wallet balances).
+  const { receivables, payables } = React.useMemo(() => {
+    let receivables = 0;
+    let payables = 0;
+    debts.forEach((d) => {
+      if (d.is_completed) return;
+      if (d.type === "receivable") receivables += d.remaining_amount;
+      else payables += d.remaining_amount;
+    });
+    return { receivables, payables };
+  }, [debts]);
+  const hasDebtPosition = receivables > 0 || payables > 0;
+
+  // Upcoming & due: future scheduled transactions + open debts with a due date,
+  // within the next 30 days (plus any already-overdue debts), nearest first.
+  const upcomingItems = React.useMemo(() => {
+    type Item = {
+      id: string;
+      title: string;
+      date: string;
+      amount: number;
+      flow: "in" | "out" | "neutral";
+      kind: "scheduled" | "debt";
+      href: string;
+    };
+    const items: Item[] = [];
+
+    scheduledTx.forEach((t) => {
+      items.push({
+        id: `s-${t.id}`,
+        title:
+          t.note ||
+          t.category?.name ||
+          (t.type === "transfer" ? `Transfer ke ${t.to_wallet?.name ?? ""}` : "Transaksi terjadwal"),
+        date: t.occurred_at,
+        amount: t.amount,
+        flow: t.type === "income" ? "in" : t.type === "expense" ? "out" : "neutral",
+        kind: "scheduled",
+        href: "/scheduled",
+      });
+    });
+
+    debts.forEach((d) => {
+      if (d.is_completed || !d.due_date) return;
+      items.push({
+        id: `d-${d.id}`,
+        title: d.name,
+        date: d.due_date,
+        amount: d.remaining_amount,
+        flow: d.type === "receivable" ? "in" : "out",
+        kind: "debt",
+        href: "/debts",
+      });
+    });
+
+    const horizon = Date.now() + 30 * 86400000;
+    return items
+      .filter((it) => new Date(it.date).getTime() <= horizon)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(0, 4);
+  }, [scheduledTx, debts]);
 
   const budgetProgress = React.useMemo(() => {
     return budgets.map((b) => {
@@ -230,6 +326,20 @@ export default function DashboardPage() {
               {formatCurrency(totalNetWorth)}
             </p>
           )}
+          {!loadingBalances && hasDebtPosition && (
+            <div className="flex items-center justify-center gap-3 pt-1 text-[11px] font-semibold">
+              {receivables > 0 && (
+                <span className="text-income">
+                  + Piutang {formatCurrency(receivables).replace("Rp", "").trim()}
+                </span>
+              )}
+              {payables > 0 && (
+                <span className="text-expense">
+                  − Utang {formatCurrency(payables).replace("Rp", "").trim()}
+                </span>
+              )}
+            </div>
+          )}
         </Card>
       </Link>
 
@@ -257,8 +367,82 @@ export default function DashboardPage() {
           <p className="text-base font-bold text-expense tracking-tight">
             {loadingTx ? "..." : `-${formatCurrency(monthlyExpense).replace("Rp", "").trim()}`}
           </p>
+          {!loadingTx && expenseDelta && (
+            <p
+              className={`flex items-center gap-0.5 text-[10px] font-semibold ${
+                expenseDelta.pct > 0
+                  ? "text-expense"
+                  : expenseDelta.pct < 0
+                  ? "text-income"
+                  : "text-muted-foreground"
+              }`}
+            >
+              {expenseDelta.pct > 0 ? (
+                <ArrowUpRight className="size-3" />
+              ) : expenseDelta.pct < 0 ? (
+                <ArrowDownRight className="size-3" />
+              ) : null}
+              {expenseDelta.pct > 0 ? "+" : ""}
+              {expenseDelta.pct}% vs bln lalu
+            </p>
+          )}
         </Card>
       </div>
+
+      {/* 3b. Upcoming & due (scheduled transactions + debts with a due date) */}
+      {upcomingItems.length > 0 && (
+        <div className="space-y-2.5">
+          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+            <CalendarClock className="size-3.5" /> Akan Datang & Jatuh Tempo
+          </h2>
+          <Card className="rounded-2xl border bg-card divide-y overflow-hidden">
+            {upcomingItems.map((it) => {
+              const due = dueLabel(it.date);
+              return (
+                <Link
+                  key={it.id}
+                  href={it.href}
+                  className="flex items-center justify-between gap-3 p-3.5 transition-colors hover:bg-muted/40"
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span
+                      className={`grid size-9 shrink-0 place-items-center rounded-xl ${
+                        it.kind === "debt"
+                          ? "bg-amber-50 text-amber-600 dark:bg-amber-950/20"
+                          : "bg-mint-soft text-mint-strong"
+                      }`}
+                    >
+                      <CalendarClock className="size-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm text-foreground truncate">{it.title}</p>
+                      <p
+                        className={`text-xs font-medium ${
+                          due.tone === "overdue"
+                            ? "text-expense"
+                            : due.tone === "today" || due.tone === "soon"
+                            ? "text-amber-600 dark:text-amber-500"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {due.text} · {it.kind === "debt" ? "Utang/Piutang" : "Terjadwal"}
+                      </p>
+                    </div>
+                  </div>
+                  <p
+                    className={`shrink-0 text-right font-bold text-sm tracking-tight ${
+                      it.flow === "in" ? "text-income" : it.flow === "out" ? "text-expense" : "text-foreground"
+                    }`}
+                  >
+                    {it.flow === "in" ? "+" : it.flow === "out" ? "-" : ""}
+                    {formatCurrency(it.amount).replace("Rp", "").trim()}
+                  </p>
+                </Link>
+              );
+            })}
+          </Card>
+        </div>
+      )}
 
       {/* 4. Budget progress display */}
       <div className="space-y-2.5">
@@ -476,4 +660,21 @@ export default function DashboardPage() {
       />
     </div>
   );
+}
+
+/** Human due-date label + tone for the upcoming/due widget. */
+function dueLabel(dateStr: string): {
+  text: string;
+  tone: "overdue" | "today" | "soon" | "future";
+} {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const d = new Date(dateStr);
+  const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.round((dd.getTime() - today.getTime()) / 86400000);
+  if (diffDays < 0) return { text: `Terlambat ${Math.abs(diffDays)} hari`, tone: "overdue" };
+  if (diffDays === 0) return { text: "Jatuh tempo hari ini", tone: "today" };
+  if (diffDays === 1) return { text: "Besok", tone: "soon" };
+  if (diffDays <= 7) return { text: `${diffDays} hari lagi`, tone: "soon" };
+  return { text: formatDateShort(d), tone: "future" };
 }
