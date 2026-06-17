@@ -160,6 +160,10 @@ function QuickAddForm() {
 
   // Handle keypad presses
   const handleKeypadPress = (key: string) => {
+    // Subtle haptic tick on supported devices (mobile). No-op elsewhere.
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate?.(8);
+    }
     if (key === "C") {
       setAmountExpr("");
     } else if (key === "⌫") {

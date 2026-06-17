@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useTransactions, useDeleteTransaction } from "@/hooks/use-transactions";
+import { useTransactions, useDeleteTransaction, useRestoreTransaction } from "@/hooks/use-transactions";
 import { useWallets } from "@/hooks/use-wallets";
 import { useCategories } from "@/hooks/use-categories";
 import { formatCurrency, formatRelative } from "@/lib/format";
@@ -13,14 +13,6 @@ import { Card } from "@/components/ui/card";
 import { PageHeading } from "@/components/shared/empty-state";
 import type { TransactionWithDetails } from "@/hooks/use-transactions";
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -56,6 +48,7 @@ export default function AllTransactionsPage() {
   const { openEditTransaction } = useUIStore();
   const allowed = useCanEdit();
   const deleteTx = useDeleteTransaction();
+  const restoreTx = useRestoreTransaction();
 
   // Navigation states (initialized to the current financial month, cycle day 25)
   const [selectedMonth, setSelectedMonth] = React.useState(() => currentFinancialMonth());
@@ -68,7 +61,6 @@ export default function AllTransactionsPage() {
 
   // Dialog & Detail states
   const [selectedTxForDetail, setSelectedTxForDetail] = React.useState<TransactionWithDetails | null>(null);
-  const [txToDelete, setTxToDelete] = React.useState<TransactionWithDetails | null>(null);
 
   // Helper: Prev/Next month logic
   const handlePrevMonth = () => {
@@ -217,20 +209,28 @@ export default function AllTransactionsPage() {
       .map((key) => groups[key]);
   }, [filteredTransactions]);
 
-  const handleDeleteConfirm = async () => {
-    if (!txToDelete) return;
+  // Delete immediately and offer an "Undo" — soft-delete keeps it in the
+  // 30-day recycle bin, so this is safe and much faster than a confirm dialog.
+  const handleQuickDelete = async (tx: TransactionWithDetails) => {
     if (!allowed) {
       viewOnlyToast();
-      setTxToDelete(null);
       return;
     }
     try {
-      await deleteTx.mutateAsync(txToDelete.id);
-      toast.success("Transaksi berhasil dihapus");
+      await deleteTx.mutateAsync(tx.id);
+      toast.success("Transaksi dihapus", {
+        description: `${tx.note || tx.category?.name || "Transaksi"} · ${formatCurrency(tx.amount)}`,
+        action: {
+          label: "Urungkan",
+          onClick: () => {
+            restoreTx.mutate(tx.id, {
+              onSuccess: () => toast.success("Transaksi dipulihkan"),
+            });
+          },
+        },
+      });
     } catch {
       toast.error("Gagal menghapus transaksi.");
-    } finally {
-      setTxToDelete(null);
     }
   };
 
@@ -502,7 +502,7 @@ export default function AllTransactionsPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => setTxToDelete(tx)}
+                            onClick={() => handleQuickDelete(tx)}
                             className="size-8 rounded-lg text-muted-foreground hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
                             aria-label="Hapus transaksi"
                           >
@@ -525,45 +525,8 @@ export default function AllTransactionsPage() {
         open={selectedTxForDetail !== null}
         onOpenChange={(o) => !o && setSelectedTxForDetail(null)}
         onEdit={openEditTransaction}
-        onDelete={setTxToDelete}
+        onDelete={handleQuickDelete}
       />
-
-      {/* Confirmation Dialog for Transaction Deletion */}
-      {txToDelete !== null && (
-        <Dialog
-          open={txToDelete !== null}
-          onOpenChange={(o) => !o && setTxToDelete(null)}
-        >
-          <DialogContent className="sm:max-w-md rounded-2xl">
-            <DialogHeader>
-              <DialogTitle>Hapus transaksi ini?</DialogTitle>
-              <DialogDescription>
-                Transaksi sebesar{" "}
-                <span className="font-semibold text-foreground">
-                  {txToDelete ? formatCurrency(txToDelete.amount) : ""}
-                </span>{" "}
-                ({txToDelete?.note || txToDelete?.category?.name || "Tanpa catatan"}) akan dipindahkan ke Recycle Bin selama 30 hari.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="gap-2 pt-2">
-              <Button
-                variant="outline"
-                className="rounded-xl h-11"
-                onClick={() => setTxToDelete(null)}
-              >
-                Batal
-              </Button>
-              <Button
-                className="rounded-xl h-11 bg-expense text-white hover:bg-expense/90"
-                onClick={handleDeleteConfirm}
-                disabled={deleteTx.isPending}
-              >
-                {deleteTx.isPending ? "Menghapus..." : "Ya, Hapus"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }
