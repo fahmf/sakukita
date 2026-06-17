@@ -25,6 +25,7 @@ import {
   ArrowLeft,
   ArrowRightLeft,
   Calendar,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Search,
@@ -257,6 +258,14 @@ export default function AllTransactionsPage() {
           <ArrowLeft className="size-4" />
         </Link>
         <PageHeading title="Riwayat Transaksi" subtitle="Semua catatan keuangan keluarga" />
+        <Link
+          href="/calendar"
+          className="ml-auto grid size-9 place-items-center rounded-full hover:bg-muted transition-colors"
+          aria-label="Tampilan kalender"
+          title="Tampilan kalender"
+        >
+          <CalendarDays className="size-4" />
+        </Link>
       </div>
 
       {/* 2. Month Navigator */}
