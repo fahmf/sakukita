@@ -145,6 +145,25 @@ export function TransactionDetailDialog({
             </div>
           </div>
 
+          {/* 3a. Tags */}
+          {tx.tags && tx.tags.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                Tag
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {tx.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-mint-soft px-2.5 py-0.5 text-xs font-medium text-mint-strong"
+                  >
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* 3b. Receipt Items (collapsible — only if receipt_items exists) */}
           {tx.receipt_items && tx.receipt_items.length > 0 && (
             <div className="space-y-1.5">

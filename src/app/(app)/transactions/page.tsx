@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useTransactions, useDeleteTransaction } from "@/hooks/use-transactions";
+import { useTransactions, useDeleteTransaction, useRestoreTransaction } from "@/hooks/use-transactions";
 import { useWallets } from "@/hooks/use-wallets";
 import { useCategories } from "@/hooks/use-categories";
 import { formatCurrency, formatRelative } from "@/lib/format";
@@ -13,14 +13,6 @@ import { Card } from "@/components/ui/card";
 import { PageHeading } from "@/components/shared/empty-state";
 import type { TransactionWithDetails } from "@/hooks/use-transactions";
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -33,6 +25,7 @@ import {
   ArrowLeft,
   ArrowRightLeft,
   Calendar,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Search,
@@ -56,6 +49,7 @@ export default function AllTransactionsPage() {
   const { openEditTransaction } = useUIStore();
   const allowed = useCanEdit();
   const deleteTx = useDeleteTransaction();
+  const restoreTx = useRestoreTransaction();
 
   // Navigation states (initialized to the current financial month, cycle day 25)
   const [selectedMonth, setSelectedMonth] = React.useState(() => currentFinancialMonth());
@@ -64,10 +58,10 @@ export default function AllTransactionsPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [selectedWalletId, setSelectedWalletId] = React.useState<string>("all");
   const [selectedCategoryId, setSelectedCategoryId] = React.useState<string>("all");
+  const [selectedTag, setSelectedTag] = React.useState<string | null>(null);
 
   // Dialog & Detail states
   const [selectedTxForDetail, setSelectedTxForDetail] = React.useState<TransactionWithDetails | null>(null);
-  const [txToDelete, setTxToDelete] = React.useState<TransactionWithDetails | null>(null);
 
   // Helper: Prev/Next month logic
   const handlePrevMonth = () => {
@@ -123,7 +117,8 @@ export default function AllTransactionsPage() {
         const walletMatch = t.wallet?.name?.toLowerCase().includes(q);
         const toWalletMatch = t.to_wallet?.name?.toLowerCase().includes(q);
         const amountMatch = t.amount.toString().includes(q);
-        return noteMatch || catMatch || walletMatch || toWalletMatch || amountMatch;
+        const tagMatch = t.tags?.some((tg) => tg.toLowerCase().includes(q.replace(/^#/, "")));
+        return noteMatch || catMatch || walletMatch || toWalletMatch || amountMatch || tagMatch;
       });
     }
 
@@ -139,8 +134,20 @@ export default function AllTransactionsPage() {
       result = result.filter((t) => t.category_id === selectedCategoryId);
     }
 
+    // Tag filter
+    if (selectedTag) {
+      result = result.filter((t) => t.tags?.includes(selectedTag));
+    }
+
     return result;
-  }, [transactions, searchQuery, selectedWalletId, selectedCategoryId]);
+  }, [transactions, searchQuery, selectedWalletId, selectedCategoryId, selectedTag]);
+
+  // Unique tags present in the current month's transactions (for the quick filter row).
+  const availableTags = React.useMemo(() => {
+    const set = new Set<string>();
+    transactions.forEach((t) => t.tags?.forEach((tg) => set.add(tg)));
+    return Array.from(set).sort();
+  }, [transactions]);
 
   // Dynamic grouping by date matching Jakarta Timezone
   const groupedTransactions = React.useMemo(() => {
@@ -203,20 +210,28 @@ export default function AllTransactionsPage() {
       .map((key) => groups[key]);
   }, [filteredTransactions]);
 
-  const handleDeleteConfirm = async () => {
-    if (!txToDelete) return;
+  // Delete immediately and offer an "Undo" — soft-delete keeps it in the
+  // 30-day recycle bin, so this is safe and much faster than a confirm dialog.
+  const handleQuickDelete = async (tx: TransactionWithDetails) => {
     if (!allowed) {
       viewOnlyToast();
-      setTxToDelete(null);
       return;
     }
     try {
-      await deleteTx.mutateAsync(txToDelete.id);
-      toast.success("Transaksi berhasil dihapus");
+      await deleteTx.mutateAsync(tx.id);
+      toast.success("Transaksi dihapus", {
+        description: `${tx.note || tx.category?.name || "Transaksi"} · ${formatCurrency(tx.amount)}`,
+        action: {
+          label: "Urungkan",
+          onClick: () => {
+            restoreTx.mutate(tx.id, {
+              onSuccess: () => toast.success("Transaksi dipulihkan"),
+            });
+          },
+        },
+      });
     } catch {
       toast.error("Gagal menghapus transaksi.");
-    } finally {
-      setTxToDelete(null);
     }
   };
 
@@ -224,8 +239,12 @@ export default function AllTransactionsPage() {
     setSearchQuery("");
     setSelectedWalletId("all");
     setSelectedCategoryId("all");
+    setSelectedTag(null);
     toast.info("Filter pencarian direset");
   };
+
+  const hasActiveFilters =
+    !!searchQuery || selectedWalletId !== "all" || selectedCategoryId !== "all" || !!selectedTag;
 
   return (
     <div className="space-y-5">
@@ -239,6 +258,14 @@ export default function AllTransactionsPage() {
           <ArrowLeft className="size-4" />
         </Link>
         <PageHeading title="Riwayat Transaksi" subtitle="Semua catatan keuangan keluarga" />
+        <Link
+          href="/calendar"
+          className="ml-auto grid size-9 place-items-center rounded-full hover:bg-muted transition-colors"
+          aria-label="Tampilan kalender"
+          title="Tampilan kalender"
+        >
+          <CalendarDays className="size-4" />
+        </Link>
       </div>
 
       {/* 2. Month Navigator */}
@@ -322,8 +349,36 @@ export default function AllTransactionsPage() {
           </div>
         </div>
 
+        {/* Tag quick-filter row */}
+        {availableTags.length > 0 && (
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block pl-1">
+              Tag
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {availableTags.map((tag) => {
+                const active = selectedTag === tag;
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setSelectedTag(active ? null : tag)}
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium transition-all active:scale-95 ${
+                      active
+                        ? "bg-mint-strong text-white"
+                        : "bg-muted/40 text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    #{tag}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Reset button if filters active */}
-        {(searchQuery || selectedWalletId !== "all" || selectedCategoryId !== "all") && (
+        {hasActiveFilters && (
           <Button
             variant="ghost"
             onClick={resetFilters}
@@ -456,7 +511,7 @@ export default function AllTransactionsPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => setTxToDelete(tx)}
+                            onClick={() => handleQuickDelete(tx)}
                             className="size-8 rounded-lg text-muted-foreground hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
                             aria-label="Hapus transaksi"
                           >
@@ -479,45 +534,8 @@ export default function AllTransactionsPage() {
         open={selectedTxForDetail !== null}
         onOpenChange={(o) => !o && setSelectedTxForDetail(null)}
         onEdit={openEditTransaction}
-        onDelete={setTxToDelete}
+        onDelete={handleQuickDelete}
       />
-
-      {/* Confirmation Dialog for Transaction Deletion */}
-      {txToDelete !== null && (
-        <Dialog
-          open={txToDelete !== null}
-          onOpenChange={(o) => !o && setTxToDelete(null)}
-        >
-          <DialogContent className="sm:max-w-md rounded-2xl">
-            <DialogHeader>
-              <DialogTitle>Hapus transaksi ini?</DialogTitle>
-              <DialogDescription>
-                Transaksi sebesar{" "}
-                <span className="font-semibold text-foreground">
-                  {txToDelete ? formatCurrency(txToDelete.amount) : ""}
-                </span>{" "}
-                ({txToDelete?.note || txToDelete?.category?.name || "Tanpa catatan"}) akan dipindahkan ke Recycle Bin selama 30 hari.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="gap-2 pt-2">
-              <Button
-                variant="outline"
-                className="rounded-xl h-11"
-                onClick={() => setTxToDelete(null)}
-              >
-                Batal
-              </Button>
-              <Button
-                className="rounded-xl h-11 bg-expense text-white hover:bg-expense/90"
-                onClick={handleDeleteConfirm}
-                disabled={deleteTx.isPending}
-              >
-                {deleteTx.isPending ? "Menghapus..." : "Ya, Hapus"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }

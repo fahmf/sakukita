@@ -59,6 +59,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import type { Category, CategoryKind } from "@/lib/supabase/types";
+import { NotificationSettingsCard } from "@/components/settings/notification-settings-card";
 
 import { iconMap } from "@/lib/icons";
 
@@ -472,6 +473,9 @@ export default function SettingsPage() {
             </SelectContent>
           </Select>
         </div>
+
+        {/* Notification preferences */}
+        <NotificationSettingsCard />
 
         {/* Troubleshoot / Reset Cache Card */}
         <button
