@@ -64,6 +64,7 @@ export default function AllTransactionsPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [selectedWalletId, setSelectedWalletId] = React.useState<string>("all");
   const [selectedCategoryId, setSelectedCategoryId] = React.useState<string>("all");
+  const [selectedTag, setSelectedTag] = React.useState<string | null>(null);
 
   // Dialog & Detail states
   const [selectedTxForDetail, setSelectedTxForDetail] = React.useState<TransactionWithDetails | null>(null);
@@ -123,7 +124,8 @@ export default function AllTransactionsPage() {
         const walletMatch = t.wallet?.name?.toLowerCase().includes(q);
         const toWalletMatch = t.to_wallet?.name?.toLowerCase().includes(q);
         const amountMatch = t.amount.toString().includes(q);
-        return noteMatch || catMatch || walletMatch || toWalletMatch || amountMatch;
+        const tagMatch = t.tags?.some((tg) => tg.toLowerCase().includes(q.replace(/^#/, "")));
+        return noteMatch || catMatch || walletMatch || toWalletMatch || amountMatch || tagMatch;
       });
     }
 
@@ -139,8 +141,20 @@ export default function AllTransactionsPage() {
       result = result.filter((t) => t.category_id === selectedCategoryId);
     }
 
+    // Tag filter
+    if (selectedTag) {
+      result = result.filter((t) => t.tags?.includes(selectedTag));
+    }
+
     return result;
-  }, [transactions, searchQuery, selectedWalletId, selectedCategoryId]);
+  }, [transactions, searchQuery, selectedWalletId, selectedCategoryId, selectedTag]);
+
+  // Unique tags present in the current month's transactions (for the quick filter row).
+  const availableTags = React.useMemo(() => {
+    const set = new Set<string>();
+    transactions.forEach((t) => t.tags?.forEach((tg) => set.add(tg)));
+    return Array.from(set).sort();
+  }, [transactions]);
 
   // Dynamic grouping by date matching Jakarta Timezone
   const groupedTransactions = React.useMemo(() => {
@@ -224,8 +238,12 @@ export default function AllTransactionsPage() {
     setSearchQuery("");
     setSelectedWalletId("all");
     setSelectedCategoryId("all");
+    setSelectedTag(null);
     toast.info("Filter pencarian direset");
   };
+
+  const hasActiveFilters =
+    !!searchQuery || selectedWalletId !== "all" || selectedCategoryId !== "all" || !!selectedTag;
 
   return (
     <div className="space-y-5">
@@ -322,8 +340,36 @@ export default function AllTransactionsPage() {
           </div>
         </div>
 
+        {/* Tag quick-filter row */}
+        {availableTags.length > 0 && (
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block pl-1">
+              Tag
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {availableTags.map((tag) => {
+                const active = selectedTag === tag;
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setSelectedTag(active ? null : tag)}
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium transition-all active:scale-95 ${
+                      active
+                        ? "bg-mint-strong text-white"
+                        : "bg-muted/40 text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    #{tag}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Reset button if filters active */}
-        {(searchQuery || selectedWalletId !== "all" || selectedCategoryId !== "all") && (
+        {hasActiveFilters && (
           <Button
             variant="ghost"
             onClick={resetFilters}

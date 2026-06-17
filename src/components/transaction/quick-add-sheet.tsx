@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -46,6 +47,8 @@ import {
   CircleDot,
   Briefcase,
   Keyboard,
+  Tag,
+  X,
 } from "lucide-react";
 import type { TransactionType } from "@/lib/supabase/types";
 import { compressImage } from "@/lib/image";
@@ -115,6 +118,13 @@ function QuickAddForm() {
   const [note, setNote] = React.useState(() =>
     editingTransaction ? (editingTransaction.note || "") : ""
   );
+  const [tags, setTags] = React.useState<string[]>(() =>
+    editingTransaction ? (editingTransaction.tags ?? []) : []
+  );
+  const [tagInput, setTagInput] = React.useState("");
+
+  // "Simpan & tambah lagi" — keeps the drawer open after saving for fast batch entry.
+  const [keepOpen, setKeepOpen] = React.useState(false);
 
   // Keypad open/close visibility state
   const [showKeypad, setShowKeypad] = React.useState(true);
@@ -323,6 +333,44 @@ function QuickAddForm() {
     return /[+\-*/()]/.test(amountExpr);
   }, [amountExpr]);
 
+  // Tag helpers — normalise (lowercase, strip leading '#', collapse spaces) and dedupe.
+  const commitTag = (raw: string) => {
+    const cleaned = raw.trim().replace(/^#+/, "").replace(/\s+/g, " ").toLowerCase();
+    if (!cleaned) return;
+    setTags((prev) => (prev.includes(cleaned) ? prev : [...prev, cleaned]));
+    setTagInput("");
+  };
+
+  const removeTag = (tag: string) => {
+    setTags((prev) => prev.filter((t) => t !== tag));
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      // Prevent the surrounding <form> from submitting on Enter.
+      e.preventDefault();
+      commitTag(tagInput);
+    } else if (e.key === "Backspace" && !tagInput && tags.length > 0) {
+      // Quick-remove the last chip when the field is empty.
+      e.preventDefault();
+      removeTag(tags[tags.length - 1]);
+    }
+  };
+
+  // Reset only the transient fields so the next entry can reuse wallet/category/date.
+  const resetForFastEntry = () => {
+    setAmountExpr("");
+    setNote("");
+    setTags([]);
+    setTagInput("");
+    setScannedItems(null);
+    setScannedItemsOpen(false);
+    setShowKeypad(true);
+    requestAnimationFrame(() => {
+      document.getElementById("amount-display-input")?.focus();
+    });
+  };
+
   // Submit transaction
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -352,6 +400,10 @@ function QuickAddForm() {
       return;
     }
 
+    // Fold any still-typed tag into the list so it isn't lost on submit.
+    const pending = tagInput.trim().replace(/^#+/, "").replace(/\s+/g, " ").toLowerCase();
+    const finalTags = pending && !tags.includes(pending) ? [...tags, pending] : tags;
+
     try {
       if (editingTransaction) {
         await updateTx.mutateAsync({
@@ -363,6 +415,7 @@ function QuickAddForm() {
           to_wallet_id: type === "transfer" ? selectedToWalletId : null,
           category_id: type !== "transfer" ? activeCategoryId : null,
           note: note.trim() || null,
+          tags: finalTags,
           receipt_items: scannedItems,
         });
         toast.success("Transaksi berhasil diubah ✓");
@@ -375,9 +428,10 @@ function QuickAddForm() {
           to_wallet_id: type === "transfer" ? selectedToWalletId : null,
           category_id: type !== "transfer" ? activeCategoryId : null,
           note: note.trim() || null,
+          tags: finalTags,
           receipt_items: scannedItems,
         });
-        toast.success("Tersimpan ✓");
+        toast.success(keepOpen ? "Tersimpan ✓ — lanjut catat berikutnya" : "Tersimpan ✓");
       }
 
       setLastWallet(activeWalletId);
@@ -385,7 +439,12 @@ function QuickAddForm() {
         setLastCategory(activeCategoryId);
       }
 
-      closeQuickAdd();
+      // Fast batch entry: keep the drawer open and clear only transient fields.
+      if (keepOpen && !editingTransaction) {
+        resetForFastEntry();
+      } else {
+        closeQuickAdd();
+      }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Gagal menyimpan transaksi. Coba lagi.";
       toast.error(errMsg);
@@ -698,6 +757,42 @@ function QuickAddForm() {
             </div>
           </div>
 
+          {/* Tags input */}
+          <div className="flex flex-col gap-1.5">
+            <Label className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+              <Tag className="size-3.5" />
+              Tag <span className="font-normal text-muted-foreground/70">(opsional)</span>
+            </Label>
+            <div className="flex flex-wrap items-center gap-1.5 rounded-xl border bg-card px-2.5 py-2 focus-within:border-mint-strong/40">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="flex items-center gap-1 rounded-full bg-mint-soft px-2 py-0.5 text-xs font-medium text-mint-strong"
+                >
+                  #{tag}
+                  <button
+                    type="button"
+                    onClick={() => removeTag(tag)}
+                    className="rounded-full p-0.5 hover:bg-mint-strong/15"
+                    aria-label={`Hapus tag ${tag}`}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </span>
+              ))}
+              <input
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={handleTagKeyDown}
+                onBlur={() => commitTag(tagInput)}
+                onFocus={() => setShowKeypad(false)}
+                placeholder={tags.length === 0 ? "mis. liburan, anak — Enter untuk tambah" : "tambah tag…"}
+                className="min-w-[7rem] flex-1 bg-transparent py-0.5 text-sm focus:outline-none"
+              />
+            </div>
+          </div>
+
           {/* Collapsible Scanned Items Breakdown */}
           {scannedItems && scannedItems.length > 0 && (
             <div className="rounded-2xl border border-border bg-card overflow-hidden">
@@ -789,6 +884,16 @@ function QuickAddForm() {
               );
             })}
           </div>
+        )}
+
+        {/* Fast batch entry toggle (new transactions only) */}
+        {!editingTransaction && (
+          <label className="flex items-center justify-between gap-2 px-1 pb-2 flex-shrink-0 cursor-pointer select-none">
+            <span className="text-xs font-medium text-muted-foreground">
+              Simpan &amp; tambah lagi
+            </span>
+            <Switch checked={keepOpen} onCheckedChange={setKeepOpen} />
+          </label>
         )}
 
         {/* Action Trigger Buttons */}
