@@ -45,6 +45,7 @@ import {
   Trash2,
   Search,
   Pencil,
+  Wallet,
 } from "lucide-react";
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
 import { TransactionDetailDialog } from "@/components/transaction/transaction-detail-dialog";
@@ -63,6 +64,9 @@ export default function DashboardPage() {
 
   const [showAll, setShowAll] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
+  // Captured once at mount so the "next 30 days" horizon stays stable across
+  // re-renders (calling Date.now() during render is impure).
+  const [nowMs] = React.useState(() => Date.now());
 
   const deleteTx = useDeleteTransaction();
   const restoreTx = useRestoreTransaction();
@@ -206,12 +210,12 @@ export default function DashboardPage() {
       });
     });
 
-    const horizon = Date.now() + 30 * 86400000;
+    const horizon = nowMs + 30 * 86400000;
     return items
       .filter((it) => new Date(it.date).getTime() <= horizon)
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .slice(0, 4);
-  }, [scheduledTx, debts]);
+  }, [scheduledTx, debts, nowMs]);
 
   const budgetProgress = React.useMemo(() => {
     return budgets.map((b) => {
@@ -301,10 +305,16 @@ export default function DashboardPage() {
         >
           <ChevronLeft className="size-5" />
         </Button>
-        <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
+        <Link
+          href="/calendar"
+          title="Buka kalender transaksi"
+          aria-label="Buka kalender transaksi"
+          className="flex items-center gap-2 rounded-xl px-3 py-1.5 font-semibold text-foreground text-sm transition-colors hover:bg-muted active:scale-95"
+        >
           <Calendar className="size-4 text-mint-strong" />
           <span>{activeMonthName}</span>
-        </div>
+          <ChevronRight className="size-3.5 text-muted-foreground" />
+        </Link>
         <Button
           variant="ghost"
           size="icon"
@@ -340,6 +350,11 @@ export default function DashboardPage() {
               )}
             </div>
           )}
+          <span className="inline-flex items-center justify-center gap-1 pt-1.5 text-[11px] font-medium text-mint-strong">
+            <Wallet className="size-3" />
+            Kelola &amp; tambah dompet
+            <ChevronRight className="size-3" />
+          </span>
         </Card>
       </Link>
 
