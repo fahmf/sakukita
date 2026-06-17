@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Cloud, CloudOff, Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { Bell, BellRing, Cloud, CloudOff, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { HouseholdSwitcher } from "./household-switcher";
 import { toast } from "sonner";
 import { useSyncStore } from "@/stores/sync-store";
@@ -8,6 +8,12 @@ import { useHousehold } from "@/components/providers/household-provider";
 import { createClient } from "@/lib/supabase/client";
 import { triggerSync } from "@/lib/db/sync";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  notificationSupported,
+  currentPermission,
+  requestNotificationPermission,
+  type NotificationPermissionState,
+} from "@/lib/notifications";
 import * as React from "react";
 
 export function TopBar() {
@@ -15,6 +21,30 @@ export function TopBar() {
   const { householdId } = useHousehold();
   const supabase = React.useMemo(() => createClient(), []);
   const queryClient = useQueryClient();
+
+  const [perm, setPerm] = React.useState<NotificationPermissionState>("default");
+  React.useEffect(() => {
+    const id = requestAnimationFrame(() => setPerm(currentPermission()));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  const handleBell = async () => {
+    if (!notificationSupported()) {
+      toast("Perangkat ini tidak mendukung notifikasi.");
+      return;
+    }
+    if (perm === "granted") {
+      toast("Notifikasi aktif. Atur peringatan budget & transaksi besar di Pengaturan.");
+      return;
+    }
+    const result = await requestNotificationPermission();
+    setPerm(result);
+    if (result === "granted") {
+      toast.success("Notifikasi diaktifkan");
+    } else if (result === "denied") {
+      toast.error("Izin notifikasi ditolak. Aktifkan lewat pengaturan browser.");
+    }
+  };
 
   const handleManualSync = async () => {
     if (!householdId || status === "syncing") return;
@@ -104,10 +134,15 @@ export function TopBar() {
         <button
           type="button"
           aria-label="Notifikasi"
-          onClick={() => toast("Notifikasi akan hadir di update berikutnya.")}
+          onClick={handleBell}
+          title={perm === "granted" ? "Notifikasi aktif" : "Aktifkan notifikasi"}
           className="grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
         >
-          <Bell className="size-5" />
+          {perm === "granted" ? (
+            <BellRing className="size-5 text-mint-strong" />
+          ) : (
+            <Bell className="size-5" />
+          )}
         </button>
       </div>
     </header>
