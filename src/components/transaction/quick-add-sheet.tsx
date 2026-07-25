@@ -264,8 +264,21 @@ function QuickAddForm() {
     setScannedItems(null);
     const toastId = toast.loading("Mengompres & men-scan struk dengan AI...");
 
+    // Time each phase so we can tell where slow scans come from: on-device
+    // image compression vs the network/AI round-trip.
+    const scanStart = performance.now();
+
     try {
-      const compressed = await compressImage(file, 1024, 1024, 0.75);
+      const compressStart = performance.now();
+      // 900px keeps receipts readable for the AI while cutting canvas decode
+      // work on high-megapixel phone photos (compression scales with source
+      // resolution, not receipt length).
+      const compressed = await compressImage(file, 900, 900, 0.75);
+      const compressMs = Math.round(performance.now() - compressStart);
+      console.log(
+        `[scan-receipt] compress=${compressMs}ms source=${(file.size / 1024).toFixed(0)}KB ` +
+          `-> payload=${((compressed.base64.length * 3) / 4 / 1024).toFixed(0)}KB`
+      );
 
       const flatCategories = categoriesTree.flatMap((p) => [p, ...p.subcategories]);
       const activeCategoriesPayload = flatCategories.map((c) => ({
@@ -274,6 +287,7 @@ function QuickAddForm() {
         kind: c.kind,
       }));
 
+      const requestStart = performance.now();
       const response = await fetch("/api/scan-receipt", {
         method: "POST",
         headers: {
@@ -285,6 +299,10 @@ function QuickAddForm() {
           categories: activeCategoriesPayload,
         }),
       });
+      console.log(
+        `[scan-receipt] request(network+ai)=${Math.round(performance.now() - requestStart)}ms ` +
+          `total=${Math.round(performance.now() - scanStart)}ms`
+      );
 
       if (!response.ok) {
         const errJson = await response.json();

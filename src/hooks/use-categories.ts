@@ -94,6 +94,7 @@ export async function seedStandardCategories(householdId: string) {
         { id: "00000000-0000-4000-8000-000000000002", name: "Bahan Makanan", icon: "🛒" },
         { id: "00000000-0000-4000-8000-000000000003", name: "Makan Luar", icon: "🍕" },
         { id: "00000000-0000-4000-8000-000000000004", name: "Kopi & Cemilan", icon: "☕" },
+        { id: "00000000-0000-4000-8000-000000000351", name: "Pesan Antar", icon: "🛵" },
       ],
     },
     {
@@ -107,6 +108,23 @@ export async function seedStandardCategories(householdId: string) {
         { id: "00000000-0000-4000-8000-000000000011", name: "Bahan Bakar", icon: "⛽" },
         { id: "00000000-0000-4000-8000-000000000012", name: "Ojek & Taksi Online", icon: "🛵" },
         { id: "00000000-0000-4000-8000-000000000013", name: "Parkir & Tol", icon: "🎫" },
+        { id: "00000000-0000-4000-8000-000000000301", name: "Transportasi Umum", icon: "🚌" },
+        { id: "00000000-0000-4000-8000-000000000302", name: "Servis Kendaraan", icon: "🔧" },
+      ],
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000200",
+      name: "Tagihan & Langganan",
+      kind: "expense" as const,
+      icon: "🧾",
+      color: "#F4A6A6",
+      sort_order: 25,
+      subcategories: [
+        { id: "00000000-0000-4000-8000-000000000201", name: "Langganan Digital", icon: "📺" },
+        { id: "00000000-0000-4000-8000-000000000202", name: "Asuransi", icon: "🛡️" },
+        { id: "00000000-0000-4000-8000-000000000203", name: "Cicilan & Utang", icon: "🏦" },
+        { id: "00000000-0000-4000-8000-000000000204", name: "Pajak", icon: "🧮" },
+        { id: "00000000-0000-4000-8000-000000000205", name: "Biaya Admin Bank", icon: "💳" },
       ],
     },
     {
@@ -120,6 +138,8 @@ export async function seedStandardCategories(householdId: string) {
         { id: "00000000-0000-4000-8000-000000000101", name: "Listrik & Air", icon: "🔌" },
         { id: "00000000-0000-4000-8000-000000000102", name: "Internet & Pulsa", icon: "📶" },
         { id: "00000000-0000-4000-8000-000000000103", name: "Perlengkapan Rumah", icon: "🧹" },
+        { id: "00000000-0000-4000-8000-000000000311", name: "Sewa & KPR", icon: "🏡" },
+        { id: "00000000-0000-4000-8000-000000000312", name: "Gas & Galon", icon: "🔥" },
       ],
     },
     {
@@ -132,6 +152,8 @@ export async function seedStandardCategories(householdId: string) {
       subcategories: [
         { id: "00000000-0000-4000-8000-000000001001", name: "Bioskop & Streaming", icon: "🍿" },
         { id: "00000000-0000-4000-8000-000000001002", name: "Liburan", icon: "✈️" },
+        { id: "00000000-0000-4000-8000-000000000321", name: "Game", icon: "🎯" },
+        { id: "00000000-0000-4000-8000-000000000322", name: "Olahraga & Gym", icon: "🏋️" },
       ],
     },
     {
@@ -144,6 +166,20 @@ export async function seedStandardCategories(householdId: string) {
       subcategories: [
         { id: "00000000-0000-4000-8000-000000010001", name: "Obat & Vitamin", icon: "💊" },
         { id: "00000000-0000-4000-8000-000000010002", name: "Dokter & Lab", icon: "🩺" },
+        { id: "00000000-0000-4000-8000-000000000331", name: "Asuransi Kesehatan", icon: "🩹" },
+      ],
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000210",
+      name: "Pendidikan",
+      kind: "expense" as const,
+      icon: "🎓",
+      color: "#A6C8E8",
+      sort_order: 55,
+      subcategories: [
+        { id: "00000000-0000-4000-8000-000000000211", name: "Uang Sekolah", icon: "🏫" },
+        { id: "00000000-0000-4000-8000-000000000212", name: "Buku & Alat Tulis", icon: "📚" },
+        { id: "00000000-0000-4000-8000-000000000213", name: "Kursus & Pelatihan", icon: "💻" },
       ],
     },
     {
@@ -156,7 +192,56 @@ export async function seedStandardCategories(householdId: string) {
       subcategories: [
         { id: "00000000-0000-4000-8000-000000100001", name: "Pakaian", icon: "👕" },
         { id: "00000000-0000-4000-8000-000000100002", name: "Perawatan Diri", icon: "🧴" },
+        { id: "00000000-0000-4000-8000-000000000341", name: "Elektronik", icon: "📱" },
+        { id: "00000000-0000-4000-8000-000000000342", name: "Kosmetik", icon: "💄" },
       ],
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000220",
+      name: "Keluarga & Anak",
+      kind: "expense" as const,
+      icon: "👨‍👩‍👧",
+      color: "#E8C8A5",
+      sort_order: 65,
+      subcategories: [
+        { id: "00000000-0000-4000-8000-000000000221", name: "Kebutuhan Anak", icon: "🍼" },
+        { id: "00000000-0000-4000-8000-000000000222", name: "Uang Saku", icon: "💵" },
+        { id: "00000000-0000-4000-8000-000000000223", name: "Orang Tua", icon: "👵" },
+      ],
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000230",
+      name: "Hadiah & Donasi",
+      kind: "expense" as const,
+      icon: "🎁",
+      color: "#E8A5D8",
+      sort_order: 70,
+      subcategories: [
+        { id: "00000000-0000-4000-8000-000000000231", name: "Sedekah & Donasi", icon: "🤲" },
+        { id: "00000000-0000-4000-8000-000000000232", name: "Zakat & Infak", icon: "🕌" },
+        { id: "00000000-0000-4000-8000-000000000233", name: "Hadiah", icon: "🎀" },
+      ],
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000240",
+      name: "Peliharaan",
+      kind: "expense" as const,
+      icon: "🐾",
+      color: "#C8E8A5",
+      sort_order: 75,
+      subcategories: [
+        { id: "00000000-0000-4000-8000-000000000241", name: "Makanan Hewan", icon: "🦴" },
+        { id: "00000000-0000-4000-8000-000000000242", name: "Dokter Hewan", icon: "🐶" },
+      ],
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000250",
+      name: "Lainnya",
+      kind: "expense" as const,
+      icon: "📦",
+      color: "#A8A29E",
+      sort_order: 900,
+      subcategories: [],
     },
 
     // --- INCOME ---
@@ -170,6 +255,31 @@ export async function seedStandardCategories(householdId: string) {
       subcategories: [
         { id: "00000000-0000-4000-8000-000001000001", name: "Gaji Bulanan", icon: "💵" },
         { id: "00000000-0000-4000-8000-000001000002", name: "Bonus & THR", icon: "🎁" },
+        { id: "00000000-0000-4000-8000-000000000421", name: "Lembur", icon: "⏰" },
+      ],
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000400",
+      name: "Usaha & Bisnis",
+      kind: "income" as const,
+      icon: "🏪",
+      color: "#A5E8B8",
+      sort_order: 105,
+      subcategories: [
+        { id: "00000000-0000-4000-8000-000000000401", name: "Penjualan", icon: "🧾" },
+        { id: "00000000-0000-4000-8000-000000000402", name: "Laba Usaha", icon: "💹" },
+      ],
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000410",
+      name: "Freelance & Sampingan",
+      kind: "income" as const,
+      icon: "💻",
+      color: "#B8E6D3",
+      sort_order: 108,
+      subcategories: [
+        { id: "00000000-0000-4000-8000-000000000411", name: "Proyek", icon: "📁" },
+        { id: "00000000-0000-4000-8000-000000000412", name: "Komisi", icon: "🤝" },
       ],
     },
     {
@@ -177,7 +287,7 @@ export async function seedStandardCategories(householdId: string) {
       name: "Investasi",
       kind: "income" as const,
       icon: "📈",
-      color: "#A5E8B8",
+      color: "#7FD4A8",
       sort_order: 110,
       subcategories: [
         { id: "00000000-0000-4000-8000-000010000001", name: "Dividen & Bunga", icon: "🪙" },
@@ -194,45 +304,57 @@ export async function seedStandardCategories(householdId: string) {
       subcategories: [
         { id: "00000000-0000-4000-8000-000020000001", name: "Refund", icon: "🔙" },
         { id: "00000000-0000-4000-8000-000020000002", name: "Pemberian", icon: "🧧" },
+        { id: "00000000-0000-4000-8000-000000000431", name: "Sewa & Rental", icon: "🏠" },
       ],
     },
   ];
 
   console.log("Seeding and deduplicating categories for household:", householdId);
 
-  // 1. Write the standard stable categories locally first
+  // Snapshot existing local ids so seeding is add-only: we never overwrite a
+  // category the user has already customized or archived, and re-runs (e.g. to
+  // top up newly shipped defaults) only insert what's genuinely missing.
+  const existingIds = new Set(
+    (await db.categories.where("household_id").equals(householdId).primaryKeys()) as string[]
+  );
+
+  // 1. Write any missing standard stable categories locally first
   for (const parent of standardCategories) {
     const parentDetId = await generateDeterministicUUID(householdId, parent.id);
-    const parentCategory: Category = {
-      id: parentDetId,
-      household_id: householdId,
-      name: parent.name,
-      kind: parent.kind,
-      parent_id: null,
-      icon: parent.icon,
-      color: parent.color,
-      sort_order: parent.sort_order,
-      is_archived: false,
-      created_at: now,
-    };
+    if (!existingIds.has(parentDetId)) {
+      const parentCategory: Category = {
+        id: parentDetId,
+        household_id: householdId,
+        name: parent.name,
+        kind: parent.kind,
+        parent_id: null,
+        icon: parent.icon,
+        color: parent.color,
+        sort_order: parent.sort_order,
+        is_archived: false,
+        created_at: now,
+      };
 
-    await db.categories.put({
-      ...parentCategory,
-      syncStatus: "pending",
-    });
+      await db.categories.put({
+        ...parentCategory,
+        syncStatus: "pending",
+      });
 
-    await db.outbox.add({
-      entity: "categories",
-      entityId: parentDetId,
-      op: "create",
-      payload: parentCategory,
-      createdAt: Date.now(),
-    });
+      await db.outbox.add({
+        entity: "categories",
+        entityId: parentDetId,
+        op: "create",
+        payload: parentCategory,
+        createdAt: Date.now(),
+      });
+    }
 
     if (parent.subcategories) {
       let childOrder = 0;
       for (const child of parent.subcategories) {
         const childDetId = await generateDeterministicUUID(householdId, child.id);
+        childOrder++;
+        if (existingIds.has(childDetId)) continue;
         const childCategory: Category = {
           id: childDetId,
           household_id: householdId,
@@ -241,7 +363,7 @@ export async function seedStandardCategories(householdId: string) {
           parent_id: parentDetId,
           icon: child.icon,
           color: parent.color,
-          sort_order: parent.sort_order + (++childOrder),
+          sort_order: parent.sort_order + childOrder,
           is_archived: false,
           created_at: now,
         };
@@ -284,8 +406,13 @@ export async function seedStandardCategories(householdId: string) {
 
   aliasToStableId.set("kebutuhan rumah", "00000000-0000-4000-8000-000000000100");
   aliasToStableId.set("rumah", "00000000-0000-4000-8000-000000000100");
-  aliasToStableId.set("tagihan", "00000000-0000-4000-8000-000000000100");
-  aliasToStableId.set("utilities", "00000000-0000-4000-8000-000000000100");
+
+  aliasToStableId.set("tagihan & langganan", "00000000-0000-4000-8000-000000000200");
+  aliasToStableId.set("tagihan", "00000000-0000-4000-8000-000000000200");
+  aliasToStableId.set("langganan", "00000000-0000-4000-8000-000000000200");
+  aliasToStableId.set("utilitas", "00000000-0000-4000-8000-000000000200");
+  aliasToStableId.set("utilities", "00000000-0000-4000-8000-000000000200");
+  aliasToStableId.set("bills", "00000000-0000-4000-8000-000000000200");
 
   aliasToStableId.set("hiburan & hobi", "00000000-0000-4000-8000-000000001000");
   aliasToStableId.set("hiburan", "00000000-0000-4000-8000-000000001000");
@@ -314,6 +441,41 @@ export async function seedStandardCategories(householdId: string) {
   aliasToStableId.set("pendapatan lain", "00000000-0000-4000-8000-000020000000");
   aliasToStableId.set("lain-lain", "00000000-0000-4000-8000-000020000000");
   aliasToStableId.set("others", "00000000-0000-4000-8000-000020000000");
+
+  aliasToStableId.set("pendidikan", "00000000-0000-4000-8000-000000000210");
+  aliasToStableId.set("sekolah", "00000000-0000-4000-8000-000000000210");
+  aliasToStableId.set("education", "00000000-0000-4000-8000-000000000210");
+
+  aliasToStableId.set("keluarga & anak", "00000000-0000-4000-8000-000000000220");
+  aliasToStableId.set("keluarga", "00000000-0000-4000-8000-000000000220");
+  aliasToStableId.set("anak", "00000000-0000-4000-8000-000000000220");
+  aliasToStableId.set("family", "00000000-0000-4000-8000-000000000220");
+
+  aliasToStableId.set("hadiah & donasi", "00000000-0000-4000-8000-000000000230");
+  aliasToStableId.set("donasi", "00000000-0000-4000-8000-000000000230");
+  aliasToStableId.set("sedekah", "00000000-0000-4000-8000-000000000230");
+  aliasToStableId.set("zakat", "00000000-0000-4000-8000-000000000230");
+  aliasToStableId.set("gift", "00000000-0000-4000-8000-000000000230");
+
+  aliasToStableId.set("peliharaan", "00000000-0000-4000-8000-000000000240");
+  aliasToStableId.set("hewan", "00000000-0000-4000-8000-000000000240");
+  aliasToStableId.set("pet", "00000000-0000-4000-8000-000000000240");
+  aliasToStableId.set("pets", "00000000-0000-4000-8000-000000000240");
+
+  aliasToStableId.set("lainnya", "00000000-0000-4000-8000-000000000250");
+  aliasToStableId.set("lain", "00000000-0000-4000-8000-000000000250");
+  aliasToStableId.set("other", "00000000-0000-4000-8000-000000000250");
+  aliasToStableId.set("misc", "00000000-0000-4000-8000-000000000250");
+
+  aliasToStableId.set("usaha & bisnis", "00000000-0000-4000-8000-000000000400");
+  aliasToStableId.set("usaha", "00000000-0000-4000-8000-000000000400");
+  aliasToStableId.set("bisnis", "00000000-0000-4000-8000-000000000400");
+  aliasToStableId.set("business", "00000000-0000-4000-8000-000000000400");
+  aliasToStableId.set("dagang", "00000000-0000-4000-8000-000000000400");
+
+  aliasToStableId.set("freelance & sampingan", "00000000-0000-4000-8000-000000000410");
+  aliasToStableId.set("freelance", "00000000-0000-4000-8000-000000000410");
+  aliasToStableId.set("sampingan", "00000000-0000-4000-8000-000000000410");
 
   // Also match subcategories
   for (const parent of standardCategories) {
@@ -589,6 +751,11 @@ export async function seedStandardCategories(householdId: string) {
   }
 }
 
+// Bump whenever the shipped standard catalog gains new categories. Existing
+// installs run the add-only seed once per version to top up the new defaults
+// without touching anything the user has already customized or archived.
+const STANDARD_CATALOG_VERSION = 2;
+
 export function useCategories() {
   const { householdId } = useHousehold();
 
@@ -642,6 +809,20 @@ export function useCategories() {
               console.error("Auto seeding standard categories failed in background:", seedErr);
             });
           }, 0);
+        } else if (typeof window !== "undefined") {
+          // Existing install: top up newly shipped default categories once per
+          // catalog version. The seed is add-only, so this never clobbers edits.
+          const versionKey = `sakukita_cat_seed_version:${householdId}`;
+          const seenVersion = Number(window.localStorage.getItem(versionKey) || "0");
+          if (seenVersion < STANDARD_CATALOG_VERSION) {
+            console.log(`Category catalog top-up: v${seenVersion} -> v${STANDARD_CATALOG_VERSION}. Adding missing defaults in background...`);
+            window.localStorage.setItem(versionKey, String(STANDARD_CATALOG_VERSION));
+            setTimeout(() => {
+              seedStandardCategories(householdId).catch((seedErr) => {
+                console.error("Category catalog top-up failed in background:", seedErr);
+              });
+            }, 0);
+          }
         }
 
         // Sort by sort_order ascending

@@ -632,7 +632,11 @@ export default function SettingsPage() {
                     />
                     <div className="flex-1 overflow-x-auto flex gap-1.5 py-1 px-0.5 scrollbar-none items-center">
                       {[
-                        "🍔", "🚗", "🏠", "🎮", "🏥", "🛍️", "💰", "📈", "🔌", "📶", "💸", "🛒", "🍿", "✈️", "💵", "🪙"
+                        "🍔", "🛒", "🍕", "☕", "🚗", "⛽", "🛵", "🚌", "🧾", "📺", "🛡️", "🏦",
+                        "🏠", "🔌", "📶", "🏡", "🔥", "🎮", "🍿", "✈️", "🎯", "🏋️", "🏥", "💊",
+                        "🩺", "🎓", "🏫", "📚", "💻", "🛍️", "👕", "📱", "💄", "🧴", "👨‍👩‍👧", "🍼",
+                        "👵", "🎁", "🤲", "🕌", "🐾", "🐶", "📦", "💰", "💵", "🏪", "📈", "📊",
+                        "🪙", "🤝", "🧧", "🔙"
                       ].map((em) => (
                         <button
                           key={em}
@@ -729,11 +733,14 @@ export default function SettingsPage() {
                             </div>
                             
                             {hasSubs && (
-                              <span>
+                              <span className="flex items-center gap-1.5 text-muted-foreground">
+                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tabular-nums">
+                                  {parent.subcategories.length}
+                                </span>
                                 {isExpanded ? (
-                                  <ChevronDown className="size-4 text-muted-foreground" />
+                                  <ChevronDown className="size-4" />
                                 ) : (
-                                  <ChevronRight className="size-4 text-muted-foreground" />
+                                  <ChevronRight className="size-4" />
                                 )}
                               </span>
                             )}
@@ -742,12 +749,36 @@ export default function SettingsPage() {
 
                         {/* Subcategories list */}
                         {hasSubs && isExpanded && (
-                          <div className="bg-muted/20 pl-16 pr-4 py-2 divide-y divide-border/40 animate-in fade-in duration-200">
+                          <div className="bg-muted/20 pl-6 pr-3 py-1.5 animate-in fade-in duration-200">
                             {parent.subcategories.map((sub) => (
-                              <div key={sub.id} className="py-2 text-xs text-muted-foreground font-medium flex items-center justify-between group/sub">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm select-none leading-none">{sub.icon || "🏷️"}</span>
-                                  <span>{sub.name}</span>
+                              <div
+                                key={sub.id}
+                                className="relative flex items-center justify-between rounded-xl py-2 pl-8 pr-2 hover:bg-card/60 transition-colors group/sub"
+                              >
+                                {/* Tree rail connecting the sub to its parent */}
+                                <span
+                                  className="absolute left-3 top-0 bottom-1/2 w-px bg-border"
+                                  aria-hidden
+                                />
+                                <span
+                                  className="absolute left-3 top-1/2 h-px w-4 bg-border"
+                                  aria-hidden
+                                />
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span
+                                    className="grid size-7 shrink-0 place-items-center rounded-lg text-sm"
+                                    style={{
+                                      backgroundColor: `${parent.color || "#A8A29E"}22`,
+                                      color: parent.color || "#78716C",
+                                    }}
+                                  >
+                                    {iconMap[sub.icon || ""] ? (
+                                      React.createElement(iconMap[sub.icon || ""], { className: "size-3.5" })
+                                    ) : (
+                                      <span className="text-sm select-none leading-none">{sub.icon || "🏷️"}</span>
+                                    )}
+                                  </span>
+                                  <span className="truncate text-sm font-medium text-foreground">{sub.name}</span>
                                 </div>
                                 <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover/sub:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                                   <Button
@@ -832,11 +863,14 @@ export default function SettingsPage() {
                             </div>
                             
                             {hasSubs && (
-                              <span>
+                              <span className="flex items-center gap-1.5 text-muted-foreground">
+                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tabular-nums">
+                                  {parent.subcategories.length}
+                                </span>
                                 {isExpanded ? (
-                                  <ChevronDown className="size-4 text-muted-foreground" />
+                                  <ChevronDown className="size-4" />
                                 ) : (
-                                  <ChevronRight className="size-4 text-muted-foreground" />
+                                  <ChevronRight className="size-4" />
                                 )}
                               </span>
                             )}
@@ -845,12 +879,36 @@ export default function SettingsPage() {
 
                         {/* Subcategories list */}
                         {hasSubs && isExpanded && (
-                          <div className="bg-muted/20 pl-16 pr-4 py-2 divide-y divide-border/40 animate-in fade-in duration-200">
+                          <div className="bg-muted/20 pl-6 pr-3 py-1.5 animate-in fade-in duration-200">
                             {parent.subcategories.map((sub) => (
-                              <div key={sub.id} className="py-2 text-xs text-muted-foreground font-medium flex items-center justify-between group/sub">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm select-none leading-none">{sub.icon || "🏷️"}</span>
-                                  <span>{sub.name}</span>
+                              <div
+                                key={sub.id}
+                                className="relative flex items-center justify-between rounded-xl py-2 pl-8 pr-2 hover:bg-card/60 transition-colors group/sub"
+                              >
+                                {/* Tree rail connecting the sub to its parent */}
+                                <span
+                                  className="absolute left-3 top-0 bottom-1/2 w-px bg-border"
+                                  aria-hidden
+                                />
+                                <span
+                                  className="absolute left-3 top-1/2 h-px w-4 bg-border"
+                                  aria-hidden
+                                />
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span
+                                    className="grid size-7 shrink-0 place-items-center rounded-lg text-sm"
+                                    style={{
+                                      backgroundColor: `${parent.color || "#A8A29E"}22`,
+                                      color: parent.color || "#78716C",
+                                    }}
+                                  >
+                                    {iconMap[sub.icon || ""] ? (
+                                      React.createElement(iconMap[sub.icon || ""], { className: "size-3.5" })
+                                    ) : (
+                                      <span className="text-sm select-none leading-none">{sub.icon || "🏷️"}</span>
+                                    )}
+                                  </span>
+                                  <span className="truncate text-sm font-medium text-foreground">{sub.name}</span>
                                 </div>
                                 <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover/sub:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                                   <Button
