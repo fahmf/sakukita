@@ -77,20 +77,49 @@ Kembalikan hasil analisis dalam format JSON terstruktur yang valid sesuai dengan
       },
     };
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
+    // Abort the Gemini call if it hangs so the client fails fast instead of
+    // waiting indefinitely on a slow/queued upstream response.
+    const controller = new AbortController();
+    const GEMINI_TIMEOUT_MS = 25_000;
+    const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+
+    // Measure how long the upstream Gemini call actually takes so we can tell
+    // network/upstream latency apart from client-side image compression.
+    const geminiStart = Date.now();
+    let response: Response;
+    try {
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal,
+        }
+      );
+    } catch (err) {
+      clearTimeout(timeout);
+      if (err instanceof Error && err.name === "AbortError") {
+        console.error(
+          `[scan-receipt] Gemini call aborted after ${GEMINI_TIMEOUT_MS}ms timeout`
+        );
+        return NextResponse.json(
+          { error: "Proses AI terlalu lama. Silakan coba lagi." },
+          { status: 504 }
+        );
       }
-    );
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const geminiMs = Date.now() - geminiStart;
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("Gemini API direct error:", errText);
+      console.error(`[scan-receipt] Gemini API error after ${geminiMs}ms:`, errText);
       return NextResponse.json(
         { error: "Gemini AI processing failed", details: errText },
         { status: response.status }
@@ -98,6 +127,16 @@ Kembalikan hasil analisis dalam format JSON terstruktur yang valid sesuai dengan
     }
 
     const responseData = await response.json();
+
+    // Log upstream timing + token usage so slow scans can be diagnosed:
+    // a large geminiMs with small output tokens points at network/cold-start,
+    // while high output tokens points at generation cost.
+    const usage = responseData.usageMetadata;
+    console.log(
+      `[scan-receipt] gemini=${geminiMs}ms tokens(prompt/candidates/total)=` +
+        `${usage?.promptTokenCount ?? "?"}/${usage?.candidatesTokenCount ?? "?"}/${usage?.totalTokenCount ?? "?"}`
+    );
+
     const textResult = responseData.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!textResult) {
