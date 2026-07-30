@@ -193,11 +193,30 @@ function QuickAddForm() {
   // look like only the first number typed is "active" while later digits
   // are silently tacked on unselected. Force the caret to the end after
   // every change so the highlighted digit always matches the last one typed.
+  //
+  // That alone isn't enough for long expressions though: at a fixed font
+  // size the value overflows the box and — since nothing scrolls it into
+  // view on its own for a readOnly, centered field — the most recently
+  // typed digits end up clipped off past the right edge, invisible. We
+  // shrink the font as the expression grows so the whole thing keeps
+  // fitting (matches how e.g. the iOS calculator handles long numbers),
+  // and scroll to the end as a safety net for the rare expression that's
+  // still too long even at the smallest size.
   React.useEffect(() => {
     const el = amountInputRef.current;
     if (el) {
       el.setSelectionRange(amountExpr.length, amountExpr.length);
+      el.scrollLeft = el.scrollWidth;
     }
+  }, [amountExpr]);
+
+  const amountFontSize = React.useMemo(() => {
+    const base = 30; // px — matches the previous fixed text-3xl size
+    const min = 15;
+    const comfortableChars = 9;
+    const len = amountExpr.length;
+    if (len <= comfortableChars) return base;
+    return Math.max(min, base - (len - comfortableChars) * 1.15);
   }, [amountExpr]);
 
   // Capture physical keyboard inputs when amount input is focused or captured globally
@@ -594,7 +613,12 @@ function QuickAddForm() {
           <div className="space-y-1.5 rounded-2xl bg-card border px-4 py-3.5 text-center relative">
             <Label className="text-xs text-muted-foreground">Nominal (Rp)</Label>
             <div className="relative flex items-center justify-center gap-1">
-              <span className="text-2xl font-bold text-muted-foreground select-none">Rp</span>
+              <span
+                className="font-bold text-muted-foreground select-none"
+                style={{ fontSize: `${amountFontSize * 0.8}px` }}
+              >
+                Rp
+              </span>
               <input
                 id="amount-display-input"
                 ref={amountInputRef}
@@ -607,7 +631,8 @@ function QuickAddForm() {
                   const end = e.currentTarget.value.length;
                   e.currentTarget.setSelectionRange(end, end);
                 }}
-                className="w-full text-center text-3xl font-bold focus:outline-none bg-transparent caret-mint-strong cursor-pointer"
+                style={{ fontSize: `${amountFontSize}px` }}
+                className="w-full text-center font-bold focus:outline-none bg-transparent caret-mint-strong cursor-pointer"
                 autoFocus
                 required
               />
