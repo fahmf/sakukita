@@ -138,6 +138,7 @@ function QuickAddForm() {
     !!(editingTransaction?.receipt_items && editingTransaction.receipt_items.length > 0)
   );
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const amountInputRef = React.useRef<HTMLInputElement>(null);
 
 
 
@@ -184,12 +185,37 @@ function QuickAddForm() {
     }
   };
 
+  // The amount field is readOnly and driven entirely by keypad taps, so the
+  // browser never moves its native text selection on its own. Left alone, a
+  // readOnly input keeps whatever selection it had when it was last focused
+  // (often the whole value, auto-selected on the initial autoFocus) — so
+  // newly appended digits land past the end of that selection, making it
+  // look like only the first number typed is "active" while later digits
+  // are silently tacked on unselected. Force the caret to the end after
+  // every change so the highlighted digit always matches the last one typed.
+  React.useEffect(() => {
+    const el = amountInputRef.current;
+    if (el) {
+      el.setSelectionRange(amountExpr.length, amountExpr.length);
+    }
+  }, [amountExpr]);
+
   // Capture physical keyboard inputs when amount input is focused or captured globally
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const activeEl = document.activeElement;
-      // If user is actively typing in Note or Date fields, let the normal typing happen!
-      if (activeEl?.tagName === "INPUT" && activeEl.id !== "amount-display-input") {
+      const activeEl = document.activeElement as HTMLElement | null;
+      const activeTag = activeEl?.tagName;
+      // If focus is on another interactive control (a text field, a Select
+      // trigger, a Switch, any <button>, etc.), let it handle the keystroke
+      // normally instead of hijacking it for the amount calculator.
+      const isOtherInteractiveTarget =
+        activeEl?.id !== "amount-display-input" &&
+        (activeTag === "INPUT" ||
+          activeTag === "TEXTAREA" ||
+          activeTag === "SELECT" ||
+          activeTag === "BUTTON" ||
+          activeEl?.isContentEditable);
+      if (isOtherInteractiveTarget) {
         return;
       }
 
@@ -571,11 +597,16 @@ function QuickAddForm() {
               <span className="text-2xl font-bold text-muted-foreground select-none">Rp</span>
               <input
                 id="amount-display-input"
+                ref={amountInputRef}
                 type="text"
                 readOnly
                 placeholder="0"
                 value={amountExpr}
                 onClick={() => setShowKeypad(true)}
+                onFocus={(e) => {
+                  const end = e.currentTarget.value.length;
+                  e.currentTarget.setSelectionRange(end, end);
+                }}
                 className="w-full text-center text-3xl font-bold focus:outline-none bg-transparent caret-mint-strong cursor-pointer"
                 autoFocus
                 required
