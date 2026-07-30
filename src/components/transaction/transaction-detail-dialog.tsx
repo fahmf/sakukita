@@ -78,7 +78,7 @@ export function TransactionDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md rounded-3xl overflow-hidden p-6 max-w-[92dvw]">
+      <DialogContent className="sm:max-w-md rounded-3xl p-6 max-w-[92dvw] max-h-[85dvh] overflow-y-auto">
         <DialogHeader className="pb-4 border-b">
           <DialogTitle className="text-center text-xs font-bold text-muted-foreground uppercase tracking-widest">
             Detail Transaksi
