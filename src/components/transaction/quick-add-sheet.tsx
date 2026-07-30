@@ -186,37 +186,23 @@ function QuickAddForm() {
   };
 
   // The amount field is readOnly and driven entirely by keypad taps, so the
-  // browser never moves its native text selection on its own. Left alone, a
-  // readOnly input keeps whatever selection it had when it was last focused
-  // (often the whole value, auto-selected on the initial autoFocus) — so
-  // newly appended digits land past the end of that selection, making it
-  // look like only the first number typed is "active" while later digits
-  // are silently tacked on unselected. Force the caret to the end after
-  // every change so the highlighted digit always matches the last one typed.
-  //
-  // That alone isn't enough for long expressions though: at a fixed font
-  // size the value overflows the box and — since nothing scrolls it into
-  // view on its own for a readOnly, centered field — the most recently
-  // typed digits end up clipped off past the right edge, invisible. We
-  // shrink the font as the expression grows so the whole thing keeps
-  // fitting (matches how e.g. the iOS calculator handles long numbers),
-  // and scroll to the end as a safety net for the rare expression that's
-  // still too long even at the smallest size.
+  // browser never moves its native text selection or scroll position on its
+  // own. Left alone, a readOnly input keeps whatever selection it had when
+  // it was last focused (often the whole value, auto-selected on the
+  // initial autoFocus) — so newly appended digits land past the end of that
+  // selection, unhighlighted. And once the expression is wider than the
+  // box, nothing scrolls it into view either, so the most recently typed
+  // digits render past the right edge and are invisible. Font size stays
+  // fixed (shrinking made long numbers hard to read); instead we keep the
+  // caret and scroll position pinned to the end after every change, so the
+  // box always shows the tail — the digits just typed — same as a normal
+  // calculator display, with older leading digits scrolled out of view.
   React.useEffect(() => {
     const el = amountInputRef.current;
     if (el) {
       el.setSelectionRange(amountExpr.length, amountExpr.length);
       el.scrollLeft = el.scrollWidth;
     }
-  }, [amountExpr]);
-
-  const amountFontSize = React.useMemo(() => {
-    const base = 30; // px — matches the previous fixed text-3xl size
-    const min = 15;
-    const comfortableChars = 9;
-    const len = amountExpr.length;
-    if (len <= comfortableChars) return base;
-    return Math.max(min, base - (len - comfortableChars) * 1.15);
   }, [amountExpr]);
 
   // Capture physical keyboard inputs when amount input is focused or captured globally
@@ -613,12 +599,7 @@ function QuickAddForm() {
           <div className="space-y-1.5 rounded-2xl bg-card border px-4 py-3.5 text-center relative">
             <Label className="text-xs text-muted-foreground">Nominal (Rp)</Label>
             <div className="relative flex items-center justify-center gap-1">
-              <span
-                className="font-bold text-muted-foreground select-none"
-                style={{ fontSize: `${amountFontSize * 0.8}px` }}
-              >
-                Rp
-              </span>
+              <span className="text-2xl font-bold text-muted-foreground select-none">Rp</span>
               <input
                 id="amount-display-input"
                 ref={amountInputRef}
@@ -631,8 +612,7 @@ function QuickAddForm() {
                   const end = e.currentTarget.value.length;
                   e.currentTarget.setSelectionRange(end, end);
                 }}
-                style={{ fontSize: `${amountFontSize}px` }}
-                className="w-full text-center font-bold focus:outline-none bg-transparent caret-mint-strong cursor-pointer"
+                className="w-full text-center text-3xl font-bold focus:outline-none bg-transparent caret-mint-strong cursor-pointer"
                 autoFocus
                 required
               />
