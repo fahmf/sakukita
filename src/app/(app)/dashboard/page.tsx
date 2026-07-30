@@ -43,7 +43,6 @@ import {
   Calendar,
   CalendarClock,
   Trash2,
-  Search,
   Pencil,
   Wallet,
 } from "lucide-react";
@@ -62,8 +61,6 @@ export default function DashboardPage() {
   // whose cycle starts on day 25 of the previous calendar month)
   const [selectedMonth, setSelectedMonth] = React.useState(() => currentFinancialMonth());
 
-  const [showAll, setShowAll] = React.useState(false);
-  const [searchQuery, setSearchQuery] = React.useState("");
   // Captured once at mount so the "next 30 days" horizon stays stable across
   // re-renders (calling Date.now() during render is impure).
   const [nowMs] = React.useState(() => Date.now());
@@ -273,25 +270,9 @@ export default function DashboardPage() {
     }
   };
 
-  // Filter transactions based on searchQuery when showAll is true
-  const displayedTransactions = React.useMemo(() => {
-    const activeTx = transactions;
-    if (!showAll) {
-      return activeTx.slice(0, 10);
-    }
-    if (!searchQuery) {
-      return activeTx;
-    }
-    const query = searchQuery.toLowerCase().trim();
-    return activeTx.filter((t) => {
-      const noteMatch = t.note?.toLowerCase().includes(query);
-      const catMatch = t.category?.name?.toLowerCase().includes(query);
-      const walletMatch = t.wallet?.name?.toLowerCase().includes(query);
-      const toWalletMatch = t.to_wallet?.name?.toLowerCase().includes(query);
-      const amountMatch = t.amount.toString().includes(query);
-      return noteMatch || catMatch || walletMatch || toWalletMatch || amountMatch;
-    });
-  }, [transactions, showAll, searchQuery]);
+  // Dashboard only ever shows a short preview; the full searchable/filterable
+  // list lives on /transactions (see the "Lihat Semua" link below).
+  const displayedTransactions = transactions.slice(0, 10);
 
   return (
     <div className="space-y-6">
@@ -513,7 +494,7 @@ export default function DashboardPage() {
       <div className="space-y-2.5">
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            {showAll ? "Semua Transaksi" : "Transaksi Terakhir"}
+            Transaksi Terakhir
           </h2>
         </div>
 
@@ -540,25 +521,7 @@ export default function DashboardPage() {
           </Card>
         ) : (
           <div className="grid gap-2.5">
-            {showAll && (
-              <div className="relative mb-1">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Cari berdasarkan catatan, kategori, dll..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-background border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-mint-strong focus:border-mint-strong transition-all"
-                />
-              </div>
-            )}
-
-            {displayedTransactions.length === 0 ? (
-              <div className="text-center py-6 border border-dashed rounded-2xl bg-card">
-                <p className="text-xs text-muted-foreground">Tidak ada transaksi yang cocok.</p>
-              </div>
-            ) : (
-              displayedTransactions.map((tx) => {
+            {displayedTransactions.map((tx) => {
                 const isExpense = tx.type === "expense";
                 const isIncome = tx.type === "income";
                 const isTransfer = tx.type === "transfer";
@@ -648,8 +611,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 );
-              })
-            )}
+              })}
 
             {transactions.length > 10 && (
               <Button

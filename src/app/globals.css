@@ -48,13 +48,18 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Saku Kita — pastel accent + semantic tokens (TRD §8) */
+/* Saku Kita — pastel accent + semantic tokens (TRD §8)
+ * mint-strong/income/expense are deliberately darker than the rest of the
+ * pastel palette: they carry text-on-white and white-on-fill combinations
+ * (amounts, the FAB, primary/destructive buttons) that need WCAG AA
+ * contrast (4.5:1). The original pastel hexes are restored for dark mode
+ * below, where they already sit comfortably on the dark card surface. */
 @theme {
   --color-mint: #b8e6d3;
-  --color-mint-strong: #5fbf9a;
+  --color-mint-strong: #047857;
   --color-mint-soft: #e8f7f0;
-  --color-income: #5fbf9a;
-  --color-expense: #e8a5a5;
+  --color-income: #047857;
+  --color-expense: #dc2626;
   --color-warning: #f4d2a6;
 }
 
@@ -126,6 +131,11 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* Original pastels read fine on the dark card surface — no darkening needed here. */
+  --color-mint-strong: #5fbf9a;
+  --color-income: #5fbf9a;
+  --color-expense: #e8a5a5;
 }
 
 /* Automatic dark mode — follow OS unless user forces .light */
@@ -155,6 +165,10 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+
+    --color-mint-strong: #5fbf9a;
+    --color-income: #5fbf9a;
+    --color-expense: #e8a5a5;
   }
 }
 
