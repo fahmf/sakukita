@@ -62,10 +62,13 @@ export function useTransactions(filters?: UseTransactionsFilters) {
       // Filter active (not deleted and not scheduled) records
       let filtered = allTxs.filter((t) => !t.is_deleted && !t.is_scheduled);
 
-      // Sort by occurred_at descending (newest first)
+      // Sort by occurred_at descending (newest first). Past-dated entries all
+      // share 07:00 WIB, so break ties by entry time — otherwise the order
+      // within a day follows random UUIDs and a fresh entry can land mid-list.
       filtered.sort(
         (a, b) =>
-          new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime()
+          new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime() ||
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
       // 2. Apply filters locally

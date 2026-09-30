@@ -52,6 +52,7 @@ import {
 } from "lucide-react";
 import type { TransactionType } from "@/lib/supabase/types";
 import { compressImage } from "@/lib/image";
+import { jakartaDateKey, occurredAtForDate, todayJakarta } from "@/lib/financial-month";
 
 import { iconMap } from "@/lib/icons";
 
@@ -112,8 +113,8 @@ function QuickAddForm() {
   );
   const [occurredAt, setOccurredAt] = React.useState(() =>
     editingTransaction
-      ? editingTransaction.occurred_at.split("T")[0]
-      : new Date().toISOString().split("T")[0]
+      ? jakartaDateKey(editingTransaction.occurred_at)
+      : todayJakarta()
   );
   const [note, setNote] = React.useState(() =>
     editingTransaction ? (editingTransaction.note || "") : ""
@@ -156,7 +157,10 @@ function QuickAddForm() {
     if (selectedCategoryId) return selectedCategoryId;
     const flatCategories = categoriesTree.flatMap((p) => [p, ...p.subcategories]);
     const available = flatCategories.filter((c) => c.kind === type);
-    return lastCategoryId || available[0]?.id || "";
+    // The remembered category may belong to the other type (last entry was
+    // income, this one is expense) — only reuse it when the kind matches.
+    const last = available.find((c) => c.id === lastCategoryId);
+    return last?.id || available[0]?.id || "";
   }, [selectedCategoryId, categoriesTree, type, lastCategoryId]);
 
   // Handle keypad presses
@@ -273,7 +277,9 @@ function QuickAddForm() {
     }
     const checkFuture = () => {
       if (!active) return;
-      setIsFutureDate(new Date(occurredAt).getTime() > Date.now());
+      // Compare Jakarta calendar dates: a date-only string parses as 07:00 WIB,
+      // which made "today" look like a future date before 7 in the morning.
+      setIsFutureDate(occurredAt > todayJakarta());
     };
     const frame = requestAnimationFrame(checkFuture);
     return () => {
@@ -457,13 +463,20 @@ function QuickAddForm() {
     const pending = tagInput.trim().replace(/^#+/, "").replace(/\s+/g, " ").toLowerCase();
     const finalTags = pending && !tags.includes(pending) ? [...tags, pending] : tags;
 
+    // Editing without touching the date keeps the original timestamp (and so
+    // its time of day and position in the list).
+    const occurredAtIso =
+      editingTransaction && occurredAt === jakartaDateKey(editingTransaction.occurred_at)
+        ? editingTransaction.occurred_at
+        : occurredAtForDate(occurredAt);
+
     try {
       if (editingTransaction) {
         await updateTx.mutateAsync({
           id: editingTransaction.id,
           type,
           amount: parsedAmount,
-          occurred_at: new Date(occurredAt).toISOString(),
+          occurred_at: occurredAtIso,
           wallet_id: activeWalletId,
           to_wallet_id: type === "transfer" ? selectedToWalletId : null,
           category_id: type !== "transfer" ? activeCategoryId : null,
@@ -476,7 +489,7 @@ function QuickAddForm() {
         await createTx.mutateAsync({
           type,
           amount: parsedAmount,
-          occurred_at: new Date(occurredAt).toISOString(),
+          occurred_at: occurredAtIso,
           wallet_id: activeWalletId,
           to_wallet_id: type === "transfer" ? selectedToWalletId : null,
           category_id: type !== "transfer" ? activeCategoryId : null,

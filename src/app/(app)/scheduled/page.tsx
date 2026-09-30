@@ -38,6 +38,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { todayJakarta } from "@/lib/financial-month";
 import {
   CalendarClock,
   X,
@@ -125,7 +126,7 @@ export default function ScheduledPage() {
   const [note, setNote] = React.useState("");
   const [frequency, setFrequency] = React.useState<"daily" | "weekly" | "monthly" | "yearly">("monthly");
   const [interval, setInterval] = React.useState("1");
-  const [startDate, setStartDate] = React.useState(new Date().toISOString().split("T")[0]);
+  const [startDate, setStartDate] = React.useState(todayJakarta());
   const [endDate, setEndDate] = React.useState("");
 
   // Delete Recurring Template State
@@ -192,7 +193,7 @@ export default function ScheduledPage() {
     setNote("");
     setFrequency("monthly");
     setInterval("1");
-    setStartDate(new Date().toISOString().split("T")[0]);
+    setStartDate(todayJakarta());
     setEndDate("");
     setDialogOpen(true);
   };

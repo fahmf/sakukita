@@ -215,6 +215,45 @@ export default function BudgetsPage() {
     return { budgetedItems: active, unbudgetedItems: inactive };
   }, [budgetsAnalysis]);
 
+  // Budgets are stored per financial month, so a new cycle starts empty (and
+  // budget alerts go quiet) until they are set again. Offer to copy the most
+  // recent month that has budgets, limited to categories that still exist.
+  const copySource = React.useMemo(() => {
+    if (budgets.some((b) => b.period_month === selectedMonth)) return null;
+    const activeIds = new Set(flatCategories.map((c) => c.id));
+    const earlier = budgets
+      .filter((b) => b.period_month < selectedMonth && activeIds.has(b.category_id))
+      .map((b) => b.period_month)
+      .sort();
+    const month = earlier[earlier.length - 1];
+    if (!month) return null;
+    const rows = budgets.filter((b) => b.period_month === month && activeIds.has(b.category_id));
+    const [y, m] = month.split("-").map(Number);
+    const label = new Date(y, m - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+    return { month, label, rows };
+  }, [budgets, selectedMonth, flatCategories]);
+
+  const [copying, setCopying] = React.useState(false);
+  const handleCopyBudgets = async () => {
+    if (!copySource) return;
+    setCopying(true);
+    try {
+      for (const b of copySource.rows) {
+        await setBudgetMutation.mutateAsync({
+          category_id: b.category_id,
+          amount: Number(b.amount),
+          period_month: selectedMonth,
+          carry_over: b.carry_over,
+        });
+      }
+      toast.success(`${copySource.rows.length} budget disalin dari ${copySource.label}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menyalin budget.");
+    } finally {
+      setCopying(false);
+    }
+  };
+
   // Open "Atur Budget" dialog
   const handleOpenSetup = (cat: Category) => {
     const item = budgetsAnalysis.find((x) => x.category.id === cat.id);
@@ -519,6 +558,21 @@ export default function BudgetsPage() {
                         Atur batas limit di kategori di bawah untuk menjaga pengeluaran Anda.
                       </p>
                     </div>
+                    {copySource && (
+                      <Button
+                        type="button"
+                        onClick={handleCopyBudgets}
+                        disabled={copying}
+                        className="h-10 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold text-xs gap-1.5"
+                      >
+                        {copying ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="size-3.5" />
+                        )}
+                        Salin {copySource.rows.length} budget dari {copySource.label}
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <div className="grid gap-3">

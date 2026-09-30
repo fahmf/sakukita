@@ -15,7 +15,7 @@ import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
 import { useTheme } from "next-themes";
 import { useQueryClient } from "@tanstack/react-query";
 import { db } from "@/lib/db/dexie";
-import { triggerSync } from "@/lib/db/sync";
+import { triggerSync, clearRejectedSync } from "@/lib/db/sync";
 import {
   Select,
   SelectContent,
@@ -128,6 +128,9 @@ export default function SettingsPage() {
           db.outbox.clear()
         ]);
       });
+      // Writes the server rejected were parked out of the outbox; a full
+      // reset re-downloads the server's truth, so drop them as well.
+      clearRejectedSync();
 
       // 2. Invalidate react-query cache
       await queryClient.resetQueries();
@@ -1014,9 +1017,26 @@ export default function SettingsPage() {
             <DialogHeader>
               <DialogTitle>Arsipkan Kategori?</DialogTitle>
             </DialogHeader>
-            <div className="py-2 text-sm text-muted-foreground">
-              Apakah Anda yakin ingin mengarsipkan kategori ini? Transaksi yang menggunakan kategori ini akan tetap aman tetapi kategori ini tidak akan muncul lagi di pilihan baru.
-            </div>
+            {(() => {
+              const parent = categoriesTree.find((c) => c.id === categoryToArchive);
+              const target =
+                parent ??
+                categoriesTree.flatMap((c) => c.subcategories).find((c) => c.id === categoryToArchive);
+              const subCount = parent?.subcategories.length ?? 0;
+              return (
+                <div className="py-2 text-sm text-muted-foreground space-y-2">
+                  <p>
+                    Kategori <span className="font-semibold text-foreground">&ldquo;{target?.name}&rdquo;</span>{" "}
+                    tidak akan muncul lagi di pilihan transaksi baru. Transaksi lama tetap tersimpan.
+                  </p>
+                  {subCount > 0 && (
+                    <p className="font-semibold text-expense">
+                      {subCount} subkategori di dalamnya ({parent!.subcategories.map((s) => s.name).join(", ")}) ikut diarsipkan.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
             <DialogFooter className="gap-2 pt-2 flex flex-row justify-end">
               <Button
                 type="button"
