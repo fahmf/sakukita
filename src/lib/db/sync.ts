@@ -22,8 +22,9 @@ export async function pullLatest(supabase: SupabaseClient, householdId: string) 
     const { data: wallets, error: walletsError } = await supabase
       .from("wallets")
       .select("*")
-      .eq("household_id", householdId)
-      .eq("is_archived", false);
+      .eq("household_id", householdId);
+    // Archived rows are pulled too: history screens still need their names,
+    // and every picker already filters is_archived out.
 
     if (walletsError) throw walletsError;
 
@@ -56,8 +57,9 @@ export async function pullLatest(supabase: SupabaseClient, householdId: string) 
     const { data: categories, error: categoriesError } = await supabase
       .from("categories")
       .select("*")
-      .eq("household_id", householdId)
-      .eq("is_archived", false);
+      .eq("household_id", householdId);
+    // Keep archived categories locally so old transactions and reports still
+    // resolve them (and so the seed treats them as tombstones, not gaps).
 
     if (categoriesError) throw categoriesError;
 
@@ -267,9 +269,11 @@ export async function flushOutbox(supabase: SupabaseClient) {
           const payload = { ...entry.payload }; delete (payload as Record<string, unknown>).syncStatus;
           const { error } = await supabase.from("transactions").insert(payload);
           if (error) {
-            // Constraint errors (e.g. duplicate key) shouldn't block queue infinitely
-            if (error.code && error.code.startsWith("23")) {
-              console.error("Constraint error during transaction insert; discarding entry", error);
+            // Duplicate key = the row already reached the server (e.g. a retried
+            // insert). Any other constraint error is a real rejection and goes
+            // through the failure path below instead of being marked synced.
+            if (error.code === UNIQUE_VIOLATION) {
+              console.warn("Transaction already on server; marking synced", error);
               await db.outbox.delete(entry.seq!);
               await db.transactions.update(entry.entityId, { syncStatus: "synced" });
               continue;
@@ -317,8 +321,8 @@ export async function flushOutbox(supabase: SupabaseClient) {
           const payload = { ...entry.payload }; delete (payload as Record<string, unknown>).syncStatus;
           const { error } = await supabase.from("wallets").insert(payload);
           if (error) {
-            if (error.code && error.code.startsWith("23")) {
-              console.error("Constraint error during wallet insert; discarding entry", error);
+            if (error.code === UNIQUE_VIOLATION) {
+              console.warn("wallet already on server; marking synced", error);
               await db.outbox.delete(entry.seq!);
               await db.wallets.update(entry.entityId, { syncStatus: "synced" });
               continue;
@@ -350,8 +354,8 @@ export async function flushOutbox(supabase: SupabaseClient) {
           const payload = { ...entry.payload }; delete (payload as Record<string, unknown>).syncStatus;
           const { error } = await supabase.from("categories").insert(payload);
           if (error) {
-            if (error.code && error.code.startsWith("23")) {
-              console.error("Constraint error during category insert; discarding entry", error);
+            if (error.code === UNIQUE_VIOLATION) {
+              console.warn("category already on server; marking synced", error);
               await db.outbox.delete(entry.seq!);
               await db.categories.update(entry.entityId, { syncStatus: "synced" });
               continue;
@@ -383,8 +387,8 @@ export async function flushOutbox(supabase: SupabaseClient) {
           const payload = { ...entry.payload }; delete (payload as Record<string, unknown>).syncStatus;
           const { error } = await supabase.from("budgets").insert(payload);
           if (error) {
-            if (error.code && error.code.startsWith("23")) {
-              console.error("Constraint error during budget insert; discarding entry", error);
+            if (error.code === UNIQUE_VIOLATION) {
+              console.warn("budget already on server; marking synced", error);
               await db.outbox.delete(entry.seq!);
               await db.budgets.update(entry.entityId, { syncStatus: "synced" });
               continue;
@@ -416,8 +420,8 @@ export async function flushOutbox(supabase: SupabaseClient) {
           const payload = { ...entry.payload }; delete (payload as Record<string, unknown>).syncStatus;
           const { error } = await supabase.from("savings_goals").insert(payload);
           if (error) {
-            if (error.code && error.code.startsWith("23")) {
-              console.error("Constraint error during goal insert; discarding entry", error);
+            if (error.code === UNIQUE_VIOLATION) {
+              console.warn("goal already on server; marking synced", error);
               await db.outbox.delete(entry.seq!);
               await db.savings_goals.update(entry.entityId, { syncStatus: "synced" });
               continue;
@@ -449,8 +453,8 @@ export async function flushOutbox(supabase: SupabaseClient) {
           const payload = { ...entry.payload }; delete (payload as Record<string, unknown>).syncStatus;
           const { error } = await supabase.from("debts").insert(payload);
           if (error) {
-            if (error.code && error.code.startsWith("23")) {
-              console.error("Constraint error during debt insert; discarding entry", error);
+            if (error.code === UNIQUE_VIOLATION) {
+              console.warn("debt already on server; marking synced", error);
               await db.outbox.delete(entry.seq!);
               await db.debts.update(entry.entityId, { syncStatus: "synced" });
               continue;
@@ -482,8 +486,8 @@ export async function flushOutbox(supabase: SupabaseClient) {
           const payload = { ...entry.payload }; delete (payload as Record<string, unknown>).syncStatus;
           const { error } = await supabase.from("recurring_transactions").insert(payload);
           if (error) {
-            if (error.code && error.code.startsWith("23")) {
-              console.error("Constraint error during recurring insert; discarding entry", error);
+            if (error.code === UNIQUE_VIOLATION) {
+              console.warn("recurring already on server; marking synced", error);
               await db.outbox.delete(entry.seq!);
               await db.recurring_transactions.update(entry.entityId, { syncStatus: "synced" });
               continue;
@@ -513,19 +517,80 @@ export async function flushOutbox(supabase: SupabaseClient) {
       }
     } catch (err) {
       console.error(`Failed to flush outbox entry seq=${entry.seq}:`, err);
+      if (!isPermanentError(err)) {
+        // Network drop, 5xx, expired JWT, paused project… none of these say
+        // anything about the entry itself. Stop here to preserve ordering and
+        // retry on the next sync — never count them towards dead-lettering.
+        break;
+      }
       const key = entry.seq!;
       const count = (_outboxRetries.get(key) ?? 0) + 1;
       _outboxRetries.set(key, count);
       if (count >= 3) {
-        // Dead-letter: discard permanently failing entries to unblock queue
-        console.error(`Outbox entry seq=${key} failed ${count} times, discarding as dead-letter`);
+        // The server keeps rejecting this exact write (validation / RLS /
+        // FK). Park it so the rest of the queue can move, but keep a copy and
+        // surface it instead of dropping the user's data silently.
+        console.error(`Outbox entry seq=${key} rejected ${count} times; parking it`);
+        parkRejectedEntry(entry, err);
         await db.outbox.delete(key);
         _outboxRetries.delete(key);
-        continue; // Try next entry instead of blocking queue
+        continue;
       }
-      // Halt on transient errors to preserve ordering, retry on next sync
       break;
     }
+  }
+}
+
+const UNIQUE_VIOLATION = "23505";
+const REJECTED_KEY = "saku_sync_rejected";
+
+/**
+ * True when PostgREST/Postgres rejected the write itself, so retrying the
+ * same payload can never succeed: data exceptions (22xxx), integrity
+ * violations (23xxx), privilege/RLS and undefined column errors (42xxx) and
+ * PostgREST schema errors (PGRST1xx/2xx). Anything else — fetch failures,
+ * timeouts, 5xx, JWT errors (PGRST3xx) — is treated as transient.
+ */
+function isPermanentError(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  if (typeof code !== "string" || !code) return false;
+  return /^(22|23|42)/.test(code) || /^PGRST[12]/.test(code);
+}
+
+function parkRejectedEntry(entry: { entity: string; entityId: string; op: string; payload: unknown }, err: unknown) {
+  if (typeof window === "undefined") return;
+  try {
+    const parked = JSON.parse(window.localStorage.getItem(REJECTED_KEY) || "[]");
+    parked.push({
+      entity: entry.entity,
+      entityId: entry.entityId,
+      op: entry.op,
+      payload: entry.payload,
+      error: err instanceof Error ? err.message : (err as { message?: string })?.message ?? String(err),
+      at: new Date().toISOString(),
+    });
+    window.localStorage.setItem(REJECTED_KEY, JSON.stringify(parked));
+  } catch {
+    /* storage full or blocked — the console error above is all we can do */
+  }
+}
+
+export function clearRejectedSync() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(REJECTED_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Writes the server rejected and that were parked out of the outbox. */
+export function getRejectedSyncCount(): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    return JSON.parse(window.localStorage.getItem(REJECTED_KEY) || "[]").length;
+  } catch {
+    return 0;
   }
 }
 
@@ -575,70 +640,6 @@ export function calculateNextMaterializeDate(currentDateStr: string, frequency: 
   return date.toISOString();
 }
 
-export async function materializeRecurringTransactions() {
-  try {
-    const nowStr = new Date().toISOString();
-    const templates = await db.recurring_transactions.toArray();
-    const activeTemplates = templates.filter(t => t.is_active && t.next_materialize_at <= nowStr);
-
-    for (const t of activeTemplates) {
-      console.log("Materializing recurring transaction locally:", t.id);
-      
-      const txId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
-      const newTx = {
-        id: txId,
-        household_id: t.household_id,
-        created_by: "system",
-        type: t.type,
-        amount: t.amount,
-        occurred_at: t.next_materialize_at,
-        is_scheduled: false,
-        wallet_id: t.wallet_id,
-        to_wallet_id: t.to_wallet_id || null,
-        category_id: t.category_id || null,
-        note: t.note || "Transaksi Berulang Otomatis",
-        tags: [],
-        receipt_url: null,
-        receipt_items: null,
-        is_deleted: false,
-        deleted_at: null,
-        deleted_by: null,
-        client_id: "recurring-system",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      await db.transactions.put({ ...newTx, syncStatus: "pending" });
-      await db.outbox.add({
-        entity: "transactions",
-        entityId: txId,
-        op: "create",
-        payload: newTx,
-        createdAt: Date.now(),
-      });
-
-      const nextDate = calculateNextMaterializeDate(t.next_materialize_at, t.frequency, t.interval);
-      const updatedTemplate = {
-        ...t,
-        last_materialized_at: t.next_materialize_at,
-        next_materialize_at: nextDate,
-        updated_at: new Date().toISOString(),
-      };
-
-      await db.recurring_transactions.put({ ...updatedTemplate, syncStatus: "pending" });
-      await db.outbox.add({
-        entity: "recurring_transactions",
-        entityId: t.id,
-        op: "update",
-        payload: updatedTemplate,
-        createdAt: Date.now(),
-      });
-    }
-  } catch (err) {
-    console.error("Failed to materialize recurring transactions locally:", err);
-  }
-}
-
 export async function triggerSync(supabase: SupabaseClient, householdId: string) {
   // Mutex: prevent concurrent sync executions that cause data corruption
   if (_syncLock) return;
@@ -652,8 +653,18 @@ export async function triggerSync(supabase: SupabaseClient, householdId: string)
     await flushOutbox(supabase);
     await pullLatest(supabase, householdId);
     await materializePassedScheduledTransactions();
-    await materializeRecurringTransactions();
+    // Recurring templates are materialized server-side by the
+    // `materialize-recurring` pg_cron job (migration 0014), which catches up
+    // missed runs, honours end_date and uses the Jakarta calendar. The old
+    // client-side copy inserted created_by "system" (not a UUID), so every
+    // insert was rejected and could leave phantom duplicates on the device.
     useSyncStore.getState().setLastSynced(new Date().toISOString());
+    const rejected = getRejectedSyncCount();
+    if (rejected > 0) {
+      useSyncStore
+        .getState()
+        .setStatus("error", `${rejected} perubahan ditolak server dan belum tersinkron`);
+    }
     // Notify listeners (e.g. SyncProvider) to invalidate query caches
     _onSyncComplete?.();
   } catch (err) {

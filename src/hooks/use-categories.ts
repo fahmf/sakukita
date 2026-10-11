@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useHousehold } from "@/components/providers/household-provider";
 import type { Category, CategoryKind } from "@/lib/supabase/types";
-import { db } from "@/lib/db/dexie";
+import { db, type Syncable } from "@/lib/db/dexie";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { triggerSync } from "@/lib/db/sync";
 import { safeRandomUUID } from "@/lib/utils";
 
@@ -74,13 +75,115 @@ export async function generateDeterministicUUID(householdId: string, stableId: s
   return `${part1}-${part2}-${part3}-${part4}-${part5}`;
 }
 
+/**
+ * Fold category `dupId` into `targetId`: transactions, recurring templates,
+ * budgets and subcategories are all repointed before the duplicate goes away.
+ *
+ * Remote writes run first and every PostgREST error is checked (supabase-js
+ * returns `{ error }` instead of throwing). If any of them fails we stop
+ * before touching local data, so the device never diverges from the server
+ * and nothing is orphaned — the merge simply retries on the next seed run.
+ */
+async function mergeCategoryInto(
+  supabase: SupabaseClient,
+  householdId: string,
+  dupId: string,
+  targetId: string
+): Promise<boolean> {
+  const fail = (step: string, error: unknown) => {
+    console.error(`Category merge ${dupId} -> ${targetId} aborted at ${step}:`, error);
+    return false;
+  };
+
+  const remaps: [string, Record<string, string>, string][] = [
+    ["transactions", { category_id: targetId }, "category_id"],
+    ["recurring_transactions", { category_id: targetId }, "category_id"],
+    ["categories", { parent_id: targetId }, "parent_id"],
+  ];
+  for (const [table, patch, column] of remaps) {
+    const { error } = await supabase.from(table).update(patch).eq(column, dupId);
+    if (error) return fail(table, error);
+  }
+
+  // Budgets: fold into the target's budget for the same month if one exists,
+  // since (household, category, month) is unique.
+  const householdBudgets = await db.budgets.where("household_id").equals(householdId).toArray();
+  const dupBudgets = householdBudgets.filter((b) => b.category_id === dupId);
+  for (const b of dupBudgets) {
+    const existing = householdBudgets.find(
+      (x) => x.category_id === targetId && x.period_month === b.period_month
+    );
+    if (existing) {
+      const amount = Number(existing.amount) + Number(b.amount);
+      const { error: upErr } = await supabase.from("budgets").update({ amount }).eq("id", existing.id);
+      if (upErr) return fail("budgets", upErr);
+      const { error: delErr } = await supabase.from("budgets").delete().eq("id", b.id);
+      if (delErr) return fail("budgets", delErr);
+      await db.budgets.update(existing.id, { amount });
+      await db.budgets.delete(b.id);
+    } else {
+      const { error } = await supabase.from("budgets").update({ category_id: targetId }).eq("id", b.id);
+      if (error) return fail("budgets", error);
+      await db.budgets.update(b.id, { category_id: targetId });
+    }
+  }
+
+  // Deleting a category is admin-only under RLS; editors fall back to archiving
+  // it, which hides it just the same now that nothing points at it.
+  const { error: delError } = await supabase.from("categories").delete().eq("id", dupId);
+  if (delError) {
+    const { error: archError } = await supabase
+      .from("categories")
+      .update({ is_archived: true })
+      .eq("id", dupId);
+    if (archError) return fail("categories delete/archive", archError);
+  }
+
+  // Server is consistent — mirror it locally.
+  await db.transactions.where("category_id").equals(dupId).modify({ category_id: targetId });
+  await db.recurring_transactions
+    .filter((r) => r.category_id === dupId)
+    .modify({ category_id: targetId });
+  await db.categories.filter((c) => c.parent_id === dupId).modify({ parent_id: targetId });
+  await db.categories.delete(dupId);
+
+  // Queued writes still carrying the old id would re-point rows at a deleted
+  // category (FK violation) — rewrite them, and drop the duplicate's own ops.
+  const queued = await db.outbox.toArray();
+  for (const entry of queued) {
+    if (entry.entity === "categories" && entry.entityId === dupId) {
+      await db.outbox.delete(entry.seq!);
+      continue;
+    }
+    const payload = entry.payload ?? {};
+    if (payload.category_id === dupId || payload.parent_id === dupId) {
+      await db.outbox.update(entry.seq!, {
+        payload: {
+          ...payload,
+          ...(payload.category_id === dupId ? { category_id: targetId } : {}),
+          ...(payload.parent_id === dupId ? { parent_id: targetId } : {}),
+        },
+      });
+    }
+  }
+  return true;
+}
+
 export async function seedStandardCategories(householdId: string) {
   if (_seedingInProgress) return;
   _seedingInProgress = true;
   try {
-  const supabase: any = createClient();
+  const supabase = createClient();
   const now = new Date().toISOString();
 
+  // Lean default catalog (Oct 2026), shaped by five months of real usage:
+  // four subcategories held 55% of entries while ~25 were never used, and
+  // missing/hidden "Kesehatan" pushed medicine into "Bahan Makanan".
+  //
+  // Stable ids are kept from the previous catalog wherever the concept
+  // survives (renamed or moved), so existing households that already hold
+  // these ids never get a duplicate. Dropped entries simply stop being seeded
+  // for new households; nothing is removed from existing ones.
   const standardCategories = [
     // --- EXPENSES ---
     {
@@ -91,10 +194,22 @@ export async function seedStandardCategories(householdId: string) {
       color: "#E8A5A5",
       sort_order: 10,
       subcategories: [
-        { id: "00000000-0000-4000-8000-000000000002", name: "Bahan Makanan", icon: "🛒" },
-        { id: "00000000-0000-4000-8000-000000000003", name: "Makan Luar", icon: "🍕" },
-        { id: "00000000-0000-4000-8000-000000000004", name: "Kopi & Cemilan", icon: "☕" },
-        { id: "00000000-0000-4000-8000-000000000351", name: "Pesan Antar", icon: "🛵" },
+        { id: "00000000-0000-4000-8000-000000000002", name: "Belanja Dapur", icon: "🛒" },
+        { id: "00000000-0000-4000-8000-000000000003", name: "Makan di Luar", icon: "🍕" },
+        { id: "00000000-0000-4000-8000-000000000004", name: "Jajan & Kopi", icon: "☕" },
+      ],
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000100",
+      name: "Rumah Tangga",
+      kind: "expense" as const,
+      icon: "🏠",
+      color: "#F4D2A6",
+      sort_order: 20,
+      subcategories: [
+        { id: "00000000-0000-4000-8000-000000000101", name: "Listrik & Air", icon: "🔌" },
+        { id: "00000000-0000-4000-8000-000000000312", name: "Gas & Galon", icon: "🔥" },
+        { id: "00000000-0000-4000-8000-000000000103", name: "Perlengkapan Rumah", icon: "🧹" },
       ],
     },
     {
@@ -103,57 +218,26 @@ export async function seedStandardCategories(householdId: string) {
       kind: "expense" as const,
       icon: "🚗",
       color: "#B8E6D3",
-      sort_order: 20,
+      sort_order: 30,
       subcategories: [
-        { id: "00000000-0000-4000-8000-000000000011", name: "Bahan Bakar", icon: "⛽" },
-        { id: "00000000-0000-4000-8000-000000000012", name: "Ojek & Taksi Online", icon: "🛵" },
-        { id: "00000000-0000-4000-8000-000000000013", name: "Parkir & Tol", icon: "🎫" },
-        { id: "00000000-0000-4000-8000-000000000301", name: "Transportasi Umum", icon: "🚌" },
+        { id: "00000000-0000-4000-8000-000000000011", name: "Bensin", icon: "⛽" },
+        { id: "00000000-0000-4000-8000-000000000013", name: "Ojek, Parkir & Tol", icon: "🎫" },
         { id: "00000000-0000-4000-8000-000000000302", name: "Servis Kendaraan", icon: "🔧" },
       ],
     },
     {
       id: "00000000-0000-4000-8000-000000000200",
-      name: "Tagihan & Langganan",
+      name: "Tagihan",
       kind: "expense" as const,
       icon: "🧾",
       color: "#F4A6A6",
-      sort_order: 25,
-      subcategories: [
-        { id: "00000000-0000-4000-8000-000000000201", name: "Langganan Digital", icon: "📺" },
-        { id: "00000000-0000-4000-8000-000000000202", name: "Asuransi", icon: "🛡️" },
-        { id: "00000000-0000-4000-8000-000000000203", name: "Cicilan & Utang", icon: "🏦" },
-        { id: "00000000-0000-4000-8000-000000000204", name: "Pajak", icon: "🧮" },
-        { id: "00000000-0000-4000-8000-000000000205", name: "Biaya Admin Bank", icon: "💳" },
-      ],
-    },
-    {
-      id: "00000000-0000-4000-8000-000000000100",
-      name: "Kebutuhan Rumah",
-      kind: "expense" as const,
-      icon: "🏠",
-      color: "#F4D2A6",
-      sort_order: 30,
-      subcategories: [
-        { id: "00000000-0000-4000-8000-000000000101", name: "Listrik & Air", icon: "🔌" },
-        { id: "00000000-0000-4000-8000-000000000102", name: "Internet & Pulsa", icon: "📶" },
-        { id: "00000000-0000-4000-8000-000000000103", name: "Perlengkapan Rumah", icon: "🧹" },
-        { id: "00000000-0000-4000-8000-000000000311", name: "Sewa & KPR", icon: "🏡" },
-        { id: "00000000-0000-4000-8000-000000000312", name: "Gas & Galon", icon: "🔥" },
-      ],
-    },
-    {
-      id: "00000000-0000-4000-8000-000000001000",
-      name: "Hiburan & Hobi",
-      kind: "expense" as const,
-      icon: "🎮",
-      color: "#C8A5E8",
       sort_order: 40,
       subcategories: [
-        { id: "00000000-0000-4000-8000-000000001001", name: "Bioskop & Streaming", icon: "🍿" },
-        { id: "00000000-0000-4000-8000-000000001002", name: "Liburan", icon: "✈️" },
-        { id: "00000000-0000-4000-8000-000000000321", name: "Game", icon: "🎯" },
-        { id: "00000000-0000-4000-8000-000000000322", name: "Olahraga & Gym", icon: "🏋️" },
+        // Moved here from Rumah Tangga; same stable id as before.
+        { id: "00000000-0000-4000-8000-000000000102", name: "Pulsa & Internet", icon: "📶" },
+        { id: "00000000-0000-4000-8000-000000000201", name: "Langganan Digital", icon: "📺" },
+        { id: "00000000-0000-4000-8000-000000000203", name: "Cicilan & Utang", icon: "🏦" },
+        { id: "00000000-0000-4000-8000-000000000204", name: "Pajak & Asuransi", icon: "🧮" },
       ],
     },
     {
@@ -165,8 +249,20 @@ export async function seedStandardCategories(householdId: string) {
       sort_order: 50,
       subcategories: [
         { id: "00000000-0000-4000-8000-000000010001", name: "Obat & Vitamin", icon: "💊" },
-        { id: "00000000-0000-4000-8000-000000010002", name: "Dokter & Lab", icon: "🩺" },
-        { id: "00000000-0000-4000-8000-000000000331", name: "Asuransi Kesehatan", icon: "🩹" },
+        { id: "00000000-0000-4000-8000-000000010002", name: "Dokter, Bidan & Lab", icon: "🩺" },
+        { id: "00000000-0000-4000-8000-000000000331", name: "BPJS & Asuransi Kesehatan", icon: "🩹" },
+      ],
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000220",
+      name: "Anak & Keluarga",
+      kind: "expense" as const,
+      icon: "👨‍👩‍👧",
+      color: "#E8C8A5",
+      sort_order: 55,
+      subcategories: [
+        { id: "00000000-0000-4000-8000-000000000221", name: "Kebutuhan Anak & Bayi", icon: "🍼" },
+        { id: "00000000-0000-4000-8000-000000000223", name: "Kiriman Orang Tua", icon: "👵" },
       ],
     },
     {
@@ -175,64 +271,45 @@ export async function seedStandardCategories(householdId: string) {
       kind: "expense" as const,
       icon: "🎓",
       color: "#A6C8E8",
-      sort_order: 55,
+      sort_order: 60,
       subcategories: [
-        { id: "00000000-0000-4000-8000-000000000211", name: "Uang Sekolah", icon: "🏫" },
+        { id: "00000000-0000-4000-8000-000000000211", name: "SPP & Biaya Sekolah", icon: "🏫" },
         { id: "00000000-0000-4000-8000-000000000212", name: "Buku & Alat Tulis", icon: "📚" },
-        { id: "00000000-0000-4000-8000-000000000213", name: "Kursus & Pelatihan", icon: "💻" },
       ],
     },
     {
       id: "00000000-0000-4000-8000-000000100000",
-      name: "Belanja Pribadi",
+      name: "Pakaian & Perawatan",
       kind: "expense" as const,
       icon: "🛍️",
       color: "#E8A5C8",
-      sort_order: 60,
+      sort_order: 65,
       subcategories: [
         { id: "00000000-0000-4000-8000-000000100001", name: "Pakaian", icon: "👕" },
         { id: "00000000-0000-4000-8000-000000100002", name: "Perawatan Diri", icon: "🧴" },
-        { id: "00000000-0000-4000-8000-000000000341", name: "Elektronik", icon: "📱" },
-        { id: "00000000-0000-4000-8000-000000000342", name: "Kosmetik", icon: "💄" },
-      ],
-    },
-    {
-      id: "00000000-0000-4000-8000-000000000220",
-      name: "Keluarga & Anak",
-      kind: "expense" as const,
-      icon: "👨‍👩‍👧",
-      color: "#E8C8A5",
-      sort_order: 65,
-      subcategories: [
-        { id: "00000000-0000-4000-8000-000000000221", name: "Kebutuhan Anak", icon: "🍼" },
-        { id: "00000000-0000-4000-8000-000000000222", name: "Uang Saku", icon: "💵" },
-        { id: "00000000-0000-4000-8000-000000000223", name: "Orang Tua", icon: "👵" },
+        { id: "00000000-0000-4000-8000-000000000341", name: "Elektronik & Gadget", icon: "📱" },
       ],
     },
     {
       id: "00000000-0000-4000-8000-000000000230",
-      name: "Hadiah & Donasi",
+      name: "Sosial & Ibadah",
       kind: "expense" as const,
-      icon: "🎁",
+      icon: "🤲",
       color: "#E8A5D8",
       sort_order: 70,
       subcategories: [
-        { id: "00000000-0000-4000-8000-000000000231", name: "Sedekah & Donasi", icon: "🤲" },
-        { id: "00000000-0000-4000-8000-000000000232", name: "Zakat & Infak", icon: "🕌" },
-        { id: "00000000-0000-4000-8000-000000000233", name: "Hadiah", icon: "🎀" },
+        { id: "00000000-0000-4000-8000-000000000232", name: "Zakat, Infak & Sedekah", icon: "🕌" },
+        { id: "00000000-0000-4000-8000-000000000233", name: "Hadiah & Kondangan", icon: "🎀" },
       ],
     },
     {
-      id: "00000000-0000-4000-8000-000000000240",
-      name: "Peliharaan",
+      id: "00000000-0000-4000-8000-000000001000",
+      name: "Hiburan & Liburan",
       kind: "expense" as const,
-      icon: "🐾",
-      color: "#C8E8A5",
-      sort_order: 75,
-      subcategories: [
-        { id: "00000000-0000-4000-8000-000000000241", name: "Makanan Hewan", icon: "🦴" },
-        { id: "00000000-0000-4000-8000-000000000242", name: "Dokter Hewan", icon: "🐶" },
-      ],
+      icon: "🎡",
+      color: "#C8A5E8",
+      sort_order: 80,
+      subcategories: [],
     },
     {
       id: "00000000-0000-4000-8000-000000000250",
@@ -247,52 +324,34 @@ export async function seedStandardCategories(householdId: string) {
     // --- INCOME ---
     {
       id: "00000000-0000-4000-8000-000001000000",
-      name: "Gaji & Pendapatan",
+      name: "Gaji",
       kind: "income" as const,
       icon: "💰",
       color: "#5FBF9A",
       sort_order: 100,
       subcategories: [
         { id: "00000000-0000-4000-8000-000001000001", name: "Gaji Bulanan", icon: "💵" },
-        { id: "00000000-0000-4000-8000-000001000002", name: "Bonus & THR", icon: "🎁" },
-        { id: "00000000-0000-4000-8000-000000000421", name: "Lembur", icon: "⏰" },
+        { id: "00000000-0000-4000-8000-000001000002", name: "Bonus, THR & Lembur", icon: "🎁" },
       ],
     },
     {
       id: "00000000-0000-4000-8000-000000000400",
-      name: "Usaha & Bisnis",
+      name: "Usaha & Sampingan",
       kind: "income" as const,
       icon: "🏪",
       color: "#A5E8B8",
-      sort_order: 105,
-      subcategories: [
-        { id: "00000000-0000-4000-8000-000000000401", name: "Penjualan", icon: "🧾" },
-        { id: "00000000-0000-4000-8000-000000000402", name: "Laba Usaha", icon: "💹" },
-      ],
-    },
-    {
-      id: "00000000-0000-4000-8000-000000000410",
-      name: "Freelance & Sampingan",
-      kind: "income" as const,
-      icon: "💻",
-      color: "#B8E6D3",
-      sort_order: 108,
-      subcategories: [
-        { id: "00000000-0000-4000-8000-000000000411", name: "Proyek", icon: "📁" },
-        { id: "00000000-0000-4000-8000-000000000412", name: "Komisi", icon: "🤝" },
-      ],
-    },
-    {
-      id: "00000000-0000-4000-8000-000010000000",
-      name: "Investasi",
-      kind: "income" as const,
-      icon: "📈",
-      color: "#7FD4A8",
       sort_order: 110,
-      subcategories: [
-        { id: "00000000-0000-4000-8000-000010000001", name: "Dividen & Bunga", icon: "🪙" },
-        { id: "00000000-0000-4000-8000-000010000002", name: "Reksa Dana & Saham", icon: "📊" },
-      ],
+      subcategories: [],
+    },
+    {
+      // Promoted from a subcategory of "Pendapatan Lain"; same stable id.
+      id: "00000000-0000-4000-8000-000020000002",
+      name: "Pemberian & Hadiah",
+      kind: "income" as const,
+      icon: "🧧",
+      color: "#E8C8A5",
+      sort_order: 115,
+      subcategories: [],
     },
     {
       id: "00000000-0000-4000-8000-000020000000",
@@ -303,8 +362,8 @@ export async function seedStandardCategories(householdId: string) {
       sort_order: 120,
       subcategories: [
         { id: "00000000-0000-4000-8000-000020000001", name: "Refund", icon: "🔙" },
-        { id: "00000000-0000-4000-8000-000020000002", name: "Pemberian", icon: "🧧" },
-        { id: "00000000-0000-4000-8000-000000000431", name: "Sewa & Rental", icon: "🏠" },
+        // Moved here from the dropped "Investasi" parent; same stable id.
+        { id: "00000000-0000-4000-8000-000010000001", name: "Bunga & Imbal Hasil", icon: "🪙" },
       ],
     },
   ];
@@ -384,238 +443,102 @@ export async function seedStandardCategories(householdId: string) {
     }
   }
 
-  // 2. Fetch all local categories to detect duplicates and map aliases
+  // 2. Merge legacy/alias duplicates into their standard category.
+  //
+  // Only names that earlier versions (or the server signup trigger) seeded are
+  // aliased here. Generic words people plausibly use for their own categories
+  // ("obat", "anak", "sekolah", "tabungan", ...) are deliberately absent: an
+  // alias hit merges and then deletes the category, so a broad alias silently
+  // destroys user-made categories. Every alias also carries its kind so an
+  // expense category can never be folded into an income one (the old
+  // "lain-lain" -> "Pendapatan Lain" mapping did exactly that).
+  const kindByStableId = new Map<string, CategoryKind>();
+  for (const parent of standardCategories) {
+    kindByStableId.set(parent.id, parent.kind);
+    for (const child of parent.subcategories) kindByStableId.set(child.id, parent.kind);
+  }
+
+  // Current names plus every name an earlier catalog or the server signup
+  // trigger used for the same stable category.
+  const rootAliases: Record<string, string> = {
+    "makanan": "00000000-0000-4000-8000-000000000001",
+    "makanan & dapur": "00000000-0000-4000-8000-000000000001",
+    "makanan/minuman": "00000000-0000-4000-8000-000000000001",
+    "food": "00000000-0000-4000-8000-000000000001",
+    "rumah tangga": "00000000-0000-4000-8000-000000000100",
+    "kebutuhan rumah": "00000000-0000-4000-8000-000000000100",
+    "transportasi": "00000000-0000-4000-8000-000000000010",
+    "transport": "00000000-0000-4000-8000-000000000010",
+    "tagihan": "00000000-0000-4000-8000-000000000200",
+    "tagihan & langganan": "00000000-0000-4000-8000-000000000200",
+    "utilities": "00000000-0000-4000-8000-000000000200",
+    "bills": "00000000-0000-4000-8000-000000000200",
+    "kesehatan": "00000000-0000-4000-8000-000000010000",
+    "health": "00000000-0000-4000-8000-000000010000",
+    "anak & keluarga": "00000000-0000-4000-8000-000000000220",
+    "keluarga & anak": "00000000-0000-4000-8000-000000000220",
+    "pendidikan": "00000000-0000-4000-8000-000000000210",
+    "education": "00000000-0000-4000-8000-000000000210",
+    "pakaian & perawatan": "00000000-0000-4000-8000-000000100000",
+    "belanja pribadi": "00000000-0000-4000-8000-000000100000",
+    "belanja": "00000000-0000-4000-8000-000000100000",
+    "shopping": "00000000-0000-4000-8000-000000100000",
+    "sosial & ibadah": "00000000-0000-4000-8000-000000000230",
+    "hadiah & donasi": "00000000-0000-4000-8000-000000000230",
+    "hiburan & liburan": "00000000-0000-4000-8000-000000001000",
+    "hiburan & hobi": "00000000-0000-4000-8000-000000001000",
+    "hiburan": "00000000-0000-4000-8000-000000001000",
+    "entertainment": "00000000-0000-4000-8000-000000001000",
+    "lainnya": "00000000-0000-4000-8000-000000000250",
+    // Server signup default "Lain-lain" is an EXPENSE category.
+    "lain-lain": "00000000-0000-4000-8000-000000000250",
+    "gaji": "00000000-0000-4000-8000-000001000000",
+    "gaji & pendapatan": "00000000-0000-4000-8000-000001000000",
+    "salary": "00000000-0000-4000-8000-000001000000",
+    "usaha & sampingan": "00000000-0000-4000-8000-000000000400",
+    "usaha & bisnis": "00000000-0000-4000-8000-000000000400",
+    "freelance & sampingan": "00000000-0000-4000-8000-000000000400",
+    // Server signup default "Hadiah" is an INCOME category.
+    "pemberian & hadiah": "00000000-0000-4000-8000-000020000002",
+    "hadiah": "00000000-0000-4000-8000-000020000002",
+    "pendapatan lain": "00000000-0000-4000-8000-000020000000",
+  };
+
+  // alias key is `${kind}:${level}:${name}` so kind and tree level must match
+  const aliasToHouseholdStableId = new Map<string, string>();
+  const householdStableIds = new Set<string>();
+  for (const [alias, stableId] of Object.entries(rootAliases)) {
+    const detId = await generateDeterministicUUID(householdId, stableId);
+    aliasToHouseholdStableId.set(`${kindByStableId.get(stableId)}:root:${alias}`, detId);
+    householdStableIds.add(detId);
+  }
+  for (const parent of standardCategories) {
+    for (const child of parent.subcategories) {
+      const detId = await generateDeterministicUUID(householdId, child.id);
+      aliasToHouseholdStableId.set(`${parent.kind}:sub:${child.name.toLowerCase().trim()}`, detId);
+      householdStableIds.add(detId);
+    }
+  }
+
   const currentLocalCategories = await db.categories
     .where("household_id")
     .equals(householdId)
     .toArray();
+  const activeLocalIds = new Set(
+    currentLocalCategories.filter((c) => !c.is_archived).map((c) => c.id)
+  );
 
-  const aliasToStableId = new Map<string, string>();
-
-  // Add primary mappings for aliases
-  aliasToStableId.set("makanan", "00000000-0000-4000-8000-000000000001");
-  aliasToStableId.set("makanan & dapur", "00000000-0000-4000-8000-000000000001");
-  aliasToStableId.set("makanan/minuman", "00000000-0000-4000-8000-000000000001");
-  aliasToStableId.set("food", "00000000-0000-4000-8000-000000000001");
-  aliasToStableId.set("kuliner", "00000000-0000-4000-8000-000000000001");
-
-  aliasToStableId.set("transportasi", "00000000-0000-4000-8000-000000000010");
-  aliasToStableId.set("kendaraan", "00000000-0000-4000-8000-000000000010");
-  aliasToStableId.set("bensin", "00000000-0000-4000-8000-000000000010");
-  aliasToStableId.set("transport", "00000000-0000-4000-8000-000000000010");
-
-  aliasToStableId.set("kebutuhan rumah", "00000000-0000-4000-8000-000000000100");
-  aliasToStableId.set("rumah", "00000000-0000-4000-8000-000000000100");
-
-  aliasToStableId.set("tagihan & langganan", "00000000-0000-4000-8000-000000000200");
-  aliasToStableId.set("tagihan", "00000000-0000-4000-8000-000000000200");
-  aliasToStableId.set("langganan", "00000000-0000-4000-8000-000000000200");
-  aliasToStableId.set("utilitas", "00000000-0000-4000-8000-000000000200");
-  aliasToStableId.set("utilities", "00000000-0000-4000-8000-000000000200");
-  aliasToStableId.set("bills", "00000000-0000-4000-8000-000000000200");
-
-  aliasToStableId.set("hiburan & hobi", "00000000-0000-4000-8000-000000001000");
-  aliasToStableId.set("hiburan", "00000000-0000-4000-8000-000000001000");
-  aliasToStableId.set("hobi", "00000000-0000-4000-8000-000000001000");
-  aliasToStableId.set("entertainment", "00000000-0000-4000-8000-000000001000");
-
-  aliasToStableId.set("kesehatan", "00000000-0000-4000-8000-000000010000");
-  aliasToStableId.set("medis", "00000000-0000-4000-8000-000000010000");
-  aliasToStableId.set("obat", "00000000-0000-4000-8000-000000010000");
-  aliasToStableId.set("health", "00000000-0000-4000-8000-000000010000");
-
-  aliasToStableId.set("belanja pribadi", "00000000-0000-4000-8000-000000100000");
-  aliasToStableId.set("belanja", "00000000-0000-4000-8000-000000100000");
-  aliasToStableId.set("pribadi", "00000000-0000-4000-8000-000000100000");
-  aliasToStableId.set("shopping", "00000000-0000-4000-8000-000000100000");
-
-  aliasToStableId.set("gaji & pendapatan", "00000000-0000-4000-8000-000001000000");
-  aliasToStableId.set("gaji", "00000000-0000-4000-8000-000001000000");
-  aliasToStableId.set("pendapatan", "00000000-0000-4000-8000-000001000000");
-  aliasToStableId.set("salary", "00000000-0000-4000-8000-000001000000");
-
-  aliasToStableId.set("investasi", "00000000-0000-4000-8000-000010000000");
-  aliasToStableId.set("tabungan", "00000000-0000-4000-8000-000010000000");
-  aliasToStableId.set("invest", "00000000-0000-4000-8000-000010000000");
-
-  aliasToStableId.set("pendapatan lain", "00000000-0000-4000-8000-000020000000");
-  aliasToStableId.set("lain-lain", "00000000-0000-4000-8000-000020000000");
-  aliasToStableId.set("others", "00000000-0000-4000-8000-000020000000");
-
-  aliasToStableId.set("pendidikan", "00000000-0000-4000-8000-000000000210");
-  aliasToStableId.set("sekolah", "00000000-0000-4000-8000-000000000210");
-  aliasToStableId.set("education", "00000000-0000-4000-8000-000000000210");
-
-  aliasToStableId.set("keluarga & anak", "00000000-0000-4000-8000-000000000220");
-  aliasToStableId.set("keluarga", "00000000-0000-4000-8000-000000000220");
-  aliasToStableId.set("anak", "00000000-0000-4000-8000-000000000220");
-  aliasToStableId.set("family", "00000000-0000-4000-8000-000000000220");
-
-  aliasToStableId.set("hadiah & donasi", "00000000-0000-4000-8000-000000000230");
-  aliasToStableId.set("donasi", "00000000-0000-4000-8000-000000000230");
-  aliasToStableId.set("sedekah", "00000000-0000-4000-8000-000000000230");
-  aliasToStableId.set("zakat", "00000000-0000-4000-8000-000000000230");
-  aliasToStableId.set("gift", "00000000-0000-4000-8000-000000000230");
-
-  aliasToStableId.set("peliharaan", "00000000-0000-4000-8000-000000000240");
-  aliasToStableId.set("hewan", "00000000-0000-4000-8000-000000000240");
-  aliasToStableId.set("pet", "00000000-0000-4000-8000-000000000240");
-  aliasToStableId.set("pets", "00000000-0000-4000-8000-000000000240");
-
-  aliasToStableId.set("lainnya", "00000000-0000-4000-8000-000000000250");
-  aliasToStableId.set("lain", "00000000-0000-4000-8000-000000000250");
-  aliasToStableId.set("other", "00000000-0000-4000-8000-000000000250");
-  aliasToStableId.set("misc", "00000000-0000-4000-8000-000000000250");
-
-  aliasToStableId.set("usaha & bisnis", "00000000-0000-4000-8000-000000000400");
-  aliasToStableId.set("usaha", "00000000-0000-4000-8000-000000000400");
-  aliasToStableId.set("bisnis", "00000000-0000-4000-8000-000000000400");
-  aliasToStableId.set("business", "00000000-0000-4000-8000-000000000400");
-  aliasToStableId.set("dagang", "00000000-0000-4000-8000-000000000400");
-
-  aliasToStableId.set("freelance & sampingan", "00000000-0000-4000-8000-000000000410");
-  aliasToStableId.set("freelance", "00000000-0000-4000-8000-000000000410");
-  aliasToStableId.set("sampingan", "00000000-0000-4000-8000-000000000410");
-
-  // Also match subcategories
-  for (const parent of standardCategories) {
-    for (const child of parent.subcategories) {
-      aliasToStableId.set(child.name.toLowerCase().trim(), child.id);
-    }
-  }
-
-  // Pre-calculate deterministic stable IDs for household context mapping
-  const householdStableIds = new Set<string>();
-  const aliasToHouseholdStableId = new Map<string, string>();
-  for (const [alias, stableId] of aliasToStableId.entries()) {
-    const detId = await generateDeterministicUUID(householdId, stableId);
-    aliasToHouseholdStableId.set(alias, detId);
-    householdStableIds.add(detId);
-  }
-
-  // Find duplicate categories (non-stable IDs whose name/alias is a duplicate)
-  const duplicates = currentLocalCategories.filter((c) => {
-    const isStable = householdStableIds.has(c.id);
-    if (isStable) return false;
-
-    const nameKey = c.name.toLowerCase().trim();
-    return aliasToHouseholdStableId.has(nameKey);
-  });
-
-  if (duplicates.length > 0) {
-    console.log(`Found ${duplicates.length} duplicate categories to deduplicate & merge.`);
-
-    for (const dup of duplicates) {
-      const nameKey = dup.name.toLowerCase().trim();
-      const stableId = aliasToHouseholdStableId.get(nameKey)!;
-
-      console.log(`Merging duplicate category "${dup.name}" (${dup.id}) into stable category (${stableId})`);
-
-      // A. Remap local transactions
-      const localTxs = await db.transactions
-        .where("category_id")
-        .equals(dup.id)
-        .toArray();
-
-      for (const tx of localTxs) {
-        await db.transactions.update(tx.id, { category_id: stableId, syncStatus: "pending" });
-        await db.outbox.add({
-          entity: "transactions",
-          entityId: tx.id,
-          op: "update",
-          payload: { id: tx.id, category_id: stableId },
-          createdAt: Date.now(),
-        });
-      }
-
-      // B. Remap remote transactions on Supabase directly
-      try {
-        await supabase
-          .from("transactions")
-          .update({ category_id: stableId } as any)
-          .eq("category_id", dup.id);
-      } catch (err) {
-        console.error("Failed to update remote transactions for duplicate category:", err);
-      }
-
-      // C. Remap budgets
-      const localBudgets = await db.budgets
-        .where("category_id")
-        .equals(dup.id)
-        .toArray();
-
-      for (const b of localBudgets) {
-        // Query to see if a budget already exists for the stable category in the same month
-        const allBudgets = await db.budgets.where("household_id").equals(householdId).toArray();
-        const existingStableBudget = allBudgets.find(
-          (x) => x.category_id === stableId && x.period_month === b.period_month
-        );
-
-        if (existingStableBudget) {
-          // Combine amounts to prevent duplicates
-          const newAmount = Number(existingStableBudget.amount) + Number(b.amount);
-          
-          await db.budgets.update(existingStableBudget.id, { amount: newAmount, syncStatus: "pending" });
-          await db.outbox.add({
-            entity: "budgets",
-            entityId: existingStableBudget.id,
-            op: "update",
-            payload: { ...existingStableBudget, amount: newAmount },
-            createdAt: Date.now(),
-          });
-
-          await db.budgets.delete(b.id);
-          try {
-            await supabase
-              .from("budgets")
-              .delete()
-              .eq("id", b.id);
-          } catch (err) {
-            console.error("Failed to delete remote budget for duplicate category:", err);
-          }
-        } else {
-          // Simply update the category_id
-          await db.budgets.update(b.id, { category_id: stableId, syncStatus: "pending" });
-          await db.outbox.add({
-            entity: "budgets",
-            entityId: b.id,
-            op: "update",
-            payload: { ...b, category_id: stableId },
-            createdAt: Date.now(),
-          });
-          try {
-            await supabase
-              .from("budgets")
-              .update({ category_id: stableId } as any)
-              .eq("id", b.id);
-          } catch (err) {
-            console.error("Failed to update remote budget for duplicate category:", err);
-          }
-        }
-      }
-
-      // D. Delete the duplicate category locally and remotely
-      await db.categories.delete(dup.id);
-      try {
-        await supabase
-          .from("categories")
-          .delete()
-          .eq("id", dup.id);
-      } catch (err) {
-        console.error("Failed to delete duplicate category from remote:", err);
-      }
-
-      // E. Clean up outbox entries referencing this duplicate category ID
-      const pendingOutbox = await db.outbox
-        .where("entity")
-        .equals("categories")
-        .toArray();
-      for (const entry of pendingOutbox) {
-        if (entry.entityId === dup.id) {
-          await db.outbox.delete(entry.seq!);
-        }
-      }
-    }
+  for (const cat of currentLocalCategories) {
+    // Archived rows are left alone: they are invisible already and double as
+    // tombstones that stop the seed from recreating a category the user removed.
+    if (cat.is_archived || householdStableIds.has(cat.id)) continue;
+    const level = cat.parent_id ? "sub" : "root";
+    const targetId = aliasToHouseholdStableId.get(
+      `${cat.kind}:${level}:${cat.name.toLowerCase().trim()}`
+    );
+    // Never merge into a standard category that is missing or archived here.
+    if (!targetId || !activeLocalIds.has(targetId)) continue;
+    await mergeCategoryInto(supabase, householdId, cat.id, targetId);
   }
 
   // 3. Self-healing deduplication by NAME (case-insensitive, same kind & parent_id)
@@ -624,7 +547,7 @@ export async function seedStandardCategories(householdId: string) {
     .equals(householdId)
     .toArray();
 
-  const categoriesGrouped = new Map<string, any[]>();
+  const categoriesGrouped = new Map<string, Category[]>();
   for (const cat of freshLocalCategories) {
     if (cat.is_archived) continue;
     const key = `${cat.kind}:${cat.parent_id || "root"}:${cat.name.toLowerCase().trim()}`;
@@ -634,114 +557,15 @@ export async function seedStandardCategories(householdId: string) {
     categoriesGrouped.get(key)!.push(cat);
   }
 
-  for (const [key, list] of categoriesGrouped.entries()) {
-    if (list.length > 1) {
-      console.log(`Self-healing: Found duplicate categories for key "${key}":`, list.map(c => c.id));
-      
-      // Select the best category to keep:
-      // Prefer the one with a deterministic stable ID if possible
-      let stableCat = list.find(c => householdStableIds.has(c.id));
-      if (!stableCat) {
-        stableCat = list.find(c => c.syncStatus === "synced") || list[0];
-      }
-
-      const duplicatesToMerge = list.filter(c => c.id !== stableCat!.id);
-
-      for (const dup of duplicatesToMerge) {
-        console.log(`Self-healing: Merging duplicate category "${dup.name}" (${dup.id}) into stable category (${stableCat!.id})`);
-
-        // A. Remap local transactions
-        const localTxs = await db.transactions
-          .where("category_id")
-          .equals(dup.id)
-          .toArray();
-
-        for (const tx of localTxs) {
-          await db.transactions.update(tx.id, { category_id: stableCat!.id, syncStatus: "pending" });
-          await db.outbox.add({
-            entity: "transactions",
-            entityId: tx.id,
-            op: "update",
-            payload: { id: tx.id, category_id: stableCat!.id },
-            createdAt: Date.now(),
-          });
-        }
-
-        // B. Remap remote transactions on Supabase
-        try {
-          await supabase
-            .from("transactions")
-            .update({ category_id: stableCat!.id } as any)
-            .eq("category_id", dup.id);
-        } catch (err) {
-          console.error("Self-healing: Failed to update remote transactions for duplicate:", err);
-        }
-
-        // C. Remap budgets
-        const localBudgets = await db.budgets
-          .where("category_id")
-          .equals(dup.id)
-          .toArray();
-
-        for (const b of localBudgets) {
-          const allBudgets = await db.budgets.where("household_id").equals(householdId).toArray();
-          const existingStableBudget = allBudgets.find(
-            (x) => x.category_id === stableCat!.id && x.period_month === b.period_month
-          );
-
-          if (existingStableBudget) {
-            const newAmount = Number(existingStableBudget.amount) + Number(b.amount);
-            await db.budgets.update(existingStableBudget.id, { amount: newAmount, syncStatus: "pending" });
-            await db.outbox.add({
-              entity: "budgets",
-              entityId: existingStableBudget.id,
-              op: "update",
-              payload: { ...existingStableBudget, amount: newAmount },
-              createdAt: Date.now(),
-            });
-
-            await db.budgets.delete(b.id);
-            try {
-              await supabase.from("budgets").delete().eq("id", b.id);
-            } catch (err) {
-              console.error("Self-healing: Failed to delete remote budget for duplicate:", err);
-            }
-          } else {
-            await db.budgets.update(b.id, { category_id: stableCat!.id, syncStatus: "pending" });
-            await db.outbox.add({
-              entity: "budgets",
-              entityId: b.id,
-              op: "update",
-              payload: { ...b, category_id: stableCat!.id },
-              createdAt: Date.now(),
-            });
-            try {
-              await supabase.from("budgets").update({ category_id: stableCat!.id } as any).eq("id", b.id);
-            } catch (err) {
-              console.error("Self-healing: Failed to update remote budget for duplicate:", err);
-            }
-          }
-        }
-
-        // D. Delete duplicate locally and remotely
-        await db.categories.delete(dup.id);
-        try {
-          await supabase.from("categories").delete().eq("id", dup.id);
-        } catch (err) {
-          console.error("Self-healing: Failed to delete remote duplicate category:", err);
-        }
-
-        // E. Clean up pending outbox entries
-        const pendingOutbox = await db.outbox
-          .where("entity")
-          .equals("categories")
-          .toArray();
-        for (const entry of pendingOutbox) {
-          if (entry.entityId === dup.id) {
-            await db.outbox.delete(entry.seq!);
-          }
-        }
-      }
+  for (const list of categoriesGrouped.values()) {
+    if (list.length < 2) continue;
+    // Prefer the deterministic standard id, then an already-synced row
+    const keep =
+      list.find((c) => householdStableIds.has(c.id)) ||
+      list.find((c) => (c as Syncable<Category>).syncStatus === "synced") ||
+      list[0];
+    for (const dup of list) {
+      if (dup.id !== keep.id) await mergeCategoryInto(supabase, householdId, dup.id, keep.id);
     }
   }
 
@@ -828,11 +652,14 @@ export function useCategories() {
         // Sort by sort_order ascending
         allCategories.sort((a, b) => a.sort_order - b.sort_order);
 
-        // Separate parents from subcategories
-        const parents = allCategories.filter(
-          (c) => c.parent_id === null
-        ) as HierarchicalCategory[];
-        const children = allCategories.filter((c) => c.parent_id !== null);
+        // Separate parents from subcategories. A subcategory whose parent is
+        // archived or missing is promoted to a top-level entry rather than
+        // silently vanishing from every picker (this is how "Kesehatan › Obat
+        // & Vitamin" disappeared once its parent was archived).
+        const activeIds = new Set(allCategories.map((c) => c.id));
+        const isRoot = (c: Category) => c.parent_id === null || !activeIds.has(c.parent_id);
+        const parents = allCategories.filter(isRoot) as HierarchicalCategory[];
+        const children = allCategories.filter((c) => !isRoot(c));
 
         parents.forEach((parent) => {
           parent.subcategories = children.filter(
@@ -845,6 +672,32 @@ export function useCategories() {
         console.error("Critical error in useCategories queryFn:", err);
         return [];
       }
+    },
+  });
+}
+
+/**
+ * How often each category was used in the last `days` days (live, non-deleted,
+ * non-scheduled transactions). Keyed under ["transactions", householdId, ...]
+ * so every transaction mutation that invalidates "transactions" refreshes it.
+ */
+export function useCategoryUsage(days = 90) {
+  const { householdId } = useHousehold();
+
+  return useQuery<Map<string, number>>({
+    queryKey: ["transactions", householdId, "category-usage", days],
+    enabled: !!householdId,
+    queryFn: async () => {
+      const counts = new Map<string, number>();
+      if (!householdId) return counts;
+      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+      const txs = await db.transactions.where("household_id").equals(householdId).toArray();
+      for (const t of txs) {
+        if (t.is_deleted || t.is_scheduled || !t.category_id) continue;
+        if (new Date(t.occurred_at).getTime() < cutoff) continue;
+        counts.set(t.category_id, (counts.get(t.category_id) ?? 0) + 1);
+      }
+      return counts;
     },
   });
 }
@@ -971,25 +824,40 @@ export function useArchiveCategory() {
       const localCat = await db.categories.get(categoryId);
       if (!localCat) throw new Error("Category not found locally");
 
+      // Archiving a parent archives its subcategories too; otherwise they are
+      // left pointing at a hidden parent.
+      const subcategories = localCat.parent_id
+        ? []
+        : await db.categories
+            .where("household_id")
+            .equals(householdId)
+            .filter((c) => c.parent_id === categoryId && !c.is_archived)
+            .toArray();
+
       const archivedCategory: Category = {
         ...localCat,
         is_archived: true,
       };
 
-      // Write locally to IndexedDB immediately
-      await db.categories.put({
-        ...archivedCategory,
-        syncStatus: "pending",
-      });
+      for (const cat of [...subcategories, localCat]) {
+        const archived: Category = { ...cat, is_archived: true };
+        delete (archived as Syncable<Category>).syncStatus;
 
-      // Queue action into outbox sync queue
-      await db.outbox.add({
-        entity: "categories",
-        entityId: categoryId,
-        op: "delete",
-        payload: archivedCategory,
-        createdAt: Date.now(),
-      });
+        // Write locally to IndexedDB immediately
+        await db.categories.put({
+          ...archived,
+          syncStatus: "pending",
+        });
+
+        // Queue action into outbox sync queue
+        await db.outbox.add({
+          entity: "categories",
+          entityId: cat.id,
+          op: "delete",
+          payload: archived,
+          createdAt: Date.now(),
+        });
+      }
 
       // Fire a background sync attempt
       triggerSync(supabase, householdId);
@@ -1000,6 +868,158 @@ export function useArchiveCategory() {
       queryClient.invalidateQueries({ queryKey: ["categories", householdId] });
       queryClient.invalidateQueries({ queryKey: ["transactions", householdId] });
       queryClient.invalidateQueries({ queryKey: ["budgets", householdId] });
+    },
+  });
+}
+
+export interface ArchivedCategory extends Category {
+  /** Name of its parent (archived or not), for "Parent › Child" labels. */
+  parentName: string | null;
+}
+
+/**
+ * Archived categories that can usefully be restored. Archived rows whose name
+ * matches an active category of the same kind and level are left out — those
+ * are old duplicates kept as seed tombstones, and restoring one would only
+ * recreate the duplicate.
+ */
+export function useArchivedCategories() {
+  const { householdId } = useHousehold();
+
+  return useQuery<ArchivedCategory[]>({
+    queryKey: ["categories", householdId, "archived"],
+    enabled: !!householdId,
+    queryFn: async () => {
+      if (!householdId) return [];
+      const all = await db.categories.where("household_id").equals(householdId).toArray();
+      const byId = new Map(all.map((c) => [c.id, c]));
+      const key = (c: Category) =>
+        `${c.kind}:${c.parent_id ? "sub" : "root"}:${c.name.toLowerCase().trim()}`;
+      const activeKeys = new Set(all.filter((c) => !c.is_archived).map(key));
+      return all
+        .filter((c) => c.is_archived && !activeKeys.has(key(c)))
+        .map((c) => ({ ...c, parentName: c.parent_id ? byId.get(c.parent_id)?.name ?? null : null }))
+        .sort(
+          (a, b) =>
+            a.kind.localeCompare(b.kind) ||
+            (a.parentName ?? a.name).localeCompare(b.parentName ?? b.name) ||
+            (a.parent_id ? 1 : 0) - (b.parent_id ? 1 : 0) ||
+            a.name.localeCompare(b.name)
+        );
+    },
+  });
+}
+
+/**
+ * Restore an archived category. A parent comes back with its archived
+ * subcategories (archiving cascades, so this undoes it); a subcategory brings
+ * its parent back too so it isn't left under a hidden parent.
+ */
+export function useRestoreCategory() {
+  const supabase = createClient();
+  const { householdId } = useHousehold();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (categoryId: string) => {
+      if (!householdId) throw new Error("Active household context is required");
+      const cat = await db.categories.get(categoryId);
+      if (!cat) throw new Error("Kategori tidak ditemukan");
+
+      const all = await db.categories.where("household_id").equals(householdId).toArray();
+      const toRestore: Category[] = [cat];
+      if (cat.parent_id) {
+        const parent = all.find((c) => c.id === cat.parent_id);
+        if (parent?.is_archived) toRestore.push(parent);
+      } else {
+        toRestore.push(...all.filter((c) => c.parent_id === cat.id && c.is_archived));
+      }
+
+      for (const c of toRestore) {
+        const restored: Category = { ...c, is_archived: false };
+        delete (restored as Syncable<Category>).syncStatus;
+        await db.categories.put({ ...restored, syncStatus: "pending" });
+        await db.outbox.add({
+          entity: "categories",
+          entityId: c.id,
+          op: "update",
+          payload: restored,
+          createdAt: Date.now(),
+        });
+      }
+      triggerSync(supabase, householdId);
+      return toRestore.length;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories", householdId] });
+      queryClient.invalidateQueries({ queryKey: ["transactions", householdId] });
+    },
+  });
+}
+
+/**
+ * Merge one category into another of the same kind: every transaction,
+ * recurring template, budget and subcategory moves to the target and the
+ * source disappears. Runs against the server directly (see mergeCategoryInto),
+ * so it needs a connection.
+ */
+export function useMergeCategory() {
+  const supabase = createClient();
+  const { householdId } = useHousehold();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ sourceId, targetId }: { sourceId: string; targetId: string }) => {
+      if (!householdId) throw new Error("Active household context is required");
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        throw new Error("Menggabungkan kategori butuh koneksi internet.");
+      }
+      const [source, target] = await Promise.all([
+        db.categories.get(sourceId),
+        db.categories.get(targetId),
+      ]);
+      if (!source || !target) throw new Error("Kategori tidak ditemukan");
+      if (source.id === target.id) throw new Error("Pilih kategori tujuan yang berbeda");
+      if (source.kind !== target.kind) {
+        throw new Error("Kategori pemasukan dan pengeluaran tidak bisa digabung");
+      }
+      if (target.parent_id === source.id) {
+        throw new Error("Tidak bisa digabung ke subkategorinya sendiri");
+      }
+      const hasSubs = (await db.categories.filter((c) => c.parent_id === source.id && !c.is_archived).count()) > 0;
+      if (hasSubs && target.parent_id) {
+        throw new Error("Kategori yang punya subkategori hanya bisa digabung ke kategori induk");
+      }
+
+      const ok = await mergeCategoryInto(supabase, householdId, source.id, target.id);
+      if (!ok) throw new Error("Server menolak penggabungan. Coba lagi nanti.");
+      triggerSync(supabase, householdId);
+      return { source: source.name, target: target.name };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories", householdId] });
+      queryClient.invalidateQueries({ queryKey: ["transactions", householdId] });
+      queryClient.invalidateQueries({ queryKey: ["budgets", householdId] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-transactions", householdId] });
+    },
+  });
+}
+
+/**
+ * Every category of the household by id, archived ones included. Reports and
+ * history need this: a transaction keeps pointing at its category after that
+ * category (or its parent) is archived, and must still be counted and named.
+ */
+export function useCategoryLookup() {
+  const { householdId } = useHousehold();
+
+  return useQuery<Map<string, Category>>({
+    queryKey: ["categories", householdId, "lookup"],
+    enabled: !!householdId,
+    queryFn: async () => {
+      if (!householdId) return new Map();
+      const all = await db.categories.where("household_id").equals(householdId).toArray();
+      return new Map(all.map((c) => [c.id, c]));
     },
   });
 }

@@ -1,10 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+// The client compresses receipts to ~900px JPEG (typically < 300 KB), so 6 MB
+// of base64 is generous while still stopping abuse of the paid Gemini quota.
+const MAX_IMAGE_BASE64_CHARS = 6 * 1024 * 1024;
+const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_CATEGORIES = 200;
 
 export async function POST(req: NextRequest) {
   try {
-    const { image, mimeType, categories } = await req.json();
-    if (!image || !mimeType) {
+    // Don't rely on middleware alone: this route spends the Gemini quota, so
+    // verify the session here too.
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Harus login terlebih dahulu" }, { status: 401 });
+    }
+
+    const body = await req.json().catch(() => null);
+    const { image, mimeType } = body ?? {};
+    const categories: { name: string; id: string; kind: string }[] = Array.isArray(body?.categories)
+      ? body.categories.slice(0, MAX_CATEGORIES)
+      : [];
+    if (typeof image !== "string" || !image || typeof mimeType !== "string") {
       return NextResponse.json({ error: "Missing image data" }, { status: 400 });
+    }
+    if (!ALLOWED_MIME_TYPES.has(mimeType)) {
+      return NextResponse.json({ error: "Format gambar tidak didukung" }, { status: 415 });
+    }
+    if (image.length > MAX_IMAGE_BASE64_CHARS) {
+      return NextResponse.json({ error: "Ukuran gambar terlalu besar" }, { status: 413 });
     }
 
     const apiKey = process.env.GEMINI_API_KEY?.trim();
@@ -16,7 +43,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Build categories formatted list for context
-    const categoriesPromptText = (categories || [])
+    const categoriesPromptText = categories
       .map(
         (c: { name: string; id: string; kind: string }) =>
           `- Name: "${c.name}", ID: "${c.id}", Type (kind): "${c.kind}"`
@@ -121,7 +148,8 @@ Kembalikan hasil analisis dalam format JSON terstruktur yang valid sesuai dengan
       const errText = await response.text();
       console.error(`[scan-receipt] Gemini API error after ${geminiMs}ms:`, errText);
       return NextResponse.json(
-        { error: "Gemini AI processing failed", details: errText },
+        // Upstream details stay in the server log only.
+        { error: "Gagal memproses struk dengan AI. Coba lagi." },
         { status: response.status }
       );
     }

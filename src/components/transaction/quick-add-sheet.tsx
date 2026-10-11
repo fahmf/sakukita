@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useUIStore } from "@/stores/ui-store";
 import { useWallets } from "@/hooks/use-wallets";
-import { useCategories } from "@/hooks/use-categories";
+import { useCategories, useCategoryUsage } from "@/hooks/use-categories";
 import { useCreateTransaction, useUpdateTransaction } from "@/hooks/use-transactions";
 import { parseAmountExpression } from "@/lib/calculator";
 import { formatCurrency } from "@/lib/format";
@@ -52,6 +52,7 @@ import {
 } from "lucide-react";
 import type { TransactionType } from "@/lib/supabase/types";
 import { compressImage } from "@/lib/image";
+import { jakartaDateKey, occurredAtForDate, todayJakarta } from "@/lib/financial-month";
 
 import { iconMap } from "@/lib/icons";
 
@@ -91,6 +92,7 @@ function QuickAddForm() {
 
   const { data: wallets = [] } = useWallets();
   const { data: categoriesTree = [] } = useCategories();
+  const { data: categoryUsage } = useCategoryUsage();
   const createTx = useCreateTransaction();
   const updateTx = useUpdateTransaction();
 
@@ -112,8 +114,8 @@ function QuickAddForm() {
   );
   const [occurredAt, setOccurredAt] = React.useState(() =>
     editingTransaction
-      ? editingTransaction.occurred_at.split("T")[0]
-      : new Date().toISOString().split("T")[0]
+      ? jakartaDateKey(editingTransaction.occurred_at)
+      : todayJakarta()
   );
   const [note, setNote] = React.useState(() =>
     editingTransaction ? (editingTransaction.note || "") : ""
@@ -142,11 +144,32 @@ function QuickAddForm() {
 
 
 
-  // Gather categories for quick chips
+  // Quick chips: the categories this household actually uses most (last 90
+  // days, subcategories included), topped up with parents in catalog order.
+  // Previously these were just the first six parents, so the most common
+  // picks (e.g. "Belanja Dapur", "Jajan & Kopi") always needed the dropdown.
+  const QUICK_CHIP_COUNT = 8;
+  const rankedCategories = React.useMemo(() => {
+    if (type === "transfer") return [];
+    const flat = categoriesTree
+      .filter((c) => c.kind === type)
+      .flatMap((p) => [p, ...p.subcategories]);
+    const usage = categoryUsage ?? new Map<string, number>();
+    return flat
+      .filter((c) => (usage.get(c.id) ?? 0) > 0)
+      .sort((a, b) => (usage.get(b.id) ?? 0) - (usage.get(a.id) ?? 0));
+  }, [type, categoriesTree, categoryUsage]);
+
   const activeCategories = React.useMemo(() => {
     if (type === "transfer") return [];
-    return categoriesTree.filter((c) => c.kind === type);
-  }, [type, categoriesTree]);
+    const picked = rankedCategories.slice(0, QUICK_CHIP_COUNT);
+    const pickedIds = new Set(picked.map((c) => c.id));
+    for (const parent of categoriesTree) {
+      if (picked.length >= QUICK_CHIP_COUNT) break;
+      if (parent.kind === type && !pickedIds.has(parent.id)) picked.push(parent);
+    }
+    return picked;
+  }, [type, categoriesTree, rankedCategories]);
 
   // Compute active default selections purely during render — eliminates cascading render set-state-in-effect errors
   const activeWalletId = selectedWalletId || lastWalletId || wallets[0]?.id || "";
@@ -156,8 +179,11 @@ function QuickAddForm() {
     if (selectedCategoryId) return selectedCategoryId;
     const flatCategories = categoriesTree.flatMap((p) => [p, ...p.subcategories]);
     const available = flatCategories.filter((c) => c.kind === type);
-    return lastCategoryId || available[0]?.id || "";
-  }, [selectedCategoryId, categoriesTree, type, lastCategoryId]);
+    // The remembered category may belong to the other type (last entry was
+    // income, this one is expense) — only reuse it when the kind matches.
+    const last = available.find((c) => c.id === lastCategoryId);
+    return last?.id || rankedCategories[0]?.id || available[0]?.id || "";
+  }, [selectedCategoryId, categoriesTree, type, lastCategoryId, rankedCategories]);
 
   // Handle keypad presses
   const handleKeypadPress = (key: string) => {
@@ -247,13 +273,9 @@ function QuickAddForm() {
   // Adjust categories automatically when transaction type changes
   const handleTypeChange = (newType: TransactionType) => {
     setType(newType);
-    if (newType !== "transfer") {
-      const flatCategories = categoriesTree.flatMap((p) => [p, ...p.subcategories]);
-      const available = flatCategories.filter((c) => c.kind === newType);
-      if (available.length > 0) {
-        setSelectedCategoryId(available[0].id);
-      }
-    }
+    // Clear the explicit pick so the default logic chooses for the new type:
+    // the last-used category of that kind, else the most-used one.
+    setSelectedCategoryId("");
   };
 
   // State to track if the selected date is in the future (scheduled)
@@ -273,7 +295,9 @@ function QuickAddForm() {
     }
     const checkFuture = () => {
       if (!active) return;
-      setIsFutureDate(new Date(occurredAt).getTime() > Date.now());
+      // Compare Jakarta calendar dates: a date-only string parses as 07:00 WIB,
+      // which made "today" look like a future date before 7 in the morning.
+      setIsFutureDate(occurredAt > todayJakarta());
     };
     const frame = requestAnimationFrame(checkFuture);
     return () => {
@@ -457,13 +481,20 @@ function QuickAddForm() {
     const pending = tagInput.trim().replace(/^#+/, "").replace(/\s+/g, " ").toLowerCase();
     const finalTags = pending && !tags.includes(pending) ? [...tags, pending] : tags;
 
+    // Editing without touching the date keeps the original timestamp (and so
+    // its time of day and position in the list).
+    const occurredAtIso =
+      editingTransaction && occurredAt === jakartaDateKey(editingTransaction.occurred_at)
+        ? editingTransaction.occurred_at
+        : occurredAtForDate(occurredAt);
+
     try {
       if (editingTransaction) {
         await updateTx.mutateAsync({
           id: editingTransaction.id,
           type,
           amount: parsedAmount,
-          occurred_at: new Date(occurredAt).toISOString(),
+          occurred_at: occurredAtIso,
           wallet_id: activeWalletId,
           to_wallet_id: type === "transfer" ? selectedToWalletId : null,
           category_id: type !== "transfer" ? activeCategoryId : null,
@@ -476,7 +507,7 @@ function QuickAddForm() {
         await createTx.mutateAsync({
           type,
           amount: parsedAmount,
-          occurred_at: new Date(occurredAt).toISOString(),
+          occurred_at: occurredAtIso,
           wallet_id: activeWalletId,
           to_wallet_id: type === "transfer" ? selectedToWalletId : null,
           category_id: type !== "transfer" ? activeCategoryId : null,
@@ -643,7 +674,7 @@ function QuickAddForm() {
             <div className="space-y-2">
               <Label className="text-xs font-semibold text-muted-foreground">Kategori Cepat</Label>
               <div className="flex flex-wrap gap-2">
-                {activeCategories.slice(0, 6).map((cat) => {
+                {activeCategories.map((cat) => {
                   const isActive = activeCategoryId === cat.id;
                   return (
                     <button

@@ -86,8 +86,43 @@ export function financialMonthDateRangeAsDates(monthStr: string): { start: Date;
   return { start, end };
 }
 
-/** Whether a `YYYY-MM-DD...` timestamp falls within the given financial month. */
+const jakartaDateFmt = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Jakarta",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/**
+ * Jakarta calendar date ("YYYY-MM-DD") of a timestamp. Slicing the ISO string
+ * gives the UTC date instead, which is a day early for anything between 00:00
+ * and 06:59 WIB — e.g. the server-materialized salary stored as
+ * 2026-09-24T17:00Z is really 25 Sep WIB, the first day of a new cycle.
+ */
+export function jakartaDateKey(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (isNaN(date.getTime())) return typeof value === "string" ? value.slice(0, 10) : "";
+  return jakartaDateFmt.format(date); // en-CA formats as YYYY-MM-DD
+}
+
+/** Today's date in Jakarta as "YYYY-MM-DD" (for date inputs' defaults). */
+export function todayJakarta(): string {
+  return jakartaDateKey(new Date());
+}
+
+/** Whether a timestamp falls within the given financial month (Jakarta calendar). */
 export function isInFinancialMonth(occurredAt: string, monthStr: string): boolean {
-  const [y, m, d] = occurredAt.slice(0, 10).split("-").map(Number);
+  const [y, m, d] = jakartaDateKey(occurredAt).split("-").map(Number);
   return financialMonthLabel(y, m - 1, d) === monthStr;
+}
+
+/**
+ * Timestamp to store for a transaction dated `dateStr` (Jakarta "YYYY-MM-DD").
+ * Today keeps the real current time so it is never mistaken for a future
+ * (scheduled) entry before 07:00 WIB and sorts in entry order; other days keep
+ * the long-standing 07:00 WIB (00:00Z) convention used by existing rows.
+ */
+export function occurredAtForDate(dateStr: string): string {
+  if (dateStr === todayJakarta()) return new Date().toISOString();
+  return new Date(`${dateStr}T00:00:00Z`).toISOString();
 }

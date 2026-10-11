@@ -24,6 +24,8 @@ import {
 import type { TransactionWithDetails } from "@/hooks/use-transactions";
 import { formatCurrency } from "@/lib/format";
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
+import { useHouseholdMembers } from "@/hooks/use-households";
+import { useHousehold } from "@/components/providers/household-provider";
 
 import { iconMap } from "@/lib/icons";
 
@@ -44,6 +46,9 @@ export function TransactionDetailDialog({
 }: TransactionDetailDialogProps) {
   const allowed = useCanEdit();
   const [receiptOpen, setReceiptOpen] = React.useState(false);
+  const { userId } = useHousehold();
+  // Online-only lookup; offline it falls back to a generic label below.
+  const { data: members = [] } = useHouseholdMembers();
 
   if (!tx) return null;
 
@@ -61,20 +66,37 @@ export function TransactionDetailDialog({
     bgColor = tx.category.color || "#C4C4C4";
   }
 
-  // Format exact occurred date
+  // Format exact occurred date in Jakarta time (the label says WIB).
   const dateObj = new Date(tx.occurred_at);
   const formattedDay = dateObj.toLocaleDateString("id-ID", {
     weekday: "long",
+    timeZone: "Asia/Jakarta",
   });
   const formattedDate = dateObj.toLocaleDateString("id-ID", {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: "Asia/Jakarta",
   });
   const formattedTime = dateObj.toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Asia/Jakarta",
   });
+  // Entries dated in the past are stored as 00:00Z (07:00 WIB) by convention
+  // and carry no real time of day — don't present "07:00 WIB" as fact.
+  const isDateOnly =
+    dateObj.getUTCHours() === 0 && dateObj.getUTCMinutes() === 0 && dateObj.getUTCSeconds() === 0;
+
+  // Who recorded it. Manual entries always set client_id; the server's
+  // recurring job inserts with client_id null (and the owner as created_by).
+  const isAutomatic = !tx.client_id;
+  const member = members.find((m) => m.user_id === tx.created_by);
+  const recordedBy = isAutomatic
+    ? "Otomatis (transaksi berulang)"
+    : tx.created_by === userId
+    ? "Anda"
+    : member?.profile?.display_name || member?.profile?.email || "Anggota keluarga";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -241,7 +263,8 @@ export function TransactionDetailDialog({
               <div className="flex items-center gap-1.5 text-foreground font-semibold">
                 <Calendar className="size-3.5 text-muted-foreground" />
                 <span>
-                  {formattedDay}, {formattedDate} · {formattedTime} WIB
+                  {formattedDay}, {formattedDate}
+                  {!isDateOnly && ` · ${formattedTime} WIB`}
                 </span>
               </div>
             </div>
@@ -255,7 +278,7 @@ export function TransactionDetailDialog({
                 <div className="flex items-center gap-1.5 text-foreground font-semibold">
                   <User className="size-3.5 text-muted-foreground" />
                   <span className="truncate">
-                    {tx.client_id ? "Sistem Otomatis" : "Anggota Keluarga"}
+                    {recordedBy}
                   </span>
                 </div>
               </div>

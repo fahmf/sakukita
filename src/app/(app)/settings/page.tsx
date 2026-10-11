@@ -3,7 +3,15 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCategories, useCreateCategory, useUpdateCategory, useArchiveCategory } from "@/hooks/use-categories";
+import {
+  useCategories,
+  useCreateCategory,
+  useUpdateCategory,
+  useArchiveCategory,
+  useArchivedCategories,
+  useRestoreCategory,
+  useMergeCategory,
+} from "@/hooks/use-categories";
 import { useHousehold } from "@/components/providers/household-provider";
 import { PageHeading } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
@@ -15,7 +23,7 @@ import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
 import { useTheme } from "next-themes";
 import { useQueryClient } from "@tanstack/react-query";
 import { db } from "@/lib/db/dexie";
-import { triggerSync } from "@/lib/db/sync";
+import { triggerSync, clearRejectedSync } from "@/lib/db/sync";
 import {
   Select,
   SelectContent,
@@ -57,6 +65,10 @@ import {
   Monitor,
   Database,
   AlertTriangle,
+  ListFilter,
+  RotateCcw,
+  Merge,
+  Archive,
 } from "lucide-react";
 import type { Category, CategoryKind } from "@/lib/supabase/types";
 import { NotificationSettingsCard } from "@/components/settings/notification-settings-card";
@@ -69,6 +81,12 @@ export default function SettingsPage() {
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateCategory();
   const archiveCategory = useArchiveCategory();
+  const { data: archivedCategories = [] } = useArchivedCategories();
+  const restoreCategory = useRestoreCategory();
+  const mergeCategory = useMergeCategory();
+  const [archivedOpen, setArchivedOpen] = React.useState(false);
+  const [mergeTargetId, setMergeTargetId] = React.useState("");
+  const [mergeConfirm, setMergeConfirm] = React.useState(false);
   const { theme, setTheme } = useTheme();
 
   const router = useRouter();
@@ -128,6 +146,9 @@ export default function SettingsPage() {
           db.outbox.clear()
         ]);
       });
+      // Writes the server rejected were parked out of the outbox; a full
+      // reset re-downloads the server's truth, so drop them as well.
+      clearRejectedSync();
 
       // 2. Invalidate react-query cache
       await queryClient.resetQueries();
@@ -247,6 +268,8 @@ export default function SettingsPage() {
   };
 
   const handleOpenEdit = (category: Category) => {
+    setMergeTargetId("");
+    setMergeConfirm(false);
     setEditingCategory(category);
     setName(category.name);
     setKind(category.kind);
@@ -292,6 +315,35 @@ export default function SettingsPage() {
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Gagal menyimpan kategori. Coba lagi.";
       toast.error(errMsg);
+    }
+  };
+
+  const handleRestoreCategory = async (id: string, label: string) => {
+    if (!allowed) return viewOnlyToast();
+    try {
+      const count = await restoreCategory.mutateAsync(id);
+      toast.success(
+        count > 1 ? `${label} dipulihkan (bersama ${count - 1} kategori terkait)` : `${label} dipulihkan`
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal memulihkan kategori.");
+    }
+  };
+
+  const handleMergeCategory = async () => {
+    if (!editingCategory || !mergeTargetId) return;
+    if (!allowed) return viewOnlyToast();
+    try {
+      const { source, target } = await mergeCategory.mutateAsync({
+        sourceId: editingCategory.id,
+        targetId: mergeTargetId,
+      });
+      toast.success(`"${source}" digabung ke "${target}"`);
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menggabungkan kategori.");
+    } finally {
+      setMergeConfirm(false);
     }
   };
 
@@ -653,6 +705,67 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
+                {editingCategory && (() => {
+                  // Same kind only; never into itself or one of its own subs.
+                  // A category with subcategories can only merge into a parent.
+                  const sourceTree = categoriesTree.find((c) => c.id === editingCategory.id);
+                  const hasSubs = (sourceTree?.subcategories.length ?? 0) > 0;
+                  const targets = categoriesTree
+                    .filter((p) => p.kind === editingCategory.kind)
+                    .flatMap((p) => [
+                      { id: p.id, label: p.name },
+                      ...(hasSubs ? [] : p.subcategories.map((sub) => ({ id: sub.id, label: `${p.name} › ${sub.name}` }))),
+                    ])
+                    .filter((t) => t.id !== editingCategory.id && !sourceTree?.subcategories.some((sub) => sub.id === t.id));
+                  const targetLabel = targets.find((t) => t.id === mergeTargetId)?.label;
+                  return (
+                    <div className="rounded-2xl border p-3 space-y-2 bg-muted/20">
+                      <Label className="flex items-center gap-1.5 text-xs font-semibold">
+                        <Merge className="size-3.5" /> Gabungkan ke kategori lain
+                      </Label>
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        Semua transaksi, budget, dan transaksi berulang di &ldquo;{editingCategory.name}&rdquo;
+                        {hasSubs ? " (beserta subkategorinya)" : ""} dipindah, lalu kategori ini dihapus.
+                      </p>
+                      <Select
+                        value={mergeTargetId}
+                        onValueChange={(v) => {
+                          setMergeTargetId(v);
+                          setMergeConfirm(false);
+                        }}
+                      >
+                        <SelectTrigger className="h-10 rounded-xl text-xs">
+                          <SelectValue placeholder="Pilih kategori tujuan" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {targets.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {mergeTargetId && (
+                        <Button
+                          type="button"
+                          variant={mergeConfirm ? "default" : "outline"}
+                          disabled={mergeCategory.isPending}
+                          onClick={() => (mergeConfirm ? handleMergeCategory() : setMergeConfirm(true))}
+                          className={`w-full h-10 rounded-xl text-xs font-semibold ${
+                            mergeConfirm ? "bg-expense text-white hover:bg-expense/90" : ""
+                          }`}
+                        >
+                          {mergeCategory.isPending
+                            ? "Menggabungkan..."
+                            : mergeConfirm
+                            ? `Ya, gabungkan ke "${targetLabel}" (tidak bisa dibatalkan)`
+                            : `Gabungkan ke "${targetLabel}"`}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 <DialogFooter className="pt-2">
                   <Button
                     type="submit"
@@ -714,6 +827,14 @@ export default function SettingsPage() {
                           <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                             {/* Action Buttons (visible on hover) */}
                             <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                              <Link
+                                href={`/transactions?kategori=${parent.id}&rentang=semua`}
+                                className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50"
+                                aria-label={`Lihat transaksi ${parent.name}`}
+                                title="Lihat transaksi"
+                              >
+                                <ListFilter className="size-3.5" />
+                              </Link>
                               <Button
                                 size="icon"
                                 variant="ghost"
@@ -781,6 +902,14 @@ export default function SettingsPage() {
                                   <span className="truncate text-sm font-medium text-foreground">{sub.name}</span>
                                 </div>
                                 <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover/sub:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                  <Link
+                                    href={`/transactions?kategori=${sub.id}&rentang=semua`}
+                                    className="grid size-7 place-items-center rounded-md text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50"
+                                    aria-label={`Lihat transaksi ${sub.name}`}
+                                    title="Lihat transaksi"
+                                  >
+                                    <ListFilter className="size-3" />
+                                  </Link>
                                   <Button
                                     size="icon"
                                     variant="ghost"
@@ -844,6 +973,14 @@ export default function SettingsPage() {
                           <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                             {/* Action Buttons (visible on hover) */}
                             <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                              <Link
+                                href={`/transactions?kategori=${parent.id}&rentang=semua`}
+                                className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50"
+                                aria-label={`Lihat transaksi ${parent.name}`}
+                                title="Lihat transaksi"
+                              >
+                                <ListFilter className="size-3.5" />
+                              </Link>
                               <Button
                                 size="icon"
                                 variant="ghost"
@@ -911,6 +1048,14 @@ export default function SettingsPage() {
                                   <span className="truncate text-sm font-medium text-foreground">{sub.name}</span>
                                 </div>
                                 <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover/sub:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                  <Link
+                                    href={`/transactions?kategori=${sub.id}&rentang=semua`}
+                                    className="grid size-7 place-items-center rounded-md text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50"
+                                    aria-label={`Lihat transaksi ${sub.name}`}
+                                    title="Lihat transaksi"
+                                  >
+                                    <ListFilter className="size-3" />
+                                  </Link>
                                   <Button
                                     size="icon"
                                     variant="ghost"
@@ -937,6 +1082,58 @@ export default function SettingsPage() {
                   })}
               </div>
             </div>
+
+            {/* ARCHIVED CATEGORIES */}
+            {archivedCategories.length > 0 && (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setArchivedOpen((o) => !o)}
+                  className="flex w-full items-center justify-between rounded-xl px-1 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Archive className="size-3.5" />
+                    Kategori Diarsipkan ({archivedCategories.length})
+                  </span>
+                  {archivedOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                </button>
+                {archivedOpen && (
+                  <div className="rounded-2xl border bg-card overflow-hidden divide-y">
+                    {archivedCategories.map((cat) => {
+                      const label = cat.parentName ? `${cat.parentName} › ${cat.name}` : cat.name;
+                      return (
+                        <div key={cat.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <span className="text-base leading-none select-none opacity-60">
+                              {iconMap[cat.icon || ""]
+                                ? React.createElement(iconMap[cat.icon || ""], { className: "size-4" })
+                                : cat.icon || "🏷️"}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm text-muted-foreground">{label}</p>
+                              <p className="text-[10px] text-muted-foreground/70">
+                                {cat.kind === "income" ? "Pemasukan" : "Pengeluaran"}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={restoreCategory.isPending}
+                            onClick={() => handleRestoreCategory(cat.id, label)}
+                            className="h-8 shrink-0 rounded-lg text-xs font-semibold gap-1 text-mint-strong hover:bg-mint-soft/50"
+                          >
+                            <RotateCcw className="size-3.5" />
+                            Pulihkan
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1014,9 +1211,26 @@ export default function SettingsPage() {
             <DialogHeader>
               <DialogTitle>Arsipkan Kategori?</DialogTitle>
             </DialogHeader>
-            <div className="py-2 text-sm text-muted-foreground">
-              Apakah Anda yakin ingin mengarsipkan kategori ini? Transaksi yang menggunakan kategori ini akan tetap aman tetapi kategori ini tidak akan muncul lagi di pilihan baru.
-            </div>
+            {(() => {
+              const parent = categoriesTree.find((c) => c.id === categoryToArchive);
+              const target =
+                parent ??
+                categoriesTree.flatMap((c) => c.subcategories).find((c) => c.id === categoryToArchive);
+              const subCount = parent?.subcategories.length ?? 0;
+              return (
+                <div className="py-2 text-sm text-muted-foreground space-y-2">
+                  <p>
+                    Kategori <span className="font-semibold text-foreground">&ldquo;{target?.name}&rdquo;</span>{" "}
+                    tidak akan muncul lagi di pilihan transaksi baru. Transaksi lama tetap tersimpan.
+                  </p>
+                  {subCount > 0 && (
+                    <p className="font-semibold text-expense">
+                      {subCount} subkategori di dalamnya ({parent!.subcategories.map((s) => s.name).join(", ")}) ikut diarsipkan.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
             <DialogFooter className="gap-2 pt-2 flex flex-row justify-end">
               <Button
                 type="button"
