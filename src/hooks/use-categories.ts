@@ -1004,3 +1004,22 @@ export function useMergeCategory() {
     },
   });
 }
+
+/**
+ * Every category of the household by id, archived ones included. Reports and
+ * history need this: a transaction keeps pointing at its category after that
+ * category (or its parent) is archived, and must still be counted and named.
+ */
+export function useCategoryLookup() {
+  const { householdId } = useHousehold();
+
+  return useQuery<Map<string, Category>>({
+    queryKey: ["categories", householdId, "lookup"],
+    enabled: !!householdId,
+    queryFn: async () => {
+      if (!householdId) return new Map();
+      const all = await db.categories.where("household_id").equals(householdId).toArray();
+      return new Map(all.map((c) => [c.id, c]));
+    },
+  });
+}

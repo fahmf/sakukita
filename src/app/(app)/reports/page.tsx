@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { useTransactions } from "@/hooks/use-transactions";
-import { useCategories } from "@/hooks/use-categories";
+import { useCategories, useCategoryLookup } from "@/hooks/use-categories";
+import Link from "next/link";
 import { useWallets, useWalletBalances } from "@/hooks/use-wallets";
 import { formatCurrency } from "@/lib/format";
 import { chartColor } from "@/lib/chart-colors";
@@ -10,6 +11,7 @@ import {
   currentFinancialMonth,
   shiftMonth,
   financialMonthDateRangeAsDates,
+  jakartaDateKey,
 } from "@/lib/financial-month";
 import { PageHeading } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
@@ -33,6 +35,7 @@ import {
   PieChart as PieIcon,
   ChevronRight,
   Info,
+  ListFilter,
 } from "lucide-react";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
@@ -85,12 +88,12 @@ export default function ReportsPage() {
 
   React.useEffect(() => {
     setMounted(true);
-    const todayStr = new Date().toISOString().slice(0, 10);
     setSelectedHeatmapDay({ date: new Date(), amount: 0 });
   }, []);
 
   // Fetch all categories, wallets, transactions
   const { data: categories = [], isLoading: loadingCategories } = useCategories();
+  const { data: categoryLookup } = useCategoryLookup();
   const { data: wallets = [], isLoading: loadingWallets } = useWallets();
   const { data: transactions = [], isLoading: loadingTxs } = useTransactions();
 
@@ -141,8 +144,9 @@ export default function ReportsPage() {
     // Create a map of YYYY-MM-DD -> total expense
     const expenseMap = new Map<string, number>();
     expenses.forEach((t) => {
-      const d = new Date(t.occurred_at);
-      const key = d.toISOString().slice(0, 10);
+      // Jakarta calendar day: a UTC slice puts 00:00–06:59 WIB entries
+      // (e.g. auto-recorded salary at midnight) on the previous day.
+      const key = jakartaDateKey(t.occurred_at);
       expenseMap.set(key, (expenseMap.get(key) || 0) + Number(t.amount || 0));
     });
 
@@ -155,7 +159,7 @@ export default function ReportsPage() {
 
     const tempDate = new Date(start);
     while (tempDate <= end) {
-      const dateStr = tempDate.toISOString().slice(0, 10);
+      const dateStr = jakartaDateKey(tempDate);
       const amount = expenseMap.get(dateStr) || 0;
       
       let level = 0;
@@ -215,24 +219,24 @@ export default function ReportsPage() {
 
   const selectedDayTxs = React.useMemo(() => {
     if (!selectedHeatmapDay) return [];
-    const targetStr = selectedHeatmapDay.date.toISOString().slice(0, 10);
+    const targetStr = jakartaDateKey(selectedHeatmapDay.date);
     return transactions.filter(
       (t) =>
         t.type === "expense" &&
         !t.is_deleted &&
-        new Date(t.occurred_at).toISOString().slice(0, 10) === targetStr
+        jakartaDateKey(t.occurred_at) === targetStr
     );
   }, [transactions, selectedHeatmapDay]);
 
   // Keep the selected heatmap day amount in sync when transactions load/change
   React.useEffect(() => {
     if (!selectedHeatmapDay) return;
-    const targetStr = selectedHeatmapDay.date.toISOString().slice(0, 10);
+    const targetStr = jakartaDateKey(selectedHeatmapDay.date);
     const dayExpenses = transactions.filter(
       (t) =>
         t.type === "expense" &&
         !t.is_deleted &&
-        new Date(t.occurred_at).toISOString().slice(0, 10) === targetStr
+        jakartaDateKey(t.occurred_at) === targetStr
     );
     const total = dayExpenses.reduce((sum, t) => sum + Number(t.amount || 0), 0);
     if (selectedHeatmapDay.amount !== total) {
@@ -260,19 +264,41 @@ export default function ReportsPage() {
     };
   }, [filteredTxs]);
 
-  // Flat category map to query details by ID quickly
+  // Every category by id — archived ones included — so spending recorded in a
+  // category that was later archived (or whose parent was) is still counted
+  // and named instead of silently dropping out of the totals.
+  const UNCATEGORIZED_ID = "__uncategorized";
   const flatCategoryMap = React.useMemo(() => {
     const map = new Map<string, { name: string; parent_id: string | null; color: string }>();
-    categories.forEach((parent) => {
-      map.set(parent.id, { name: parent.name, parent_id: null, color: parent.color || "#C4C4C4" });
-      if (parent.subcategories) {
-        parent.subcategories.forEach((sub) => {
-          map.set(sub.id, { name: sub.name, parent_id: parent.id, color: sub.color || parent.color || "#C4C4C4" });
-        });
-      }
+    const all = categoryLookup ?? new Map();
+    all.forEach((c) => {
+      const parent = c.parent_id ? all.get(c.parent_id) : undefined;
+      map.set(c.id, {
+        name: c.name,
+        parent_id: parent ? parent.id : null,
+        color: c.color || parent?.color || "#C4C4C4",
+      });
     });
     return map;
-  }, [categories]);
+  }, [categoryLookup]);
+
+  // Bucket an expense under its top-level category; unknown/missing ones go
+  // to "Tanpa Kategori" so the donut always adds up to total spending.
+  const parentBucketOf = React.useCallback(
+    (categoryId: string | null) => {
+      if (!categoryId) return UNCATEGORIZED_ID;
+      const details = flatCategoryMap.get(categoryId);
+      if (!details) return UNCATEGORIZED_ID;
+      return details.parent_id || categoryId;
+    },
+    [flatCategoryMap]
+  );
+
+  const bucketName = React.useCallback(
+    (id: string) =>
+      id === UNCATEGORIZED_ID ? "Tanpa Kategori" : flatCategoryMap.get(id)?.name || "Kategori Lain",
+    [flatCategoryMap]
+  );
 
   // 1. Donut Chart Data: Expenses by Parent Category
   const expenseDonutData = React.useMemo(() => {
@@ -280,29 +306,22 @@ export default function ReportsPage() {
     const parentSums = new Map<string, number>();
 
     expenses.forEach((t) => {
-      if (!t.category_id) return;
-      const catDetails = flatCategoryMap.get(t.category_id);
-      if (!catDetails) return;
-
-      const parentId = catDetails.parent_id || t.category_id;
+      const parentId = parentBucketOf(t.category_id);
       parentSums.set(parentId, (parentSums.get(parentId) || 0) + t.amount);
     });
 
-    const data = Array.from(parentSums.entries()).map(([id, value]) => {
-      const parentCat = categories.find((c) => c.id === id);
-      return {
-        id,
-        name: parentCat?.name || "Kategori Lain",
-        value,
-      };
-    });
+    const data = Array.from(parentSums.entries()).map(([id, value]) => ({
+      id,
+      name: bucketName(id),
+      value,
+    }));
 
     // Sort from highest expense to lowest, then assign vivid, theme-aware
     // colours by rank so adjacent slices stay easy to tell apart in dark mode.
     return data
       .sort((a, b) => b.value - a.value)
       .map((item, index) => ({ ...item, color: chartColor(index) }));
-  }, [filteredTxs, flatCategoryMap, categories]);
+  }, [filteredTxs, parentBucketOf, bucketName]);
 
   // Subcategory list breakdown for the selected parent slice
   const subcategoryBreakdown = React.useMemo(() => {
@@ -312,29 +331,35 @@ export default function ReportsPage() {
     const subSums = new Map<string, number>();
 
     expenses.forEach((t) => {
-      if (!t.category_id) return;
-      const catDetails = flatCategoryMap.get(t.category_id);
-      if (!catDetails) return;
-
-      const parentId = catDetails.parent_id || t.category_id;
-      if (parentId === selectedParentCategoryId) {
-        subSums.set(t.category_id, (subSums.get(t.category_id) || 0) + t.amount);
-      }
+      if (parentBucketOf(t.category_id) !== selectedParentCategoryId) return;
+      const key = t.category_id && flatCategoryMap.has(t.category_id) ? t.category_id : UNCATEGORIZED_ID;
+      subSums.set(key, (subSums.get(key) || 0) + t.amount);
     });
 
-    const data = Array.from(subSums.entries()).map(([id, value]) => {
-      const details = flatCategoryMap.get(id);
-      return {
-        id,
-        name: details?.name || "Subkategori",
-        value,
-      };
-    });
+    const data = Array.from(subSums.entries()).map(([id, value]) => ({
+      id,
+      name: id === selectedParentCategoryId ? `${bucketName(id)} (tanpa sub)` : bucketName(id),
+      value,
+    }));
 
     return data
       .sort((a, b) => b.value - a.value)
       .map((item, index) => ({ ...item, color: chartColor(index) }));
-  }, [selectedParentCategoryId, filteredTxs, flatCategoryMap]);
+  }, [selectedParentCategoryId, filteredTxs, flatCategoryMap, parentBucketOf, bucketName]);
+
+  // Deep link to the transaction list for the selected slice, matching the
+  // report's period where the list has an equivalent (it is per month).
+  const selectedSliceHref = React.useMemo(() => {
+    if (!selectedParentCategoryId || selectedParentCategoryId === UNCATEGORIZED_ID) return null;
+    const nowLabel = currentFinancialMonth();
+    const range =
+      period === "this-month"
+        ? `&bulan=${nowLabel}`
+        : period === "last-month"
+        ? `&bulan=${shiftMonth(nowLabel, -1)}`
+        : "&rentang=semua";
+    return `/transactions?kategori=${selectedParentCategoryId}${range}`;
+  }, [selectedParentCategoryId, period]);
 
   // Set default selected slice once donut data loads
   React.useEffect(() => {
@@ -811,7 +836,7 @@ export default function ReportsPage() {
                         <Tag className="size-3" /> Subkategori Rincian
                       </span>
                       <span className="text-[10px] text-muted-foreground">
-                        {categories.find((c) => c.id === selectedParentCategoryId)?.name}
+                        {bucketName(selectedParentCategoryId)}
                       </span>
                     </div>
 
@@ -828,6 +853,15 @@ export default function ReportsPage() {
                         </div>
                       ))}
                     </div>
+                    {selectedSliceHref && (
+                      <Link
+                        href={selectedSliceHref}
+                        className="flex h-9 items-center justify-center gap-1.5 rounded-xl text-xs font-semibold text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/40 transition-colors"
+                      >
+                        <ListFilter className="size-3.5" />
+                        Lihat transaksi {bucketName(selectedParentCategoryId)}
+                      </Link>
+                    )}
                   </div>
                 )}
               </div>
