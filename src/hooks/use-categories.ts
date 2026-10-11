@@ -176,6 +176,14 @@ export async function seedStandardCategories(householdId: string) {
   const supabase = createClient();
   const now = new Date().toISOString();
 
+  // Lean default catalog (Oct 2026), shaped by five months of real usage:
+  // four subcategories held 55% of entries while ~25 were never used, and
+  // missing/hidden "Kesehatan" pushed medicine into "Bahan Makanan".
+  //
+  // Stable ids are kept from the previous catalog wherever the concept
+  // survives (renamed or moved), so existing households that already hold
+  // these ids never get a duplicate. Dropped entries simply stop being seeded
+  // for new households; nothing is removed from existing ones.
   const standardCategories = [
     // --- EXPENSES ---
     {
@@ -186,10 +194,22 @@ export async function seedStandardCategories(householdId: string) {
       color: "#E8A5A5",
       sort_order: 10,
       subcategories: [
-        { id: "00000000-0000-4000-8000-000000000002", name: "Bahan Makanan", icon: "🛒" },
-        { id: "00000000-0000-4000-8000-000000000003", name: "Makan Luar", icon: "🍕" },
-        { id: "00000000-0000-4000-8000-000000000004", name: "Kopi & Cemilan", icon: "☕" },
-        { id: "00000000-0000-4000-8000-000000000351", name: "Pesan Antar", icon: "🛵" },
+        { id: "00000000-0000-4000-8000-000000000002", name: "Belanja Dapur", icon: "🛒" },
+        { id: "00000000-0000-4000-8000-000000000003", name: "Makan di Luar", icon: "🍕" },
+        { id: "00000000-0000-4000-8000-000000000004", name: "Jajan & Kopi", icon: "☕" },
+      ],
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000100",
+      name: "Rumah Tangga",
+      kind: "expense" as const,
+      icon: "🏠",
+      color: "#F4D2A6",
+      sort_order: 20,
+      subcategories: [
+        { id: "00000000-0000-4000-8000-000000000101", name: "Listrik & Air", icon: "🔌" },
+        { id: "00000000-0000-4000-8000-000000000312", name: "Gas & Galon", icon: "🔥" },
+        { id: "00000000-0000-4000-8000-000000000103", name: "Perlengkapan Rumah", icon: "🧹" },
       ],
     },
     {
@@ -198,57 +218,26 @@ export async function seedStandardCategories(householdId: string) {
       kind: "expense" as const,
       icon: "🚗",
       color: "#B8E6D3",
-      sort_order: 20,
+      sort_order: 30,
       subcategories: [
-        { id: "00000000-0000-4000-8000-000000000011", name: "Bahan Bakar", icon: "⛽" },
-        { id: "00000000-0000-4000-8000-000000000012", name: "Ojek & Taksi Online", icon: "🛵" },
-        { id: "00000000-0000-4000-8000-000000000013", name: "Parkir & Tol", icon: "🎫" },
-        { id: "00000000-0000-4000-8000-000000000301", name: "Transportasi Umum", icon: "🚌" },
+        { id: "00000000-0000-4000-8000-000000000011", name: "Bensin", icon: "⛽" },
+        { id: "00000000-0000-4000-8000-000000000013", name: "Ojek, Parkir & Tol", icon: "🎫" },
         { id: "00000000-0000-4000-8000-000000000302", name: "Servis Kendaraan", icon: "🔧" },
       ],
     },
     {
       id: "00000000-0000-4000-8000-000000000200",
-      name: "Tagihan & Langganan",
+      name: "Tagihan",
       kind: "expense" as const,
       icon: "🧾",
       color: "#F4A6A6",
-      sort_order: 25,
-      subcategories: [
-        { id: "00000000-0000-4000-8000-000000000201", name: "Langganan Digital", icon: "📺" },
-        { id: "00000000-0000-4000-8000-000000000202", name: "Asuransi", icon: "🛡️" },
-        { id: "00000000-0000-4000-8000-000000000203", name: "Cicilan & Utang", icon: "🏦" },
-        { id: "00000000-0000-4000-8000-000000000204", name: "Pajak", icon: "🧮" },
-        { id: "00000000-0000-4000-8000-000000000205", name: "Biaya Admin Bank", icon: "💳" },
-      ],
-    },
-    {
-      id: "00000000-0000-4000-8000-000000000100",
-      name: "Kebutuhan Rumah",
-      kind: "expense" as const,
-      icon: "🏠",
-      color: "#F4D2A6",
-      sort_order: 30,
-      subcategories: [
-        { id: "00000000-0000-4000-8000-000000000101", name: "Listrik & Air", icon: "🔌" },
-        { id: "00000000-0000-4000-8000-000000000102", name: "Internet & Pulsa", icon: "📶" },
-        { id: "00000000-0000-4000-8000-000000000103", name: "Perlengkapan Rumah", icon: "🧹" },
-        { id: "00000000-0000-4000-8000-000000000311", name: "Sewa & KPR", icon: "🏡" },
-        { id: "00000000-0000-4000-8000-000000000312", name: "Gas & Galon", icon: "🔥" },
-      ],
-    },
-    {
-      id: "00000000-0000-4000-8000-000000001000",
-      name: "Hiburan & Hobi",
-      kind: "expense" as const,
-      icon: "🎮",
-      color: "#C8A5E8",
       sort_order: 40,
       subcategories: [
-        { id: "00000000-0000-4000-8000-000000001001", name: "Bioskop & Streaming", icon: "🍿" },
-        { id: "00000000-0000-4000-8000-000000001002", name: "Liburan", icon: "✈️" },
-        { id: "00000000-0000-4000-8000-000000000321", name: "Game", icon: "🎯" },
-        { id: "00000000-0000-4000-8000-000000000322", name: "Olahraga & Gym", icon: "🏋️" },
+        // Moved here from Rumah Tangga; same stable id as before.
+        { id: "00000000-0000-4000-8000-000000000102", name: "Pulsa & Internet", icon: "📶" },
+        { id: "00000000-0000-4000-8000-000000000201", name: "Langganan Digital", icon: "📺" },
+        { id: "00000000-0000-4000-8000-000000000203", name: "Cicilan & Utang", icon: "🏦" },
+        { id: "00000000-0000-4000-8000-000000000204", name: "Pajak & Asuransi", icon: "🧮" },
       ],
     },
     {
@@ -260,8 +249,20 @@ export async function seedStandardCategories(householdId: string) {
       sort_order: 50,
       subcategories: [
         { id: "00000000-0000-4000-8000-000000010001", name: "Obat & Vitamin", icon: "💊" },
-        { id: "00000000-0000-4000-8000-000000010002", name: "Dokter & Lab", icon: "🩺" },
-        { id: "00000000-0000-4000-8000-000000000331", name: "Asuransi Kesehatan", icon: "🩹" },
+        { id: "00000000-0000-4000-8000-000000010002", name: "Dokter, Bidan & Lab", icon: "🩺" },
+        { id: "00000000-0000-4000-8000-000000000331", name: "BPJS & Asuransi Kesehatan", icon: "🩹" },
+      ],
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000220",
+      name: "Anak & Keluarga",
+      kind: "expense" as const,
+      icon: "👨‍👩‍👧",
+      color: "#E8C8A5",
+      sort_order: 55,
+      subcategories: [
+        { id: "00000000-0000-4000-8000-000000000221", name: "Kebutuhan Anak & Bayi", icon: "🍼" },
+        { id: "00000000-0000-4000-8000-000000000223", name: "Kiriman Orang Tua", icon: "👵" },
       ],
     },
     {
@@ -270,64 +271,45 @@ export async function seedStandardCategories(householdId: string) {
       kind: "expense" as const,
       icon: "🎓",
       color: "#A6C8E8",
-      sort_order: 55,
+      sort_order: 60,
       subcategories: [
-        { id: "00000000-0000-4000-8000-000000000211", name: "Uang Sekolah", icon: "🏫" },
+        { id: "00000000-0000-4000-8000-000000000211", name: "SPP & Biaya Sekolah", icon: "🏫" },
         { id: "00000000-0000-4000-8000-000000000212", name: "Buku & Alat Tulis", icon: "📚" },
-        { id: "00000000-0000-4000-8000-000000000213", name: "Kursus & Pelatihan", icon: "💻" },
       ],
     },
     {
       id: "00000000-0000-4000-8000-000000100000",
-      name: "Belanja Pribadi",
+      name: "Pakaian & Perawatan",
       kind: "expense" as const,
       icon: "🛍️",
       color: "#E8A5C8",
-      sort_order: 60,
+      sort_order: 65,
       subcategories: [
         { id: "00000000-0000-4000-8000-000000100001", name: "Pakaian", icon: "👕" },
         { id: "00000000-0000-4000-8000-000000100002", name: "Perawatan Diri", icon: "🧴" },
-        { id: "00000000-0000-4000-8000-000000000341", name: "Elektronik", icon: "📱" },
-        { id: "00000000-0000-4000-8000-000000000342", name: "Kosmetik", icon: "💄" },
-      ],
-    },
-    {
-      id: "00000000-0000-4000-8000-000000000220",
-      name: "Keluarga & Anak",
-      kind: "expense" as const,
-      icon: "👨‍👩‍👧",
-      color: "#E8C8A5",
-      sort_order: 65,
-      subcategories: [
-        { id: "00000000-0000-4000-8000-000000000221", name: "Kebutuhan Anak", icon: "🍼" },
-        { id: "00000000-0000-4000-8000-000000000222", name: "Uang Saku", icon: "💵" },
-        { id: "00000000-0000-4000-8000-000000000223", name: "Orang Tua", icon: "👵" },
+        { id: "00000000-0000-4000-8000-000000000341", name: "Elektronik & Gadget", icon: "📱" },
       ],
     },
     {
       id: "00000000-0000-4000-8000-000000000230",
-      name: "Hadiah & Donasi",
+      name: "Sosial & Ibadah",
       kind: "expense" as const,
-      icon: "🎁",
+      icon: "🤲",
       color: "#E8A5D8",
       sort_order: 70,
       subcategories: [
-        { id: "00000000-0000-4000-8000-000000000231", name: "Sedekah & Donasi", icon: "🤲" },
-        { id: "00000000-0000-4000-8000-000000000232", name: "Zakat & Infak", icon: "🕌" },
-        { id: "00000000-0000-4000-8000-000000000233", name: "Hadiah", icon: "🎀" },
+        { id: "00000000-0000-4000-8000-000000000232", name: "Zakat, Infak & Sedekah", icon: "🕌" },
+        { id: "00000000-0000-4000-8000-000000000233", name: "Hadiah & Kondangan", icon: "🎀" },
       ],
     },
     {
-      id: "00000000-0000-4000-8000-000000000240",
-      name: "Peliharaan",
+      id: "00000000-0000-4000-8000-000000001000",
+      name: "Hiburan & Liburan",
       kind: "expense" as const,
-      icon: "🐾",
-      color: "#C8E8A5",
-      sort_order: 75,
-      subcategories: [
-        { id: "00000000-0000-4000-8000-000000000241", name: "Makanan Hewan", icon: "🦴" },
-        { id: "00000000-0000-4000-8000-000000000242", name: "Dokter Hewan", icon: "🐶" },
-      ],
+      icon: "🎡",
+      color: "#C8A5E8",
+      sort_order: 80,
+      subcategories: [],
     },
     {
       id: "00000000-0000-4000-8000-000000000250",
@@ -342,52 +324,34 @@ export async function seedStandardCategories(householdId: string) {
     // --- INCOME ---
     {
       id: "00000000-0000-4000-8000-000001000000",
-      name: "Gaji & Pendapatan",
+      name: "Gaji",
       kind: "income" as const,
       icon: "💰",
       color: "#5FBF9A",
       sort_order: 100,
       subcategories: [
         { id: "00000000-0000-4000-8000-000001000001", name: "Gaji Bulanan", icon: "💵" },
-        { id: "00000000-0000-4000-8000-000001000002", name: "Bonus & THR", icon: "🎁" },
-        { id: "00000000-0000-4000-8000-000000000421", name: "Lembur", icon: "⏰" },
+        { id: "00000000-0000-4000-8000-000001000002", name: "Bonus, THR & Lembur", icon: "🎁" },
       ],
     },
     {
       id: "00000000-0000-4000-8000-000000000400",
-      name: "Usaha & Bisnis",
+      name: "Usaha & Sampingan",
       kind: "income" as const,
       icon: "🏪",
       color: "#A5E8B8",
-      sort_order: 105,
-      subcategories: [
-        { id: "00000000-0000-4000-8000-000000000401", name: "Penjualan", icon: "🧾" },
-        { id: "00000000-0000-4000-8000-000000000402", name: "Laba Usaha", icon: "💹" },
-      ],
-    },
-    {
-      id: "00000000-0000-4000-8000-000000000410",
-      name: "Freelance & Sampingan",
-      kind: "income" as const,
-      icon: "💻",
-      color: "#B8E6D3",
-      sort_order: 108,
-      subcategories: [
-        { id: "00000000-0000-4000-8000-000000000411", name: "Proyek", icon: "📁" },
-        { id: "00000000-0000-4000-8000-000000000412", name: "Komisi", icon: "🤝" },
-      ],
-    },
-    {
-      id: "00000000-0000-4000-8000-000010000000",
-      name: "Investasi",
-      kind: "income" as const,
-      icon: "📈",
-      color: "#7FD4A8",
       sort_order: 110,
-      subcategories: [
-        { id: "00000000-0000-4000-8000-000010000001", name: "Dividen & Bunga", icon: "🪙" },
-        { id: "00000000-0000-4000-8000-000010000002", name: "Reksa Dana & Saham", icon: "📊" },
-      ],
+      subcategories: [],
+    },
+    {
+      // Promoted from a subcategory of "Pendapatan Lain"; same stable id.
+      id: "00000000-0000-4000-8000-000020000002",
+      name: "Pemberian & Hadiah",
+      kind: "income" as const,
+      icon: "🧧",
+      color: "#E8C8A5",
+      sort_order: 115,
+      subcategories: [],
     },
     {
       id: "00000000-0000-4000-8000-000020000000",
@@ -398,8 +362,8 @@ export async function seedStandardCategories(householdId: string) {
       sort_order: 120,
       subcategories: [
         { id: "00000000-0000-4000-8000-000020000001", name: "Refund", icon: "🔙" },
-        { id: "00000000-0000-4000-8000-000020000002", name: "Pemberian", icon: "🧧" },
-        { id: "00000000-0000-4000-8000-000000000431", name: "Sewa & Rental", icon: "🏠" },
+        // Moved here from the dropped "Investasi" parent; same stable id.
+        { id: "00000000-0000-4000-8000-000010000001", name: "Bunga & Imbal Hasil", icon: "🪙" },
       ],
     },
   ];
@@ -494,40 +458,49 @@ export async function seedStandardCategories(householdId: string) {
     for (const child of parent.subcategories) kindByStableId.set(child.id, parent.kind);
   }
 
+  // Current names plus every name an earlier catalog or the server signup
+  // trigger used for the same stable category.
   const rootAliases: Record<string, string> = {
     "makanan": "00000000-0000-4000-8000-000000000001",
     "makanan & dapur": "00000000-0000-4000-8000-000000000001",
     "makanan/minuman": "00000000-0000-4000-8000-000000000001",
     "food": "00000000-0000-4000-8000-000000000001",
+    "rumah tangga": "00000000-0000-4000-8000-000000000100",
+    "kebutuhan rumah": "00000000-0000-4000-8000-000000000100",
     "transportasi": "00000000-0000-4000-8000-000000000010",
     "transport": "00000000-0000-4000-8000-000000000010",
-    "kebutuhan rumah": "00000000-0000-4000-8000-000000000100",
-    "tagihan & langganan": "00000000-0000-4000-8000-000000000200",
     "tagihan": "00000000-0000-4000-8000-000000000200",
+    "tagihan & langganan": "00000000-0000-4000-8000-000000000200",
     "utilities": "00000000-0000-4000-8000-000000000200",
     "bills": "00000000-0000-4000-8000-000000000200",
-    "hiburan & hobi": "00000000-0000-4000-8000-000000001000",
-    "hiburan": "00000000-0000-4000-8000-000000001000",
-    "entertainment": "00000000-0000-4000-8000-000000001000",
     "kesehatan": "00000000-0000-4000-8000-000000010000",
     "health": "00000000-0000-4000-8000-000000010000",
+    "anak & keluarga": "00000000-0000-4000-8000-000000000220",
+    "keluarga & anak": "00000000-0000-4000-8000-000000000220",
+    "pendidikan": "00000000-0000-4000-8000-000000000210",
+    "education": "00000000-0000-4000-8000-000000000210",
+    "pakaian & perawatan": "00000000-0000-4000-8000-000000100000",
     "belanja pribadi": "00000000-0000-4000-8000-000000100000",
     "belanja": "00000000-0000-4000-8000-000000100000",
     "shopping": "00000000-0000-4000-8000-000000100000",
-    "pendidikan": "00000000-0000-4000-8000-000000000210",
-    "education": "00000000-0000-4000-8000-000000000210",
-    "keluarga & anak": "00000000-0000-4000-8000-000000000220",
+    "sosial & ibadah": "00000000-0000-4000-8000-000000000230",
     "hadiah & donasi": "00000000-0000-4000-8000-000000000230",
-    "peliharaan": "00000000-0000-4000-8000-000000000240",
+    "hiburan & liburan": "00000000-0000-4000-8000-000000001000",
+    "hiburan & hobi": "00000000-0000-4000-8000-000000001000",
+    "hiburan": "00000000-0000-4000-8000-000000001000",
+    "entertainment": "00000000-0000-4000-8000-000000001000",
     "lainnya": "00000000-0000-4000-8000-000000000250",
     // Server signup default "Lain-lain" is an EXPENSE category.
     "lain-lain": "00000000-0000-4000-8000-000000000250",
-    "gaji & pendapatan": "00000000-0000-4000-8000-000001000000",
     "gaji": "00000000-0000-4000-8000-000001000000",
+    "gaji & pendapatan": "00000000-0000-4000-8000-000001000000",
     "salary": "00000000-0000-4000-8000-000001000000",
+    "usaha & sampingan": "00000000-0000-4000-8000-000000000400",
     "usaha & bisnis": "00000000-0000-4000-8000-000000000400",
-    "freelance & sampingan": "00000000-0000-4000-8000-000000000410",
-    "investasi": "00000000-0000-4000-8000-000010000000",
+    "freelance & sampingan": "00000000-0000-4000-8000-000000000400",
+    // Server signup default "Hadiah" is an INCOME category.
+    "pemberian & hadiah": "00000000-0000-4000-8000-000020000002",
+    "hadiah": "00000000-0000-4000-8000-000020000002",
     "pendapatan lain": "00000000-0000-4000-8000-000020000000",
   };
 
@@ -703,6 +676,32 @@ export function useCategories() {
   });
 }
 
+/**
+ * How often each category was used in the last `days` days (live, non-deleted,
+ * non-scheduled transactions). Keyed under ["transactions", householdId, ...]
+ * so every transaction mutation that invalidates "transactions" refreshes it.
+ */
+export function useCategoryUsage(days = 90) {
+  const { householdId } = useHousehold();
+
+  return useQuery<Map<string, number>>({
+    queryKey: ["transactions", householdId, "category-usage", days],
+    enabled: !!householdId,
+    queryFn: async () => {
+      const counts = new Map<string, number>();
+      if (!householdId) return counts;
+      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+      const txs = await db.transactions.where("household_id").equals(householdId).toArray();
+      for (const t of txs) {
+        if (t.is_deleted || t.is_scheduled || !t.category_id) continue;
+        if (new Date(t.occurred_at).getTime() < cutoff) continue;
+        counts.set(t.category_id, (counts.get(t.category_id) ?? 0) + 1);
+      }
+      return counts;
+    },
+  });
+}
+
 export function useCreateCategory() {
   const supabase = createClient();
   const { householdId } = useHousehold();
@@ -869,6 +868,139 @@ export function useArchiveCategory() {
       queryClient.invalidateQueries({ queryKey: ["categories", householdId] });
       queryClient.invalidateQueries({ queryKey: ["transactions", householdId] });
       queryClient.invalidateQueries({ queryKey: ["budgets", householdId] });
+    },
+  });
+}
+
+export interface ArchivedCategory extends Category {
+  /** Name of its parent (archived or not), for "Parent › Child" labels. */
+  parentName: string | null;
+}
+
+/**
+ * Archived categories that can usefully be restored. Archived rows whose name
+ * matches an active category of the same kind and level are left out — those
+ * are old duplicates kept as seed tombstones, and restoring one would only
+ * recreate the duplicate.
+ */
+export function useArchivedCategories() {
+  const { householdId } = useHousehold();
+
+  return useQuery<ArchivedCategory[]>({
+    queryKey: ["categories", householdId, "archived"],
+    enabled: !!householdId,
+    queryFn: async () => {
+      if (!householdId) return [];
+      const all = await db.categories.where("household_id").equals(householdId).toArray();
+      const byId = new Map(all.map((c) => [c.id, c]));
+      const key = (c: Category) =>
+        `${c.kind}:${c.parent_id ? "sub" : "root"}:${c.name.toLowerCase().trim()}`;
+      const activeKeys = new Set(all.filter((c) => !c.is_archived).map(key));
+      return all
+        .filter((c) => c.is_archived && !activeKeys.has(key(c)))
+        .map((c) => ({ ...c, parentName: c.parent_id ? byId.get(c.parent_id)?.name ?? null : null }))
+        .sort(
+          (a, b) =>
+            a.kind.localeCompare(b.kind) ||
+            (a.parentName ?? a.name).localeCompare(b.parentName ?? b.name) ||
+            (a.parent_id ? 1 : 0) - (b.parent_id ? 1 : 0) ||
+            a.name.localeCompare(b.name)
+        );
+    },
+  });
+}
+
+/**
+ * Restore an archived category. A parent comes back with its archived
+ * subcategories (archiving cascades, so this undoes it); a subcategory brings
+ * its parent back too so it isn't left under a hidden parent.
+ */
+export function useRestoreCategory() {
+  const supabase = createClient();
+  const { householdId } = useHousehold();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (categoryId: string) => {
+      if (!householdId) throw new Error("Active household context is required");
+      const cat = await db.categories.get(categoryId);
+      if (!cat) throw new Error("Kategori tidak ditemukan");
+
+      const all = await db.categories.where("household_id").equals(householdId).toArray();
+      const toRestore: Category[] = [cat];
+      if (cat.parent_id) {
+        const parent = all.find((c) => c.id === cat.parent_id);
+        if (parent?.is_archived) toRestore.push(parent);
+      } else {
+        toRestore.push(...all.filter((c) => c.parent_id === cat.id && c.is_archived));
+      }
+
+      for (const c of toRestore) {
+        const restored: Category = { ...c, is_archived: false };
+        delete (restored as Syncable<Category>).syncStatus;
+        await db.categories.put({ ...restored, syncStatus: "pending" });
+        await db.outbox.add({
+          entity: "categories",
+          entityId: c.id,
+          op: "update",
+          payload: restored,
+          createdAt: Date.now(),
+        });
+      }
+      triggerSync(supabase, householdId);
+      return toRestore.length;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories", householdId] });
+      queryClient.invalidateQueries({ queryKey: ["transactions", householdId] });
+    },
+  });
+}
+
+/**
+ * Merge one category into another of the same kind: every transaction,
+ * recurring template, budget and subcategory moves to the target and the
+ * source disappears. Runs against the server directly (see mergeCategoryInto),
+ * so it needs a connection.
+ */
+export function useMergeCategory() {
+  const supabase = createClient();
+  const { householdId } = useHousehold();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ sourceId, targetId }: { sourceId: string; targetId: string }) => {
+      if (!householdId) throw new Error("Active household context is required");
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        throw new Error("Menggabungkan kategori butuh koneksi internet.");
+      }
+      const [source, target] = await Promise.all([
+        db.categories.get(sourceId),
+        db.categories.get(targetId),
+      ]);
+      if (!source || !target) throw new Error("Kategori tidak ditemukan");
+      if (source.id === target.id) throw new Error("Pilih kategori tujuan yang berbeda");
+      if (source.kind !== target.kind) {
+        throw new Error("Kategori pemasukan dan pengeluaran tidak bisa digabung");
+      }
+      if (target.parent_id === source.id) {
+        throw new Error("Tidak bisa digabung ke subkategorinya sendiri");
+      }
+      const hasSubs = (await db.categories.filter((c) => c.parent_id === source.id && !c.is_archived).count()) > 0;
+      if (hasSubs && target.parent_id) {
+        throw new Error("Kategori yang punya subkategori hanya bisa digabung ke kategori induk");
+      }
+
+      const ok = await mergeCategoryInto(supabase, householdId, source.id, target.id);
+      if (!ok) throw new Error("Server menolak penggabungan. Coba lagi nanti.");
+      triggerSync(supabase, householdId);
+      return { source: source.name, target: target.name };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories", householdId] });
+      queryClient.invalidateQueries({ queryKey: ["transactions", householdId] });
+      queryClient.invalidateQueries({ queryKey: ["budgets", householdId] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-transactions", householdId] });
     },
   });
 }

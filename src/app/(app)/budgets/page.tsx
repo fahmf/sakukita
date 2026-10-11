@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useCategories } from "@/hooks/use-categories";
 import { useBudgets, useSetBudget, useDeleteBudget } from "@/hooks/use-budgets";
 import { useTransactions } from "@/hooks/use-transactions";
@@ -30,6 +31,7 @@ import {
   ArrowRight,
   TrendingDown,
   Info,
+  ListFilter,
 } from "lucide-react";
 import { toast } from "sonner";
 import { parseAmountExpression } from "@/lib/calculator";
@@ -926,6 +928,14 @@ export default function BudgetsPage() {
                     {deleteBudgetMutation.isPending ? "Menghapus..." : "Hapus Batas Limit"}
                   </Button>
                 )}
+
+                <Link
+                  href={`/transactions?kategori=${editingCategory.id}&bulan=${selectedMonth}`}
+                  className="flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-semibold text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/40 transition-colors"
+                >
+                  <ListFilter className="size-3.5" />
+                  Lihat transaksi {editingCategory.name} bulan ini
+                </Link>
               </div>
             </form>
           )}

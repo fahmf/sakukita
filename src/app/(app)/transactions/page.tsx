@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useTransactions, useDeleteTransaction, useRestoreTransaction } from "@/hooks/use-transactions";
 import { useWallets } from "@/hooks/use-wallets";
 import { useCategories } from "@/hooks/use-categories";
@@ -45,19 +46,38 @@ import { TransactionDetailDialog } from "@/components/transaction/transaction-de
 import { iconMap } from "@/lib/icons";
 import { TransactionListSkeleton } from "@/components/shared/skeletons";
 
-export default function AllTransactionsPage() {
+export default function AllTransactionsPageRoute() {
+  // useSearchParams needs a Suspense boundary or the production build fails
+  // for this prerendered route (Next 16).
+  return (
+    <React.Suspense fallback={<TransactionListSkeleton count={5} />}>
+      <AllTransactionsPage />
+    </React.Suspense>
+  );
+}
+
+function AllTransactionsPage() {
+  const searchParams = useSearchParams();
   const { openEditTransaction } = useUIStore();
   const allowed = useCanEdit();
   const deleteTx = useDeleteTransaction();
   const restoreTx = useRestoreTransaction();
 
   // Navigation states (initialized to the current financial month, cycle day 25)
-  const [selectedMonth, setSelectedMonth] = React.useState(() => currentFinancialMonth());
+  // Deep links: ?kategori=<id>[&bulan=YYYY-MM-01][&rentang=semua] — used by
+  // "Lihat transaksi" on categories (Settings) and budgets.
+  const [selectedMonth, setSelectedMonth] = React.useState(() => {
+    const bulan = searchParams.get("bulan");
+    return bulan && /^\d{4}-\d{2}-01$/.test(bulan) ? bulan : currentFinancialMonth();
+  });
+  const [allTime, setAllTime] = React.useState(() => searchParams.get("rentang") === "semua");
 
   // Filter and search states
   const [searchQuery, setSearchQuery] = React.useState("");
   const [selectedWalletId, setSelectedWalletId] = React.useState<string>("all");
-  const [selectedCategoryId, setSelectedCategoryId] = React.useState<string>("all");
+  const [selectedCategoryId, setSelectedCategoryId] = React.useState<string>(
+    () => searchParams.get("kategori") || "all"
+  );
   const [selectedTag, setSelectedTag] = React.useState<string | null>(null);
 
   // Dialog & Detail states
@@ -95,14 +115,32 @@ export default function AllTransactionsPage() {
   // Fetch data
   const { data: transactions = [], isLoading: loadingTx } = useTransactions({
     period: "custom",
-    startDate,
-    endDate,
+    startDate: allTime ? null : startDate,
+    endDate: allTime ? null : endDate,
     walletId: null,
     categoryId: null,
   });
 
   const { data: wallets = [] } = useWallets();
   const { data: categories = [] } = useCategories();
+
+  // Selecting a parent category covers its subcategories too — most entries
+  // live in subcategories, so an exact-id match showed e.g. 4 of 90 "Makanan".
+  const selectedCategory = React.useMemo(() => {
+    if (selectedCategoryId === "all") return null;
+    const parent = categories.find((p) => p.id === selectedCategoryId);
+    if (parent) {
+      return {
+        name: parent.name,
+        parentName: null as string | null,
+        ids: new Set([parent.id, ...parent.subcategories.map((sub) => sub.id)]),
+      };
+    }
+    const owner = categories.find((p) => p.subcategories.some((sub) => sub.id === selectedCategoryId));
+    const sub = owner?.subcategories.find((c) => c.id === selectedCategoryId);
+    if (!owner || !sub) return null;
+    return { name: sub.name, parentName: owner.name as string | null, ids: new Set([sub.id]) };
+  }, [categories, selectedCategoryId]);
 
   // Apply filters in memory
   const filteredTransactions = React.useMemo(() => {
@@ -129,9 +167,10 @@ export default function AllTransactionsPage() {
       );
     }
 
-    // Category filter
+    // Category filter (parent includes its subcategories)
     if (selectedCategoryId !== "all") {
-      result = result.filter((t) => t.category_id === selectedCategoryId);
+      const ids = selectedCategory?.ids ?? new Set([selectedCategoryId]);
+      result = result.filter((t) => !!t.category_id && ids.has(t.category_id));
     }
 
     // Tag filter
@@ -140,7 +179,18 @@ export default function AllTransactionsPage() {
     }
 
     return result;
-  }, [transactions, searchQuery, selectedWalletId, selectedCategoryId, selectedTag]);
+  }, [transactions, searchQuery, selectedWalletId, selectedCategoryId, selectedCategory, selectedTag]);
+
+  // Totals for the current filter, shown when a category is picked.
+  const filterTotals = React.useMemo(() => {
+    let expense = 0;
+    let income = 0;
+    for (const t of filteredTransactions) {
+      if (t.type === "expense") expense += Number(t.amount || 0);
+      else if (t.type === "income") income += Number(t.amount || 0);
+    }
+    return { expense, income, count: filteredTransactions.length };
+  }, [filteredTransactions]);
 
   // Unique tags present in the current month's transactions (for the quick filter row).
   const availableTags = React.useMemo(() => {
@@ -240,11 +290,12 @@ export default function AllTransactionsPage() {
     setSelectedWalletId("all");
     setSelectedCategoryId("all");
     setSelectedTag(null);
+    setAllTime(false);
     toast.info("Filter pencarian direset");
   };
 
   const hasActiveFilters =
-    !!searchQuery || selectedWalletId !== "all" || selectedCategoryId !== "all" || !!selectedTag;
+    !!searchQuery || selectedWalletId !== "all" || selectedCategoryId !== "all" || !!selectedTag || allTime;
 
   return (
     <div className="space-y-5">
@@ -268,7 +319,22 @@ export default function AllTransactionsPage() {
         </Link>
       </div>
 
-      {/* 2. Month Navigator */}
+      {/* 2. Month Navigator (or the all-time banner) */}
+      {allTime ? (
+        <div className="flex items-center justify-between bg-card border rounded-2xl p-2.5 pl-4 shadow-xs">
+          <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
+            <Calendar className="size-4 text-mint-strong" />
+            <span>Semua waktu</span>
+          </div>
+          <Button
+            variant="ghost"
+            onClick={() => setAllTime(false)}
+            className="h-9 rounded-xl text-xs font-semibold"
+          >
+            Per bulan
+          </Button>
+        </div>
+      ) : (
       <div className="flex items-center justify-between bg-card border rounded-2xl p-2.5 shadow-xs">
         <Button
           variant="ghost"
@@ -291,6 +357,7 @@ export default function AllTransactionsPage() {
           <ChevronRight className="size-5" />
         </Button>
       </div>
+      )}
 
       {/* 3. Search & Filters Bar */}
       <Card className="rounded-2xl border bg-card p-4 space-y-3">
@@ -340,9 +407,16 @@ export default function AllTransactionsPage() {
               <SelectContent>
                 <SelectItem value="all">Semua Kategori</SelectItem>
                 {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
+                  <React.Fragment key={c.id}>
+                    <SelectItem value={c.id} className="font-semibold">
+                      {c.name}
+                    </SelectItem>
+                    {c.subcategories.map((sub) => (
+                      <SelectItem key={sub.id} value={sub.id} className="pl-6 text-muted-foreground">
+                        ↳ {sub.name}
+                      </SelectItem>
+                    ))}
+                  </React.Fragment>
                 ))}
               </SelectContent>
             </Select>
@@ -389,6 +463,54 @@ export default function AllTransactionsPage() {
           </Button>
         )}
       </Card>
+
+      {/* Category summary: what this category adds up to in the shown range */}
+      {selectedCategory && (
+        <Card className="rounded-2xl border bg-card p-4 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                {selectedCategory.parentName ? `${selectedCategory.parentName} ›` : "Kategori"}
+              </p>
+              <p className="font-semibold text-sm truncate">{selectedCategory.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {filterTotals.count} transaksi · {allTime ? "semua waktu" : activeMonthName}
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              {filterTotals.expense > 0 && (
+                <p className="font-bold text-sm text-expense">-{formatCurrency(filterTotals.expense)}</p>
+              )}
+              {filterTotals.income > 0 && (
+                <p className="font-bold text-sm text-income">+{formatCurrency(filterTotals.income)}</p>
+              )}
+              {filterTotals.expense === 0 && filterTotals.income === 0 && (
+                <p className="font-bold text-sm text-muted-foreground">{formatCurrency(0)}</p>
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
+            <button
+              type="button"
+              onClick={() => setAllTime(false)}
+              className={`rounded-lg py-1.5 text-xs font-semibold transition-all ${
+                !allTime ? "bg-card text-foreground shadow-xs" : "text-muted-foreground"
+              }`}
+            >
+              Per bulan
+            </button>
+            <button
+              type="button"
+              onClick={() => setAllTime(true)}
+              className={`rounded-lg py-1.5 text-xs font-semibold transition-all ${
+                allTime ? "bg-card text-foreground shadow-xs" : "text-muted-foreground"
+              }`}
+            >
+              Semua waktu
+            </button>
+          </div>
+        </Card>
+      )}
 
       {/* 4. Transactions Grouped List */}
       <div className="space-y-4">
