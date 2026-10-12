@@ -49,7 +49,7 @@ export default function DashboardPage() {
   const { data: walletBalances = [], isLoading: loadingBalances } = useWalletBalances();
 
   // Dynamic month selection state (initialized to the current financial month,
-  // whose cycle starts on day 25 of the previous calendar month)
+  // which follows the household cycle start day)
   const [selectedMonth, setSelectedMonth] = React.useState(() => currentFinancialMonth());
 
   // Captured once at mount so the "next 30 days" horizon stays stable across

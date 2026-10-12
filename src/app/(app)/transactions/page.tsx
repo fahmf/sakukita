@@ -67,7 +67,7 @@ function AllTransactionsPage() {
   const deleteTx = useDeleteTransaction();
   const restoreTx = useRestoreTransaction();
 
-  // Navigation states (initialized to the current financial month, cycle day 25)
+  // Navigation states (initialized to the current financial month)
   // Deep links: ?kategori=<id>[&bulan=YYYY-MM-01][&rentang=semua] — used by
   // "Lihat transaksi" on categories (Settings) and budgets.
   const [selectedMonth, setSelectedMonth] = React.useState(() => {

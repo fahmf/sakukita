@@ -548,7 +548,7 @@ function getPeriodDates(
   customEnd: string | null
 ): { start: Date | null; end: Date | null } {
   // We want boundaries in Asia/Jakarta timezone (+07:00). "this/last month"
-  // follow the financial cycle (starts on day 25), not the calendar 1st.
+  // follow the financial cycle (household cycle start day), not the calendar 1st.
   if (period === "this-month") {
     const { startDate, endDate } = financialMonthDateRange(currentFinancialMonth());
     return {

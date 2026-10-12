@@ -72,6 +72,7 @@ import {
 } from "lucide-react";
 import type { Category, CategoryKind } from "@/lib/supabase/types";
 import { NotificationSettingsCard } from "@/components/settings/notification-settings-card";
+import { CycleStartDayCard } from "@/components/settings/cycle-start-day-card";
 
 import { iconMap } from "@/lib/icons";
 
@@ -428,6 +429,8 @@ export default function SettingsPage() {
             </Link>
           </div>
         </div>
+
+        <CycleStartDayCard />
 
         <Link
           href="/scheduled"
