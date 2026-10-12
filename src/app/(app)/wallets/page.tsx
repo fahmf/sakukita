@@ -172,6 +172,7 @@ export default function WalletsPage() {
   return (
     <div className="space-y-6">
       <PageHeading
+        back="/more"
         title="Dompetku"
         subtitle="Kelola aset dan rekening keluarga"
         action={

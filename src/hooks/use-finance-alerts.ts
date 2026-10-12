@@ -6,7 +6,13 @@ import { useBudgets } from "@/hooks/use-budgets";
 import { useTransactions } from "@/hooks/use-transactions";
 import { useCategories } from "@/hooks/use-categories";
 import { useNotificationPrefs } from "@/stores/notification-store";
-import { currentFinancialMonth, financialMonthDateRange } from "@/lib/financial-month";
+import {
+  currentFinancialMonth,
+  financialMonthDateRange,
+  isInFinancialMonth,
+  shiftMonth,
+} from "@/lib/financial-month";
+import { computeBudgetUsage } from "@/lib/budget-usage";
 import { showLocalNotification, currentPermission } from "@/lib/notifications";
 import { formatCurrency } from "@/lib/format";
 
@@ -42,12 +48,18 @@ function budgetLevel(ratio: number): 0 | 80 | 100 {
 export function useFinanceAlerts() {
   const { householdId } = useHousehold();
   const month = React.useMemo(() => currentFinancialMonth(), []);
+  const prevMonth = React.useMemo(() => shiftMonth(month, -1), [month]);
+  // From the start of last month: carry-over needs last month's spend.
   const { startDate, endDate } = React.useMemo(
-    () => financialMonthDateRange(month),
-    [month]
+    () => ({
+      startDate: financialMonthDateRange(prevMonth).startDate,
+      endDate: financialMonthDateRange(month).endDate,
+    }),
+    [month, prevMonth]
   );
 
   const { data: budgets = [] } = useBudgets(month);
+  const { data: prevBudgets = [] } = useBudgets(prevMonth);
   const { data: categories = [] } = useCategories();
   const { data: transactions = [] } = useTransactions({
     period: "custom",
@@ -68,17 +80,22 @@ export function useFinanceAlerts() {
       const record = readJSON<Record<string, number>>(key, {});
       let changed = false;
 
-      const spentByCat = new Map<string, number>();
-      for (const t of transactions) {
-        if (t.type === "expense" && t.category_id) {
-          spentByCat.set(t.category_id, (spentByCat.get(t.category_id) ?? 0) + t.amount);
-        }
-      }
+      const flatCategories = categories.flatMap((p) => [p, ...p.subcategories]);
 
       for (const b of budgets) {
         if (b.amount <= 0) continue;
-        const spent = spentByCat.get(b.category_id) ?? 0;
-        const level = budgetLevel(spent / b.amount);
+        // Same math as Beranda and the Budget page: subcategory spend and
+        // carry-over count toward the limit.
+        const usage = computeBudgetUsage(
+          b,
+          prevBudgets.find((p) => p.category_id === b.category_id),
+          categories,
+          transactions,
+          prevMonth
+        );
+        const spent = usage.spent;
+        const limit = usage.totalLimit;
+        const level = budgetLevel(spent / limit);
         const prev = record[b.category_id];
 
         if (prev === undefined) {
@@ -88,16 +105,16 @@ export function useFinanceAlerts() {
           continue;
         }
         if (level > prev) {
-          const name = categories.find((c) => c.id === b.category_id)?.name ?? "Kategori";
+          const name = flatCategories.find((c) => c.id === b.category_id)?.name ?? "Kategori";
           if (level === 100) {
             void showLocalNotification(`Budget ${name} terlampaui`, {
-              body: `Pengeluaran ${formatCurrency(spent)} dari budget ${formatCurrency(b.amount)}.`,
+              body: `Pengeluaran ${formatCurrency(spent)} dari budget ${formatCurrency(limit)}.`,
               tag: `budget-${b.category_id}`,
               url: "/budgets",
             });
           } else {
             void showLocalNotification(`Budget ${name} sudah 80%`, {
-              body: `Terpakai ${formatCurrency(spent)} dari ${formatCurrency(b.amount)}. Sisa ${formatCurrency(b.amount - spent)}.`,
+              body: `Terpakai ${formatCurrency(spent)} dari ${formatCurrency(limit)}. Sisa ${formatCurrency(limit - spent)}.`,
               tag: `budget-${b.category_id}`,
               url: "/budgets",
             });
@@ -118,8 +135,13 @@ export function useFinanceAlerts() {
     if (largeTxAlerts && largeTxThreshold > 0) {
       const key = `saku-alert-bigtx:${householdId}`;
       const existing = localStorage.getItem(key);
+      // This month only — the query also holds last month for carry-over,
+      // and those rows were never in the seeded "already alerted" set.
       const bigTx = transactions.filter(
-        (t) => t.type === "expense" && t.amount >= largeTxThreshold
+        (t) =>
+          t.type === "expense" &&
+          t.amount >= largeTxThreshold &&
+          isInFinancialMonth(t.occurred_at, month)
       );
 
       if (existing === null) {
@@ -144,7 +166,9 @@ export function useFinanceAlerts() {
   }, [
     householdId,
     month,
+    prevMonth,
     budgets,
+    prevBudgets,
     categories,
     transactions,
     budgetAlerts,

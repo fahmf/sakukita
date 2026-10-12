@@ -7,7 +7,7 @@ import { useTransactions, useDeleteTransaction, useRestoreTransaction } from "@/
 import { useWallets } from "@/hooks/use-wallets";
 import { useCategories } from "@/hooks/use-categories";
 import { formatCurrency, formatRelative } from "@/lib/format";
-import { currentFinancialMonth, financialMonthDateRange } from "@/lib/financial-month";
+import { currentFinancialMonth, financialMonthDateRange, financialMonthRangeLabel } from "@/lib/financial-month";
 import { useUIStore } from "@/stores/ui-store";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -19,11 +19,9 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  ArrowLeft,
   ArrowRightLeft,
   Calendar,
   CalendarDays,
@@ -32,19 +30,24 @@ import {
   Search,
   Pencil,
   Trash2,
-  CircleDot,
-  Briefcase,
-  Utensils,
-  Car,
-  ShoppingBag,
-  Gift,
-  Heart,
-  Receipt,
   FilterX,
 } from "lucide-react";
 import { TransactionDetailDialog } from "@/components/transaction/transaction-detail-dialog";
 import { iconMap } from "@/lib/icons";
 import { TransactionListSkeleton } from "@/components/shared/skeletons";
+
+type TypeFilter = "all" | "expense" | "income" | "transfer";
+
+const TYPE_OPTIONS: { value: TypeFilter; label: string; activeClass: string }[] = [
+  { value: "all", label: "Semua", activeClass: "text-foreground" },
+  { value: "expense", label: "Keluar", activeClass: "text-expense" },
+  { value: "income", label: "Masuk", activeClass: "text-income" },
+  { value: "transfer", label: "Transfer", activeClass: "text-foreground" },
+];
+
+const chipClass =
+  "flex h-8! w-auto shrink-0 items-center whitespace-nowrap rounded-full border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted";
+const chipActiveClass = "border-mint-strong/30 bg-mint-soft text-mint-strong hover:bg-mint-soft";
 
 export default function AllTransactionsPageRoute() {
   // useSearchParams needs a Suspense boundary or the production build fails
@@ -63,7 +66,7 @@ function AllTransactionsPage() {
   const deleteTx = useDeleteTransaction();
   const restoreTx = useRestoreTransaction();
 
-  // Navigation states (initialized to the current financial month, cycle day 25)
+  // Navigation states (initialized to the current financial month)
   // Deep links: ?kategori=<id>[&bulan=YYYY-MM-01][&rentang=semua] — used by
   // "Lihat transaksi" on categories (Settings) and budgets.
   const [selectedMonth, setSelectedMonth] = React.useState(() => {
@@ -79,6 +82,11 @@ function AllTransactionsPage() {
     () => searchParams.get("kategori") || "all"
   );
   const [selectedTag, setSelectedTag] = React.useState<string | null>(null);
+  // ?tipe=expense|income|transfer — e.g. from the Beranda income/expense cards.
+  const [typeFilter, setTypeFilter] = React.useState<TypeFilter>(() => {
+    const tipe = searchParams.get("tipe");
+    return tipe === "expense" || tipe === "income" || tipe === "transfer" ? tipe : "all";
+  });
 
   // Dialog & Detail states
   const [selectedTxForDetail, setSelectedTxForDetail] = React.useState<TransactionWithDetails | null>(null);
@@ -178,8 +186,13 @@ function AllTransactionsPage() {
       result = result.filter((t) => t.tags?.includes(selectedTag));
     }
 
+    // Type filter
+    if (typeFilter !== "all") {
+      result = result.filter((t) => t.type === typeFilter);
+    }
+
     return result;
-  }, [transactions, searchQuery, selectedWalletId, selectedCategoryId, selectedCategory, selectedTag]);
+  }, [transactions, searchQuery, selectedWalletId, selectedCategoryId, selectedCategory, selectedTag, typeFilter]);
 
   // Totals for the current filter, shown when a category is picked.
   const filterTotals = React.useMemo(() => {
@@ -290,24 +303,23 @@ function AllTransactionsPage() {
     setSelectedWalletId("all");
     setSelectedCategoryId("all");
     setSelectedTag(null);
+    setTypeFilter("all");
     setAllTime(false);
-    toast.info("Filter pencarian direset");
   };
 
   const hasActiveFilters =
-    !!searchQuery || selectedWalletId !== "all" || selectedCategoryId !== "all" || !!selectedTag || allTime;
+    !!searchQuery ||
+    selectedWalletId !== "all" ||
+    selectedCategoryId !== "all" ||
+    !!selectedTag ||
+    typeFilter !== "all" ||
+    allTime;
+  const selectedWalletName = wallets.find((w) => w.id === selectedWalletId)?.name;
 
   return (
     <div className="space-y-5">
       {/* 1. Header with Back Link */}
       <div className="flex items-center gap-2">
-        <Link
-          href="/dashboard"
-          className="grid size-9 place-items-center rounded-full hover:bg-muted transition-colors"
-          aria-label="Kembali ke beranda"
-        >
-          <ArrowLeft className="size-4" />
-        </Link>
         <PageHeading title="Riwayat Transaksi" subtitle="Semua catatan keuangan keluarga" />
         <Link
           href="/calendar"
@@ -344,9 +356,14 @@ function AllTransactionsPage() {
         >
           <ChevronLeft className="size-5" />
         </Button>
-        <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
-          <Calendar className="size-4 text-mint-strong" />
-          <span>{activeMonthName}</span>
+        <div className="flex flex-col items-center">
+          <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
+            <Calendar className="size-4 text-mint-strong" />
+            <span>{activeMonthName}</span>
+          </div>
+          <span className="text-[10px] font-medium text-muted-foreground">
+            {financialMonthRangeLabel(selectedMonth)}
+          </span>
         </div>
         <Button
           variant="ghost"
@@ -359,110 +376,123 @@ function AllTransactionsPage() {
       </div>
       )}
 
-      {/* 3. Search & Filters Bar */}
-      <Card className="rounded-2xl border bg-card p-4 space-y-3">
-        {/* Search */}
+      {/* 3. Search + one row of filter chips (type, wallet, category, tags).
+          Compact so the list itself starts high on the screen. */}
+      <div className="space-y-2.5">
         <div className="relative">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
-            type="text"
-            placeholder="Cari transaksi..."
+            type="search"
+            placeholder="Cari catatan, kategori, nominal…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-background border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-mint-strong focus:border-mint-strong transition-all h-10"
+            className="w-full bg-card border rounded-xl pl-9 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-mint-strong focus:border-mint-strong transition-all h-10"
           />
         </div>
 
-        {/* Filters grid */}
-        <div className="grid grid-cols-2 gap-2">
-          {/* Wallet Selector */}
-          <div className="space-y-1">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block pl-1">
-              Dompet
-            </span>
-            <Select value={selectedWalletId} onValueChange={setSelectedWalletId}>
-              <SelectTrigger className="h-9 rounded-xl text-xs bg-muted/30 border-none">
-                <SelectValue placeholder="Semua Dompet" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Dompet</SelectItem>
-                {wallets.map((w) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    {w.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Category Selector */}
-          <div className="space-y-1">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block pl-1">
-              Kategori
-            </span>
-            <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
-              <SelectTrigger className="h-9 rounded-xl text-xs bg-muted/30 border-none">
-                <SelectValue placeholder="Semua Kategori" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Kategori</SelectItem>
-                {categories.map((c) => (
-                  <React.Fragment key={c.id}>
-                    <SelectItem value={c.id} className="font-semibold">
-                      {c.name}
-                    </SelectItem>
-                    {c.subcategories.map((sub) => (
-                      <SelectItem key={sub.id} value={sub.id} className="pl-6 text-muted-foreground">
-                        ↳ {sub.name}
-                      </SelectItem>
-                    ))}
-                  </React.Fragment>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="grid grid-cols-4 gap-1 rounded-xl bg-muted p-1">
+          {TYPE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              aria-pressed={typeFilter === opt.value}
+              onClick={() => setTypeFilter(opt.value)}
+              className={`rounded-lg py-1.5 text-xs font-semibold transition-all ${
+                typeFilter === opt.value
+                  ? `bg-card shadow-xs ${opt.activeClass}`
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
 
-        {/* Tag quick-filter row */}
-        {availableTags.length > 0 && (
-          <div className="space-y-1">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block pl-1">
-              Tag
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-0.5 scrollbar-none">
+          <Select value={selectedWalletId} onValueChange={(v) => v && setSelectedWalletId(v)}>
+            <SelectTrigger
+              aria-label="Filter dompet"
+              className={`${chipClass} ${selectedWalletId !== "all" ? chipActiveClass : ""}`}
+            >
+              {selectedWalletId !== "all" ? selectedWalletName ?? "Dompet" : "Semua dompet"}
+            </SelectTrigger>
+            <SelectContent position="popper">
+              <SelectItem value="all">Semua Dompet</SelectItem>
+              {wallets.map((w) => (
+                <SelectItem key={w.id} value={w.id}>
+                  {w.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedCategoryId} onValueChange={(v) => v && setSelectedCategoryId(v)}>
+            <SelectTrigger
+              aria-label="Filter kategori"
+              className={`${chipClass} ${selectedCategory ? chipActiveClass : ""}`}
+            >
+              {selectedCategory ? selectedCategory.name : "Semua kategori"}
+            </SelectTrigger>
+            <SelectContent position="popper" className="max-h-72">
+              <SelectItem value="all">Semua Kategori</SelectItem>
+              {categories.map((c) => (
+                <React.Fragment key={c.id}>
+                  <SelectItem value={c.id} className="font-semibold">
+                    {c.name}
+                  </SelectItem>
+                  {c.subcategories.map((sub) => (
+                    <SelectItem key={sub.id} value={sub.id} className="pl-6 text-muted-foreground">
+                      ↳ {sub.name}
+                    </SelectItem>
+                  ))}
+                </React.Fragment>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {availableTags.map((tag) => {
+            const active = selectedTag === tag;
+            return (
+              <button
+                key={tag}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setSelectedTag(active ? null : tag)}
+                className={`${chipClass} ${active ? chipActiveClass : ""}`}
+              >
+                #{tag}
+              </button>
+            );
+          })}
+
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className={`${chipClass} gap-1 border-dashed text-muted-foreground hover:text-expense`}
+            >
+              <FilterX className="size-3.5" />
+              Reset
+            </button>
+          )}
+        </div>
+
+        {/* What the current filter adds up to (the category card below has
+            its own, richer version). */}
+        {!selectedCategory && !loadingTx && (
+          <div className="flex items-center justify-between px-1 text-xs">
+            <span className="text-muted-foreground">{filterTotals.count} transaksi</span>
+            <span className="flex gap-3 font-semibold">
+              {filterTotals.income > 0 && (
+                <span className="text-income">+{formatCurrency(filterTotals.income)}</span>
+              )}
+              {filterTotals.expense > 0 && (
+                <span className="text-expense">−{formatCurrency(filterTotals.expense)}</span>
+              )}
             </span>
-            <div className="flex flex-wrap gap-1.5">
-              {availableTags.map((tag) => {
-                const active = selectedTag === tag;
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => setSelectedTag(active ? null : tag)}
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium transition-all active:scale-95 ${
-                      active
-                        ? "bg-mint-strong text-white"
-                        : "bg-muted/40 text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    #{tag}
-                  </button>
-                );
-              })}
-            </div>
           </div>
         )}
-
-        {/* Reset button if filters active */}
-        {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            onClick={resetFilters}
-            className="w-full text-xs text-muted-foreground hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/10 rounded-xl h-8 font-semibold flex items-center gap-1.5 transition-colors"
-          >
-            <FilterX className="size-3.5" />
-            Hapus Semua Filter
-          </Button>
-        )}
-      </Card>
+      </div>
 
       {/* Category summary: what this category adds up to in the shown range */}
       {selectedCategory && (

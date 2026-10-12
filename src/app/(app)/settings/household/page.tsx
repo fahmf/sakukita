@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import {
   useHouseholdMembers,
   useInvites,
@@ -11,6 +10,7 @@ import {
   useUpdateMemberRole,
 } from "@/hooks/use-households";
 import { useHousehold, canEdit } from "@/components/providers/household-provider";
+import { BackButton } from "@/components/shared/back-button";
 import { PageHeading, EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +32,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
-  ArrowLeft,
   Users,
   Copy,
   X,
@@ -128,13 +127,7 @@ export default function HouseholdSettingsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <Link
-          href="/settings"
-          className="grid size-9 place-items-center rounded-full hover:bg-muted transition-colors"
-          aria-label="Kembali ke pengaturan"
-        >
-          <ArrowLeft className="size-4" />
-        </Link>
+        <BackButton fallback="/more" />
         <PageHeading title={householdName} subtitle="Anggota & undangan" />
       </div>
 

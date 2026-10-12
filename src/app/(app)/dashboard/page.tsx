@@ -14,7 +14,12 @@ import { useBudgets } from "@/hooks/use-budgets";
 import { useCategories } from "@/hooks/use-categories";
 import { useDebts } from "@/hooks/use-debts";
 import { formatCurrency, formatRelative, formatDateShort } from "@/lib/format";
-import { currentFinancialMonth, financialMonthDateRange, shiftMonth } from "@/lib/financial-month";
+import {
+  currentFinancialMonth,
+  financialMonthDateRange,
+  financialMonthRangeLabel,
+  shiftMonth,
+} from "@/lib/financial-month";
 import { useUIStore } from "@/stores/ui-store";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -23,21 +28,6 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   ArrowRightLeft,
-  Banknote,
-  Utensils,
-  Car,
-  ShoppingBag,
-  Gift,
-  Heart,
-  Receipt,
-  CircleDot,
-  Briefcase,
-  TrendingUp,
-  Landmark,
-  Smartphone,
-  CreditCard,
-  PiggyBank,
-  Loader2,
   ChevronLeft,
   ChevronRight,
   Calendar,
@@ -51,6 +41,7 @@ import { TransactionDetailDialog } from "@/components/transaction/transaction-de
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { iconMap } from "@/lib/icons";
+import { computeBudgetUsage } from "@/lib/budget-usage";
 import { TransactionListSkeleton, BudgetCardSkeleton, NetWorthSkeleton } from "@/components/shared/skeletons";
 
 export default function DashboardPage() {
@@ -58,7 +49,7 @@ export default function DashboardPage() {
   const { data: walletBalances = [], isLoading: loadingBalances } = useWalletBalances();
 
   // Dynamic month selection state (initialized to the current financial month,
-  // whose cycle starts on day 25 of the previous calendar month)
+  // which follows the household cycle start day)
   const [selectedMonth, setSelectedMonth] = React.useState(() => currentFinancialMonth());
 
   // Captured once at mount so the "next 30 days" horizon stays stable across
@@ -117,6 +108,7 @@ export default function DashboardPage() {
 
   const { data: categories = [] } = useCategories();
   const { data: budgets = [], isLoading: loadingBudgets } = useBudgets(selectedMonth);
+  const { data: prevBudgets = [] } = useBudgets(shiftMonth(selectedMonth, -1));
   const { data: debts = [] } = useDebts();
   const { data: scheduledTx = [] } = useScheduledTransactions();
 
@@ -215,28 +207,25 @@ export default function DashboardPage() {
   }, [scheduledTx, debts, nowMs]);
 
   const budgetProgress = React.useMemo(() => {
+    const flat = categories.flatMap((p) => [p, ...p.subcategories]);
+    const prevMonth = shiftMonth(selectedMonth, -1);
+    const txs = [...transactions, ...prevTransactions];
     return budgets.map((b) => {
-      const cat = categories.find((c) => c.id === b.category_id);
-      let spent = 0;
-      transactions.forEach((t) => {
-        if (t.type === "expense" && t.category_id === b.category_id) {
-          spent += t.amount;
-        }
-      });
-      const progress = Math.min(100, Math.round((spent / b.amount) * 100));
-      const remaining = b.amount - spent;
+      const cat = flat.find((c) => c.id === b.category_id);
+      const prevBudget = prevBudgets.find((p) => p.category_id === b.category_id);
+      // Shared with the Budget page: subcategory spend and carry-over count.
+      const usage = computeBudgetUsage(b, prevBudget, categories, txs, prevMonth);
       return {
         id: b.id,
         name: cat?.name || "Kategori Lain",
-        iconStr: cat?.icon || "circle-dashed",
-        color: cat?.color || "#5FBF9A",
-        amount: b.amount,
-        spent,
-        progress,
-        remaining,
+        iconStr: cat?.icon || "🏷️",
+        percent: usage.percent,
+        progress: Math.min(100, usage.percent),
+        remaining: usage.remaining,
+        status: usage.status,
       };
     });
-  }, [budgets, categories, transactions]);
+  }, [budgets, prevBudgets, categories, transactions, prevTransactions, selectedMonth]);
 
   const activeMonthName = React.useMemo(() => {
     const [y, m] = selectedMonth.split("-").map(Number);
@@ -282,34 +271,42 @@ export default function DashboardPage() {
           variant="ghost"
           size="icon"
           onClick={handlePrevMonth}
+          aria-label="Bulan sebelumnya"
           className="size-9 rounded-xl hover:bg-muted"
         >
           <ChevronLeft className="size-5" />
         </Button>
-        <Link
-          href="/calendar"
-          title="Buka kalender transaksi"
-          aria-label="Buka kalender transaksi"
-          className="flex items-center gap-2 rounded-xl px-3 py-1.5 font-semibold text-foreground text-sm transition-colors hover:bg-muted active:scale-95"
-        >
-          <Calendar className="size-4 text-mint-strong" />
-          <span>{activeMonthName}</span>
-          <ChevronRight className="size-3.5 text-muted-foreground" />
-        </Link>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleNextMonth}
-          className="size-9 rounded-xl hover:bg-muted"
-        >
-          <ChevronRight className="size-5" />
-        </Button>
+        <div className="flex flex-col items-center">
+          <span className="font-semibold text-foreground text-sm">{activeMonthName}</span>
+          <span className="text-[10px] font-medium text-muted-foreground">
+            {financialMonthRangeLabel(selectedMonth)}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleNextMonth}
+            aria-label="Bulan berikutnya"
+            className="size-9 rounded-xl hover:bg-muted"
+          >
+            <ChevronRight className="size-5" />
+          </Button>
+          <Link
+            href="/calendar"
+            title="Buka kalender transaksi"
+            aria-label="Buka kalender transaksi"
+            className="grid size-9 place-items-center rounded-xl border bg-muted/30 text-mint-strong transition-colors hover:bg-muted"
+          >
+            <Calendar className="size-4" />
+          </Link>
+        </div>
       </div>
 
       {/* 2. Total Net Worth Monokrom Card */}
       <Link href="/wallets" className="block transition-all">
         <Card className="rounded-2xl border bg-card p-5 text-center space-y-1 hover:border-mint-strong/40 transition-all cursor-pointer">
-          <span className="text-xs text-muted-foreground font-medium">Saldo Total Keluarga</span>
+          <span className="text-xs text-muted-foreground font-medium">Saldo Keluarga Saat Ini</span>
           {loadingBalances ? (
             <NetWorthSkeleton />
           ) : (
@@ -341,48 +338,52 @@ export default function DashboardPage() {
 
       {/* 3. Income & Expense mini cards */}
       <div className="grid grid-cols-2 gap-3">
-        <Card className="rounded-2xl border bg-card p-4 space-y-1">
-          <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
-            <span className="grid size-5 place-items-center rounded-full bg-mint-soft text-mint-strong">
-              <ArrowUpRight className="size-3" />
-            </span>
-            Pemasukan
-          </div>
-          <p className="text-base font-bold text-income tracking-tight">
-            {loadingTx ? "..." : `+${formatCurrency(monthlyIncome).replace("Rp", "").trim()}`}
-          </p>
-        </Card>
-
-        <Card className="rounded-2xl border bg-card p-4 space-y-1">
-          <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
-            <span className="grid size-5 place-items-center rounded-full bg-red-50 dark:bg-red-950/20 text-expense">
-              <ArrowDownRight className="size-3" />
-            </span>
-            Pengeluaran
-          </div>
-          <p className="text-base font-bold text-expense tracking-tight">
-            {loadingTx ? "..." : `-${formatCurrency(monthlyExpense).replace("Rp", "").trim()}`}
-          </p>
-          {!loadingTx && expenseDelta && (
-            <p
-              className={`flex items-center gap-0.5 text-[10px] font-semibold ${
-                expenseDelta.pct > 0
-                  ? "text-expense"
-                  : expenseDelta.pct < 0
-                  ? "text-income"
-                  : "text-muted-foreground"
-              }`}
-            >
-              {expenseDelta.pct > 0 ? (
+        <Link href={`/transactions?bulan=${selectedMonth}&tipe=income`} className="block">
+          <Card className="h-full rounded-2xl border bg-card p-4 space-y-1 transition-colors hover:border-mint-strong/40">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
+              <span className="grid size-5 place-items-center rounded-full bg-mint-soft text-mint-strong">
                 <ArrowUpRight className="size-3" />
-              ) : expenseDelta.pct < 0 ? (
-                <ArrowDownRight className="size-3" />
-              ) : null}
-              {expenseDelta.pct > 0 ? "+" : ""}
-              {expenseDelta.pct}% vs bln lalu
+              </span>
+              Pemasukan
+            </div>
+            <p className="text-base font-bold text-income tracking-tight">
+              {loadingTx ? "..." : `+${formatCurrency(monthlyIncome).replace("Rp", "").trim()}`}
             </p>
-          )}
-        </Card>
+          </Card>
+        </Link>
+
+        <Link href={`/transactions?bulan=${selectedMonth}&tipe=expense`} className="block">
+          <Card className="h-full rounded-2xl border bg-card p-4 space-y-1 transition-colors hover:border-mint-strong/40">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
+              <span className="grid size-5 place-items-center rounded-full bg-red-50 dark:bg-red-950/20 text-expense">
+                <ArrowDownRight className="size-3" />
+              </span>
+              Pengeluaran
+            </div>
+            <p className="text-base font-bold text-expense tracking-tight">
+              {loadingTx ? "..." : `-${formatCurrency(monthlyExpense).replace("Rp", "").trim()}`}
+            </p>
+            {!loadingTx && expenseDelta && (
+              <p
+                className={`flex items-center gap-0.5 text-[10px] font-semibold ${
+                  expenseDelta.pct > 0
+                    ? "text-expense"
+                    : expenseDelta.pct < 0
+                    ? "text-income"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {expenseDelta.pct > 0 ? (
+                  <ArrowUpRight className="size-3" />
+                ) : expenseDelta.pct < 0 ? (
+                  <ArrowDownRight className="size-3" />
+                ) : null}
+                {expenseDelta.pct > 0 ? "+" : ""}
+                {expenseDelta.pct}% vs bln lalu
+              </p>
+            )}
+          </Card>
+        </Link>
       </div>
 
       {/* 3b. Upcoming & due (scheduled transactions + debts with a due date) */}
@@ -465,22 +466,43 @@ export default function DashboardPage() {
               </Button>
             </div>
           ) : (
-            budgetProgress.slice(0, 3).map((b) => {
-              const BIcon = iconMap[b.iconStr] || CircleDot;
+            // Most-used budgets first, so ones near or over the limit surface.
+            [...budgetProgress].sort((a, b) => b.percent - a.percent).slice(0, 3).map((b) => {
+              const BIcon = iconMap[b.iconStr];
               return (
                 <div key={b.id} className="space-y-1">
-                  <div className="flex justify-between text-xs font-medium">
-                    <span className="text-foreground flex items-center gap-1.5">
-                      <BIcon className="size-3.5" style={{ color: b.color }} /> {b.name}
+                  <div className="flex justify-between gap-2 text-xs font-medium">
+                    <span className="text-foreground flex min-w-0 items-center gap-1.5">
+                      {BIcon ? (
+                        <BIcon className="size-3.5 shrink-0" />
+                      ) : (
+                        <span className="text-sm leading-none select-none">{b.iconStr}</span>
+                      )}
+                      <span className="truncate">{b.name}</span>
                     </span>
-                    <span className="text-muted-foreground">
-                      {b.progress}% ({b.remaining >= 0 ? "Sisa" : "Over"} {formatCurrency(Math.abs(b.remaining)).replace("Rp", "").trim()})
+                    <span
+                      className={`shrink-0 ${
+                        b.status === "over"
+                          ? "font-semibold text-expense"
+                          : b.status === "near"
+                          ? "font-semibold text-amber-600 dark:text-amber-500"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {b.percent}% · {b.remaining >= 0 ? "Sisa" : "Lewat"}{" "}
+                      {formatCurrency(Math.abs(b.remaining)).replace("Rp", "").trim()}
                     </span>
                   </div>
                   <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${b.progress}%`, backgroundColor: b.color }}
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        b.status === "over"
+                          ? "bg-expense"
+                          : b.status === "near"
+                          ? "bg-amber-500"
+                          : "bg-mint-strong"
+                      }`}
+                      style={{ width: `${b.progress}%` }}
                     />
                   </div>
                 </div>
@@ -496,6 +518,12 @@ export default function DashboardPage() {
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Transaksi Terakhir
           </h2>
+          <Link
+            href={`/transactions?bulan=${selectedMonth}`}
+            className="text-xs text-mint-strong hover:underline"
+          >
+            Riwayat lengkap →
+          </Link>
         </div>
 
         {loadingTx ? (

@@ -33,37 +33,108 @@ import {
   ArrowRightLeft,
   Check,
   Camera,
-  Sparkles,
   Loader2,
   ChevronDown,
   ChevronUp,
   Trash2,
-  Utensils,
-  Car,
-  ShoppingBag,
-  Gift,
-  Heart,
-  Receipt,
-  CircleDot,
-  Briefcase,
   Keyboard,
   Tag,
   X,
 } from "lucide-react";
 import type { TransactionType } from "@/lib/supabase/types";
 import { compressImage } from "@/lib/image";
-import { jakartaDateKey, occurredAtForDate, todayJakarta } from "@/lib/financial-month";
+import {
+  financialMonthDateRangeAsDates,
+  financialMonthLabel,
+  jakartaDateKey,
+  occurredAtForDate,
+  shiftMonth,
+  todayJakarta,
+} from "@/lib/financial-month";
+import { db } from "@/lib/db/dexie";
+import { computeBudgetUsage, findApplicableBudget } from "@/lib/budget-usage";
+import { useHousehold } from "@/components/providers/household-provider";
+import type { HierarchicalCategory } from "@/hooks/use-categories";
 
 import { iconMap } from "@/lib/icons";
 
-// 4x5 Keypad layout keys definition
+// 4x4 keypad. "÷" and parentheses are rare for entering amounts and stay
+// available on a physical keyboard; the Save button replaces "OK".
 const keypadKeys = [
   "7", "8", "9", "⌫",
-  "4", "5", "6", "÷",
-  "1", "2", "3", "×",
-  "C", "0", "000", "-",
-  "(", ")", "+", "OK"
+  "4", "5", "6", "×",
+  "1", "2", "3", "-",
+  "000", "0", "C", "+",
 ];
+
+/** A category's icon: a mapped lucide icon name, else the stored emoji. */
+function CategoryIcon({
+  icon,
+  className,
+  fallback = "🏷️",
+}: {
+  icon: string | null | undefined;
+  className?: string;
+  fallback?: string;
+}) {
+  const Icon = icon ? iconMap[icon] : undefined;
+  if (Icon) return <Icon className={className} />;
+  return <span className="text-sm select-none leading-none">{icon || fallback}</span>;
+}
+
+/**
+ * Budget feedback for the toast after saving an expense, e.g. "Sisa budget
+ * Makanan: Rp 320.000". Reads straight from Dexie, which already holds the
+ * row just written. Returns null when the category has no budget that month.
+ */
+async function budgetFeedback(
+  householdId: string,
+  categoryId: string,
+  occurredAtIso: string,
+  tree: HierarchicalCategory[]
+): Promise<{ text: string; over: boolean } | null> {
+  const [y, m, d] = jakartaDateKey(occurredAtIso).split("-").map(Number);
+  const month = financialMonthLabel(y, m - 1, d);
+  const prevMonth = shiftMonth(month, -1);
+
+  const budgets = await db.budgets
+    .where("[household_id+period_month]")
+    .anyOf([
+      [householdId, month],
+      [householdId, prevMonth],
+    ])
+    .toArray();
+  const budget = findApplicableBudget(categoryId, tree, budgets, month);
+  if (!budget) return null;
+  const prevBudget = budgets.find(
+    (b) => b.period_month === prevMonth && b.category_id === budget.category_id
+  );
+
+  // A day of slack on each side covers the WIB/UTC offset; rows outside the
+  // two cycles are dropped by computeBudgetUsage.
+  const from = financialMonthDateRangeAsDates(prevMonth).start;
+  from.setDate(from.getDate() - 1);
+  const to = financialMonthDateRangeAsDates(month).end;
+  to.setDate(to.getDate() + 1);
+  const txs = (
+    await db.transactions
+      .where("[household_id+occurred_at]")
+      .between([householdId, from.toISOString()], [householdId, to.toISOString()], true, true)
+      .toArray()
+  ).filter((t) => !t.is_deleted && !t.is_scheduled);
+
+  const usage = computeBudgetUsage(budget, prevBudget, tree, txs, prevMonth);
+  const name =
+    tree.flatMap((p) => [p, ...p.subcategories]).find((c) => c.id === budget.category_id)?.name ??
+    "kategori ini";
+  if (usage.remaining < 0) {
+    return { text: `Budget ${name} terlewati ${formatCurrency(-usage.remaining)}`, over: true };
+  }
+  return {
+    text: `Sisa budget ${name}: ${formatCurrency(usage.remaining)} (${usage.percent}% terpakai)`,
+    over: false,
+  };
+}
 
 export function QuickAddSheet() {
   const { quickAddOpen, closeQuickAdd, editingTransaction } = useUIStore();
@@ -90,6 +161,7 @@ function QuickAddForm() {
     setLastCategory,
   } = useUIStore();
 
+  const { householdId } = useHousehold();
   const { data: wallets = [] } = useWallets();
   const { data: categoriesTree = [] } = useCategories();
   const { data: categoryUsage } = useCategoryUsage();
@@ -140,6 +212,7 @@ function QuickAddForm() {
     !!(editingTransaction?.receipt_items && editingTransaction.receipt_items.length > 0)
   );
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const formRef = React.useRef<HTMLFormElement>(null);
   const amountInputRef = React.useRef<HTMLInputElement>(null);
 
 
@@ -185,6 +258,25 @@ function QuickAddForm() {
     return last?.id || rankedCategories[0]?.id || available[0]?.id || "";
   }, [selectedCategoryId, categoriesTree, type, lastCategoryId, rankedCategories]);
 
+  // The chips only list the most-used categories; when the pick came from
+  // the full list, the "Lainnya" chip shows it instead.
+  const activeCategory = React.useMemo(
+    () =>
+      categoriesTree
+        .flatMap((p) => [p, ...p.subcategories])
+        .find((c) => c.id === activeCategoryId),
+    [categoriesTree, activeCategoryId]
+  );
+  const activeIsChip = activeCategories.some((c) => c.id === activeCategoryId);
+
+  // Date shortcuts (Jakarta calendar days).
+  const todayKey = todayJakarta();
+  const yesterdayKey = React.useMemo(() => {
+    const d = new Date(`${todayKey}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }, [todayKey]);
+
   // Handle keypad presses
   const handleKeypadPress = (key: string) => {
     // Subtle haptic tick on supported devices (mobile). No-op elsewhere.
@@ -226,7 +318,7 @@ function QuickAddForm() {
   React.useEffect(() => {
     const el = amountInputRef.current;
     if (el) {
-      el.setSelectionRange(amountExpr.length, amountExpr.length);
+      el.setSelectionRange(el.value.length, el.value.length);
       el.scrollLeft = el.scrollWidth;
     }
   }, [amountExpr]);
@@ -261,8 +353,9 @@ function QuickAddForm() {
         e.preventDefault();
         closeQuickAdd();
       } else if (key === "Enter") {
+        // Enter saves, like any form.
         e.preventDefault();
-        setShowKeypad(false);
+        formRef.current?.requestSubmit();
       }
     };
 
@@ -406,6 +499,21 @@ function QuickAddForm() {
     return result !== null && result > 0 ? result : 0;
   }, [amountExpr]);
 
+  // What the amount box shows: digit groups formatted ("25.000"), operators
+  // as typed symbols. The raw expression stays in state for parsing.
+  const amountDisplay = React.useMemo(
+    () =>
+      amountExpr
+        .replace(/\d+/g, (run) =>
+          // Keep leading zeros the user typed ("0" before "000") visible.
+          /^0\d/.test(run) ? run : Number(run).toLocaleString("id-ID")
+        )
+        .replace(/\*/g, "×")
+        .replace(/\//g, "÷")
+        .replace(/-/g, "−"),
+    [amountExpr]
+  );
+
   const isExpression = React.useMemo(() => {
     return /[+\-*/()]/.test(amountExpr);
   }, [amountExpr]);
@@ -515,7 +623,18 @@ function QuickAddForm() {
           tags: finalTags,
           receipt_items: scannedItems,
         });
-        toast.success(keepOpen ? "Tersimpan ✓ — lanjut catat berikutnya" : "Tersimpan ✓");
+        const title = keepOpen ? "Tersimpan ✓ — lanjut catat berikutnya" : "Tersimpan ✓";
+        const feedback =
+          type === "expense" && householdId && activeCategoryId && !isFutureDate
+            ? await budgetFeedback(householdId, activeCategoryId, occurredAtIso, categoriesTree).catch(
+                () => null
+              )
+            : null;
+        if (feedback?.over) {
+          toast.warning(title, { description: feedback.text });
+        } else {
+          toast.success(title, feedback ? { description: feedback.text } : undefined);
+        }
       }
 
       setLastWallet(activeWalletId);
@@ -537,57 +656,24 @@ function QuickAddForm() {
 
   return (
     <>
-      <DrawerHeader className="px-0 flex-shrink-0">
+      <DrawerHeader className="relative px-0 flex-shrink-0">
         <DrawerTitle className="text-center text-lg font-semibold">
           {editingTransaction ? "Ubah Catatan Keuangan" : "Tambah Catatan Keuangan"}
         </DrawerTitle>
+        <DrawerClose asChild>
+          <button
+            type="button"
+            aria-label="Tutup"
+            className="absolute right-0 top-1/2 -translate-y-1/2 grid size-9 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <X className="size-4" />
+          </button>
+        </DrawerClose>
       </DrawerHeader>
 
-      <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden min-h-0">
+      <form ref={formRef} onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Scrollable area above keypad */}
         <div className="flex-1 overflow-y-auto pr-0.5 space-y-4 pb-4 scrollbar-thin">
-          {/* Scan Struk AI Action Panel */}
-          {!editingTransaction && (
-            <div className="relative overflow-hidden rounded-2xl border border-mint-strong/20 bg-linear-to-r from-mint-soft/30 via-muted/40 to-mint-soft/20 p-3 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-mint-soft text-mint-strong">
-                  <Sparkles className="size-4 animate-pulse" />
-                </div>
-                <div className="space-y-0.5">
-                  <h4 className="text-xs font-semibold text-foreground">Scan Struk dengan AI</h4>
-                  <p className="text-[10px] text-muted-foreground">Isi nominal, kategori & catatan otomatis</p>
-                </div>
-              </div>
-              <Button
-                type="button"
-                disabled={isScanning}
-                onClick={handleScanClick}
-                size="sm"
-                className="h-8.5 rounded-lg bg-mint-strong px-3 text-xs font-medium text-white hover:bg-mint-strong/90 active:scale-95 transition-transform"
-              >
-                {isScanning ? (
-                  <>
-                    <Loader2 className="mr-1.5 size-3 animate-spin" />
-                    Memproses...
-                  </>
-                ) : (
-                  <>
-                    <Camera className="mr-1.5 size-3.5" />
-                    Ambil Foto
-                  </>
-                )}
-              </Button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-              />
-            </div>
-          )}
-
           {/* Quick-toggle Type Buttons */}
           <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">
             <button
@@ -626,10 +712,23 @@ function QuickAddForm() {
             </button>
           </div>
 
-          {/* Amount Display Input — readOnly on mobile, clickable to show Virtual Keypad */}
+          {/* Amount display — readOnly, driven by the keypad. Receipt scan sits
+              beside it as a shortcut rather than a banner above everything. */}
           <div className="space-y-1.5 rounded-2xl bg-card border px-4 py-3.5 text-center relative">
             <Label className="text-xs text-muted-foreground">Nominal (Rp)</Label>
-            <div className="relative flex items-center justify-center gap-1">
+            <div className="relative flex items-center justify-center gap-1 px-9">
+              {!editingTransaction && (
+                <button
+                  type="button"
+                  disabled={isScanning}
+                  onClick={handleScanClick}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 grid size-8 place-items-center rounded-lg text-mint-strong hover:bg-mint-soft/60 transition-colors disabled:opacity-60"
+                  title="Scan struk dengan AI"
+                  aria-label="Scan struk dengan AI"
+                >
+                  {isScanning ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
+                </button>
+              )}
               <span className="text-2xl font-bold text-muted-foreground select-none">Rp</span>
               <input
                 id="amount-display-input"
@@ -637,7 +736,7 @@ function QuickAddForm() {
                 type="text"
                 readOnly
                 placeholder="0"
-                value={amountExpr}
+                value={amountDisplay}
                 onClick={() => setShowKeypad(true)}
                 onFocus={(e) => {
                   const end = e.currentTarget.value.length;
@@ -650,11 +749,20 @@ function QuickAddForm() {
               <button
                 type="button"
                 onClick={() => setShowKeypad(!showKeypad)}
-                className="absolute right-0 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                title={showKeypad ? "Sembunyikan Keypad" : "Tampilkan Keypad"}
+                className="absolute right-0 top-1/2 -translate-y-1/2 grid size-8 place-items-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                title={showKeypad ? "Sembunyikan keypad" : "Tampilkan keypad"}
+                aria-label={showKeypad ? "Sembunyikan keypad" : "Tampilkan keypad"}
               >
                 <Keyboard className="size-4" />
               </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+              />
             </div>
             {/* Show real-time calculator evaluation */}
             {isExpression && parsedAmount > 0 && (
@@ -663,16 +771,20 @@ function QuickAddForm() {
               </p>
             )}
             {isExpression && parsedAmount === 0 && amountExpr !== "" && (
-              <p className="text-xs text-expense animate-pulse">
-                Mengetik rumus...
+              <p className="text-xs text-muted-foreground">
+                Lanjutkan rumus…
               </p>
+            )}
+            {isScanning && (
+              <p className="text-xs text-muted-foreground">Membaca struk…</p>
             )}
           </div>
 
-          {/* Category Chips (Expense / Income only) */}
-          {type !== "transfer" && activeCategories.length > 0 && (
+          {/* Category chips — the most-used ones, plus a "Lainnya" chip that
+              opens the full list (one picker instead of chips + a dropdown). */}
+          {type !== "transfer" && (
             <div className="space-y-2">
-              <Label className="text-xs font-semibold text-muted-foreground">Kategori Cepat</Label>
+              <Label className="text-xs font-semibold text-muted-foreground">Kategori</Label>
               <div className="flex flex-wrap gap-2">
                 {activeCategories.map((cat) => {
                   const isActive = activeCategoryId === cat.id;
@@ -680,6 +792,7 @@ function QuickAddForm() {
                     <button
                       key={cat.id}
                       type="button"
+                      aria-pressed={isActive}
                       onClick={() => {
                         setSelectedCategoryId(cat.id);
                         setShowKeypad(false);
@@ -692,22 +805,71 @@ function QuickAddForm() {
                     >
                       {isActive ? (
                         <Check className="size-3" />
-                      ) : iconMap[cat.icon || ""] ? (
-                        React.createElement(iconMap[cat.icon || ""], { className: "size-3" })
                       ) : (
-                        <span className="text-sm select-none leading-none">{cat.icon || "🏷️"}</span>
+                        <CategoryIcon icon={cat.icon} className="size-3" />
                       )}
                       <span>{cat.name}</span>
                     </button>
                   );
                 })}
+
+                <Select
+                  value={activeCategoryId}
+                  onValueChange={(val) => {
+                    // Radix fires onValueChange("") on mount (its hidden native
+                    // <select>); no item has an empty value, so ignore it.
+                    if (!val) return;
+                    setSelectedCategoryId(val);
+                    setShowKeypad(false);
+                  }}
+                >
+                  <SelectTrigger
+                    aria-label="Pilih kategori lain"
+                    className={`h-auto! rounded-full px-3 py-1.5 text-xs font-medium ${
+                      activeCategory && !activeIsChip
+                        ? "bg-mint-soft text-mint-strong border-mint-strong/30"
+                        : "bg-card text-foreground border-dashed"
+                    }`}
+                  >
+                    {activeCategory && !activeIsChip ? (
+                      <span className="flex items-center gap-1.5">
+                        <Check className="size-3" />
+                        {activeCategory.name}
+                      </span>
+                    ) : (
+                      <span>Lainnya…</span>
+                    )}
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="max-h-72">
+                    {categoriesTree
+                      .filter((p) => p.kind === type)
+                      .map((parent) => (
+                        <React.Fragment key={parent.id}>
+                          <SelectItem value={parent.id} className="font-semibold text-foreground">
+                            <span className="flex items-center gap-1.5">
+                              <CategoryIcon icon={parent.icon} className="size-4" fallback="📁" />
+                              <span>{parent.name}</span>
+                            </span>
+                          </SelectItem>
+                          {parent.subcategories.map((child) => (
+                            <SelectItem key={child.id} value={child.id} className="pl-6 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <span>↳</span>
+                                <CategoryIcon icon={child.icon} className="size-3" />
+                                <span>{child.name}</span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </React.Fragment>
+                      ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           )}
 
-          {/* Dompet Picker & Category Dropdown Grid */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* Wallet Source Picker */}
+          {/* Wallet(s) */}
+          <div className={type === "transfer" ? "grid grid-cols-2 gap-3" : ""}>
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs font-semibold text-muted-foreground">
                 {type === "transfer" ? "Dari Dompet" : "Dompet"}
@@ -715,11 +877,17 @@ function QuickAddForm() {
               <Select
                 value={activeWalletId}
                 onValueChange={(val) => {
+                  // Radix fires onValueChange("") on mount (its hidden native
+                  // <select>); no item has an empty value, so ignore it.
+                  if (!val) return;
                   setSelectedWalletId(val);
+                  // The destination list hides the source wallet; drop a
+                  // destination that just became the source.
+                  if (val === selectedToWalletId) setSelectedToWalletId("");
                   setShowKeypad(false);
                 }}
               >
-                <SelectTrigger className="h-10 bg-card border rounded-xl">
+                <SelectTrigger className="h-10 w-full bg-card border rounded-xl">
                   <SelectValue placeholder="Pilih dompet" />
                 </SelectTrigger>
                 <SelectContent>
@@ -732,71 +900,29 @@ function QuickAddForm() {
               </Select>
             </div>
 
-            {/* Wallet Destination (Transfers) or Kategori Dropdown */}
-            {type === "transfer" ? (
+            {type === "transfer" && (
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground">Ke Dompet</Label>
                 <Select
                   value={selectedToWalletId}
                   onValueChange={(val) => {
+                    // Radix fires onValueChange("") on mount (its hidden native
+                    // <select>); no item has an empty value, so ignore it.
+                    if (!val) return;
                     setSelectedToWalletId(val);
                     setShowKeypad(false);
                   }}
                 >
-                  <SelectTrigger className="h-10 bg-card border rounded-xl">
+                  <SelectTrigger className="h-10 w-full bg-card border rounded-xl">
                     <SelectValue placeholder="Pilih dompet" />
                   </SelectTrigger>
                   <SelectContent>
-                    {wallets.map((w) => (
-                      <SelectItem key={w.id} value={w.id}>
-                        {w.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground">Semua Kategori</Label>
-                <Select
-                  value={activeCategoryId}
-                  onValueChange={(val) => {
-                    setSelectedCategoryId(val);
-                    setShowKeypad(false);
-                  }}
-                >
-                  <SelectTrigger className="h-10 bg-card border rounded-xl">
-                    <SelectValue placeholder="Pilih kategori" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categoriesTree
-                      .filter((p) => p.kind === type)
-                      .map((parent) => (
-                        <React.Fragment key={parent.id}>
-                          <SelectItem value={parent.id} className="font-semibold text-foreground">
-                            <span className="flex items-center gap-1.5">
-                              {iconMap[parent.icon || ""] ? (
-                                React.createElement(iconMap[parent.icon || ""], { className: "size-4" })
-                              ) : (
-                                <span className="text-sm select-none leading-none">{parent.icon || "📁"}</span>
-                              )}
-                              <span>{parent.name}</span>
-                            </span>
-                          </SelectItem>
-                          {parent.subcategories.map((child) => (
-                            <SelectItem key={child.id} value={child.id} className="pl-6 text-xs text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <span>↳</span>
-                                {iconMap[child.icon || ""] ? (
-                                  React.createElement(iconMap[child.icon || ""], { className: "size-3" })
-                                ) : (
-                                  <span className="text-xs select-none leading-none">{child.icon || "🏷️"}</span>
-                                )}
-                                <span>{child.name}</span>
-                              </span>
-                            </SelectItem>
-                          ))}
-                        </React.Fragment>
+                    {wallets
+                      .filter((w) => w.id !== activeWalletId)
+                      .map((w) => (
+                        <SelectItem key={w.id} value={w.id}>
+                          {w.name}
+                        </SelectItem>
                       ))}
                   </SelectContent>
                 </Select>
@@ -804,45 +930,72 @@ function QuickAddForm() {
             )}
           </div>
 
-          {/* Date & Note Grid */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* Occurred At Date Picker */}
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground">
-                Tanggal
-                {isFutureDate && (
-                  <span className="ml-1 rounded-full bg-mint-soft px-1.5 py-0.5 text-[10px] font-semibold text-mint-strong">
-                    Terjadwal
-                  </span>
-                )}
-              </Label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          {/* Date: one-tap Hari ini / Kemarin, or any date */}
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-semibold text-muted-foreground">
+              Tanggal
+              {isFutureDate && (
+                <span className="ml-1 rounded-full bg-mint-soft px-1.5 py-0.5 text-[10px] font-semibold text-mint-strong">
+                  Terjadwal
+                </span>
+              )}
+            </Label>
+            <div className="flex items-center gap-2">
+              {[
+                { label: "Hari ini", value: todayKey },
+                { label: "Kemarin", value: yesterdayKey },
+              ].map((opt) => (
+                <button
+                  key={opt.label}
+                  type="button"
+                  aria-pressed={occurredAt === opt.value}
+                  onClick={() => {
+                    setOccurredAt(opt.value);
+                    setShowKeypad(false);
+                  }}
+                  className={`h-10 shrink-0 rounded-xl border px-3 text-xs font-medium transition-all active:scale-95 ${
+                    occurredAt === opt.value
+                      ? "bg-mint-soft text-mint-strong border-mint-strong/30"
+                      : "bg-card text-foreground hover:bg-muted"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+              <div className="relative min-w-0 flex-1">
+                <Calendar className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   type="date"
+                  aria-label="Pilih tanggal"
                   value={occurredAt}
                   onChange={(e) => setOccurredAt(e.target.value)}
                   onFocus={() => setShowKeypad(false)}
-                  className="h-10 pl-9 bg-card border rounded-xl pr-2"
+                  className={`h-10 pl-9 pr-2 bg-card border rounded-xl ${
+                    occurredAt !== todayKey && occurredAt !== yesterdayKey
+                      ? "border-mint-strong/40 text-mint-strong"
+                      : "text-muted-foreground"
+                  }`}
                   required
                 />
               </div>
             </div>
+          </div>
 
-            {/* Note text input */}
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground">Catatan</Label>
-              <div className="relative">
-                <FileText className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Beli sayur, susu, dsb."
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  onFocus={() => setShowKeypad(false)}
-                  className="h-10 pl-9 bg-card border rounded-xl"
-                />
-              </div>
+          {/* Note — full width so a real description fits */}
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-semibold text-muted-foreground">
+              Catatan <span className="font-normal text-muted-foreground/70">(opsional)</span>
+            </Label>
+            <div className="relative">
+              <FileText className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Beli sayur, susu, dsb."
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                onFocus={() => setShowKeypad(false)}
+                className="h-10 pl-9 bg-card border rounded-xl"
+              />
             </div>
           </div>
 
@@ -944,16 +1097,15 @@ function QuickAddForm() {
           )}
         </div>
 
-        {/* Custom Fixed Virtual Keyboard Area */}
+        {/* Virtual keypad (4×4). Parentheses and ÷ stay available on a
+            physical keyboard; a hidden keypad is reopened by tapping the amount. */}
         {showKeypad && (
           <div className="grid grid-cols-4 gap-1.5 bg-muted/40 p-2.5 rounded-2xl border border-border animate-in slide-in-from-bottom duration-200 flex-shrink-0 mb-3 select-none">
             {keypadKeys.map((key) => {
-              const isOperator = ["÷", "×", "-", "+", "(", ")"].includes(key);
+              const isOperator = ["×", "-", "+"].includes(key);
               let btnClass = "h-11 rounded-xl font-bold text-sm transition-all active:scale-95 duration-75 flex items-center justify-center ";
 
-              if (key === "OK") {
-                btnClass += "bg-mint-strong text-white hover:bg-mint-strong/90";
-              } else if (key === "⌫" || key === "C") {
+              if (key === "⌫" || key === "C") {
                 btnClass += "bg-red-50 text-expense dark:bg-red-950/20 dark:text-red-400 hover:bg-red-100/50";
               } else if (isOperator) {
                 btnClass += "bg-muted text-foreground hover:bg-muted/80";
@@ -967,31 +1119,24 @@ function QuickAddForm() {
                   type="button"
                   onClick={() => handleKeypadPress(key)}
                   className={btnClass}
+                  aria-label={key === "⌫" ? "Hapus satu digit" : key === "C" ? "Hapus semua" : undefined}
                 >
-                  {key === "⌫" ? <span className="text-base select-none">⌫</span> : key}
+                  {key === "⌫" ? <span className="text-base select-none">⌫</span> : key === "-" ? "−" : key}
                 </button>
               );
             })}
           </div>
         )}
 
-        {/* Fast batch entry toggle (new transactions only) */}
-        {!editingTransaction && (
-          <label className="flex items-center justify-between gap-2 px-1 pb-2 flex-shrink-0 cursor-pointer select-none">
-            <span className="text-xs font-medium text-muted-foreground">
-              Simpan &amp; tambah lagi
-            </span>
-            <Switch checked={keepOpen} onCheckedChange={setKeepOpen} />
-          </label>
-        )}
-
-        {/* Action Trigger Buttons */}
-        <DrawerFooter className="px-0 pt-3 pb-1 flex flex-row gap-2 flex-shrink-0 border-t bg-background">
-          <DrawerClose asChild>
-            <Button type="button" variant="outline" className="flex-1 h-12 rounded-xl">
-              Batal
-            </Button>
-          </DrawerClose>
+        {/* Action row: batch-entry toggle + one full-width save. Closing is the
+            X in the header or a swipe down. */}
+        <DrawerFooter className="px-0 pt-3 pb-1 flex flex-row items-center gap-3 flex-shrink-0 border-t bg-background">
+          {!editingTransaction && (
+            <label className="flex shrink-0 cursor-pointer select-none flex-col items-center gap-1">
+              <Switch checked={keepOpen} onCheckedChange={setKeepOpen} aria-label="Simpan lalu tambah lagi" />
+              <span className="text-[10px] font-medium leading-none text-muted-foreground">Tambah lagi</span>
+            </label>
+          )}
           <Button
             type="submit"
             disabled={createTx.isPending || updateTx.isPending || parsedAmount <= 0}
@@ -1001,6 +1146,8 @@ function QuickAddForm() {
               "Menyimpan..."
             ) : editingTransaction ? (
               "Simpan Perubahan"
+            ) : parsedAmount > 0 ? (
+              `Simpan ${formatCurrency(parsedAmount)}`
             ) : (
               "Simpan Transaksi"
             )}

@@ -2,6 +2,7 @@
 
 import { createContext, useContext } from "react";
 import type { MemberRole } from "@/lib/supabase/types";
+import { setCycleStartDay } from "@/lib/financial-month";
 
 export interface HouseholdContextValue {
   userId: string;
@@ -9,6 +10,10 @@ export interface HouseholdContextValue {
   householdName: string;
   displayName: string;
   role: MemberRole;
+  /** Household owner — the only member RLS lets update the household row. */
+  isOwner: boolean;
+  /** Financial-month start day (1–28). */
+  cycleStartDay: number;
 }
 
 const HouseholdContext = createContext<HouseholdContextValue | null>(null);
@@ -20,6 +25,9 @@ export function HouseholdProvider({
   value: HouseholdContextValue;
   children: React.ReactNode;
 }) {
+  // Set during render (not in an effect) so children computing month ranges
+  // in this same render already see the household's day.
+  setCycleStartDay(value.cycleStartDay);
   return (
     <HouseholdContext.Provider value={value}>
       {children}

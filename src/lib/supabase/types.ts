@@ -35,6 +35,8 @@ export interface Household {
   name: string;
   owner_id: string;
   currency: string;
+  /** Financial-month start day, 1–28 (migration 0015; default 25). */
+  cycle_start_day: number;
   created_at: string;
 }
 
@@ -174,7 +176,7 @@ export interface Database {
   public: {
     Tables: {
       profiles: DbTable<Profile, "created_at" | "updated_at" | "display_name" | "avatar_url" | "active_household_id">;
-      households: DbTable<Household, "id" | "created_at" | "currency">;
+      households: DbTable<Household, "id" | "created_at" | "currency" | "cycle_start_day">;
       household_members: DbTable<HouseholdMember, "joined_at" | "role">;
       wallets: DbTable<
         Wallet,

@@ -1,16 +1,37 @@
 /**
  * Financial-month (budget cycle) helpers.
  *
- * The household's accounting month does NOT start on the 1st — it starts on
- * `CYCLE_START_DAY`. Any transaction dated on/after that day counts toward the
- * NEXT calendar month. With day 25, a transaction on 25 May belongs to the
- * "June" cycle, and the June cycle spans 25 May – 24 June.
+ * A household's accounting month starts on its cycle start day
+ * (`households.cycle_start_day`, 1–28, default 25). With day 25, any
+ * transaction dated on/after the 25th counts toward the NEXT calendar month:
+ * 25 May belongs to the "June" cycle, which spans 25 May – 24 June. Day 1
+ * means plain calendar months.
  *
  * Month "labels" stay as "YYYY-MM-01" strings (matching how budgets are stored
  * in `period_month`) and name the calendar month that contains the cycle's end.
- * Change `CYCLE_START_DAY` here to move the cycle boundary everywhere.
+ *
+ * The active household's day is set once by HouseholdProvider via
+ * `setCycleStartDay`, so every helper here follows it without threading it
+ * through each call site.
  */
-export const CYCLE_START_DAY = 25;
+export const DEFAULT_CYCLE_START_DAY = 25;
+
+let cycleStartDay = DEFAULT_CYCLE_START_DAY;
+
+/** Clamp to the supported 1–28 range (every month has a 28th). */
+export function normalizeCycleStartDay(day: unknown): number {
+  const n = Math.trunc(Number(day));
+  return Number.isFinite(n) && n >= 1 && n <= 28 ? n : DEFAULT_CYCLE_START_DAY;
+}
+
+/** Set the active household's cycle start day. */
+export function setCycleStartDay(day: unknown): void {
+  cycleStartDay = normalizeCycleStartDay(day);
+}
+
+export function getCycleStartDay(): number {
+  return cycleStartDay;
+}
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -24,7 +45,9 @@ function label(year: number, month0: number): string {
 
 /** The financial-month label a calendar date (year, 0-indexed month, day) falls into. */
 export function financialMonthLabel(year: number, month0: number, day: number): string {
-  const shifted = day >= CYCLE_START_DAY ? month0 + 1 : month0;
+  // Day 1 cycles are calendar months; otherwise the start day rolls into
+  // the next month's cycle.
+  const shifted = cycleStartDay > 1 && day >= cycleStartDay ? month0 + 1 : month0;
   return label(year, shifted);
 }
 
@@ -69,20 +92,27 @@ export function financialMonthDateRange(monthStr: string): {
   startDate: string;
   endDate: string;
 } {
-  const [y, m] = monthStr.split("-").map(Number); // m is 1-indexed
-  const start = new Date(y, m - 2, CYCLE_START_DAY); // previous month, day 25
-  const end = new Date(y, m - 1, CYCLE_START_DAY - 1); // this month, day 24
+  const { start, end } = financialMonthDateRangeAsDates(monthStr);
   return {
     startDate: `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`,
     endDate: `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`,
   };
 }
 
-/** Same range as Date objects (local time), for in-memory comparisons. */
-export function financialMonthDateRangeAsDates(monthStr: string): { start: Date; end: Date } {
-  const [y, m] = monthStr.split("-").map(Number);
-  const start = new Date(y, m - 2, CYCLE_START_DAY, 0, 0, 0, 0);
-  const end = new Date(y, m - 1, CYCLE_START_DAY - 1, 23, 59, 59, 999);
+/**
+ * Same range as Date objects (local time), for in-memory comparisons. `day`
+ * overrides the active cycle start day (e.g. to preview a new setting).
+ */
+export function financialMonthDateRangeAsDates(
+  monthStr: string,
+  day: number = cycleStartDay
+): { start: Date; end: Date } {
+  const [y, m] = monthStr.split("-").map(Number); // m is 1-indexed
+  // Day 25: 25th of the previous month .. 24th of this one. Day 1: the 1st
+  // .. last day of this month (day 0 of the next month).
+  const startMonth0 = day > 1 ? m - 2 : m - 1;
+  const start = new Date(y, startMonth0, day, 0, 0, 0, 0);
+  const end = new Date(y, startMonth0 + 1, day - 1, 23, 59, 59, 999);
   return { start, end };
 }
 
@@ -125,4 +155,15 @@ export function isInFinancialMonth(occurredAt: string, monthStr: string): boolea
 export function occurredAtForDate(dateStr: string): string {
   if (dateStr === todayJakarta()) return new Date().toISOString();
   return new Date(`${dateStr}T00:00:00Z`).toISOString();
+}
+
+/**
+ * Short human label for the dates a financial month covers, e.g.
+ * "25 Sep – 24 Okt". Shown under month navigators so a label like "Oktober"
+ * doesn't read as the calendar month.
+ */
+export function financialMonthRangeLabel(monthStr: string, day: number = cycleStartDay): string {
+  const { start, end } = financialMonthDateRangeAsDates(monthStr, day);
+  const fmt = (d: Date) => d.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+  return `${fmt(start)} – ${fmt(end)}`;
 }

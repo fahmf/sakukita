@@ -7,6 +7,7 @@ import type { TransactionWithDetails } from "@/hooks/use-transactions";
 import { useUIStore } from "@/stores/ui-store";
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
 import { formatCurrency } from "@/lib/format";
+import { BackButton } from "@/components/shared/back-button";
 import { PageHeading } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,7 +16,6 @@ import { TransactionListSkeleton } from "@/components/shared/skeletons";
 import { iconMap } from "@/lib/icons";
 import { toast } from "sonner";
 import {
-  ArrowLeft,
   ArrowRightLeft,
   ChevronLeft,
   ChevronRight,
@@ -154,13 +154,7 @@ export default function CalendarPage() {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center gap-2">
-        <Link
-          href="/dashboard"
-          className="grid size-9 place-items-center rounded-full hover:bg-muted transition-colors"
-          aria-label="Kembali ke beranda"
-        >
-          <ArrowLeft className="size-4" />
-        </Link>
+        <BackButton fallback="/transactions" />
         <PageHeading title="Kalender" subtitle="Transaksi per hari" />
         <Link
           href="/transactions"

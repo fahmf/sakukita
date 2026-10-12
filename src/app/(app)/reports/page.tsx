@@ -85,8 +85,8 @@ export default function ReportsPage() {
   const { data: transactions = [], isLoading: loadingTxs } = useTransactions();
 
   // Helper: Get start and end dates based on period filter.
-  // Boundaries follow the financial cycle (starts on day 25), so e.g. "this
-  // month" spans the 25th of last month through the 24th of this month.
+  // Boundaries follow the household's financial cycle, so with the default
+  // start day 25 "this month" spans the 25th of last month through the 24th.
   const periodDates = React.useMemo(() => {
     const nowLabel = currentFinancialMonth();
     const thisMonth = financialMonthDateRangeAsDates(nowLabel);

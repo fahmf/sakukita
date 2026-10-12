@@ -1,12 +1,12 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import {
   useTrashedTransactions,
   useRestoreTransaction,
   usePurgeTransaction,
 } from "@/hooks/use-transactions";
+import { BackButton } from "@/components/shared/back-button";
 import { PageHeading, EmptyState } from "@/components/shared/empty-state";
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { formatCurrency, formatRelative, formatDate } from "@/lib/format";
-import { ArrowLeft, Trash2, Undo2, Loader2 } from "lucide-react";
+import { Trash2, Undo2 } from "lucide-react";
 import { TransactionListSkeleton } from "@/components/shared/skeletons";
 
 export default function TrashPage() {
@@ -66,15 +66,9 @@ export default function TrashPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <Link
-          href="/settings"
-          className="grid size-9 place-items-center rounded-full hover:bg-muted transition-colors"
-          aria-label="Kembali ke pengaturan"
-        >
-          <ArrowLeft className="size-4" />
-        </Link>
+        <BackButton fallback="/more" />
         <PageHeading
-          title="Recycle Bin"
+          title="Tempat Sampah"
           subtitle="Transaksi terhapus disimpan 30 hari sebelum dihapus permanen otomatis"
         />
       </div>
