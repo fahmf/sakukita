@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useGoals, useCreateGoal, useUpdateGoal, useDeleteGoal } from "@/hooks/use-goals";
 import type { SavingsGoal } from "@/lib/supabase/types";
 import { useHousehold } from "@/components/providers/household-provider";
@@ -43,8 +43,23 @@ const presetColors = [
   "#A5E8C8", // Soft Emerald
 ];
 
+const presetEmojis = ["🎯", "🏦", "🚗", "🏠", "📈", "✈️", "💍", "💻", "💼", "💰"];
+
+/** "Butuh Rp X/bln" hint: what to save per month to hit the target date. */
+function monthlyNeeded(goal: SavingsGoal): { text: string; urgent: boolean } | null {
+  const remaining = goal.target_amount - goal.current_amount;
+  if (remaining <= 0 || !goal.target_date) return null;
+  const target = new Date(goal.target_date);
+  const today = new Date();
+  const months =
+    (target.getFullYear() - today.getFullYear()) * 12 + (target.getMonth() - today.getMonth());
+  if (months <= 0) return { text: `Kurang ${formatCurrency(remaining)} bulan ini`, urgent: true };
+  return { text: `Butuh ${formatCurrency(Math.ceil(remaining / months))}/bln`, urgent: false };
+}
+
 export default function SavingsGoalsPage() {
   useHousehold();
+  const router = useRouter();
   const { data: goals = [], isLoading: loadingGoals } = useGoals();
   const createGoal = useCreateGoal();
   const updateGoal = useUpdateGoal();
@@ -65,6 +80,7 @@ export default function SavingsGoalsPage() {
   const [currentAmount, setCurrentAmount] = React.useState("");
   const [targetDate, setTargetDate] = React.useState("");
   const [selectedColor, setSelectedColor] = React.useState("#B8E6D3");
+  const [selectedEmoji, setSelectedEmoji] = React.useState(presetEmojis[0]);
   const [addAmount, setAddAmount] = React.useState("");
 
   // Calculate stats
@@ -86,6 +102,7 @@ export default function SavingsGoalsPage() {
     setCurrentAmount("0");
     setTargetDate("");
     setSelectedColor(presetColors[0]);
+    setSelectedEmoji(presetEmojis[0]);
     setGoalOpen(true);
   };
 
@@ -100,6 +117,7 @@ export default function SavingsGoalsPage() {
     setCurrentAmount(String(goal.current_amount));
     setTargetDate(goal.target_date || "");
     setSelectedColor(goal.color || presetColors[0]);
+    setSelectedEmoji(goal.icon || presetEmojis[0]);
     setGoalOpen(true);
   };
 
@@ -143,6 +161,7 @@ export default function SavingsGoalsPage() {
           target_amount: targetVal,
           current_amount: currentVal,
           target_date: targetDate || null,
+          icon: selectedEmoji,
           color: selectedColor,
         });
         toast.success("Target tabungan berhasil diperbarui!");
@@ -152,6 +171,7 @@ export default function SavingsGoalsPage() {
           target_amount: targetVal,
           current_amount: currentVal,
           target_date: targetDate || null,
+          icon: selectedEmoji,
           color: selectedColor,
         });
         toast.success("Target tabungan berhasil dibuat!");
@@ -212,13 +232,16 @@ export default function SavingsGoalsPage() {
     <div className="space-y-6">
       {/* 1. Header with back link */}
       <div className="flex items-center gap-2">
-        <Link
-          href="/settings"
+        {/* Reached from both Budget and Pengaturan — go back to wherever the
+            user came from. */}
+        <button
+          type="button"
+          onClick={() => (window.history.length > 1 ? router.back() : router.push("/budgets"))}
           className="grid size-9 place-items-center rounded-full hover:bg-muted transition-colors"
-          aria-label="Kembali ke pengaturan"
+          aria-label="Kembali"
         >
           <ArrowLeft className="size-4" />
-        </Link>
+        </button>
         <PageHeading title="Tabungan Masa Depan" subtitle="Target impian & rencana tabungan" />
       </div>
 
@@ -302,6 +325,7 @@ export default function SavingsGoalsPage() {
                 : 0;
               const isCompleted = goal.current_amount >= goal.target_amount;
               const goalColor = goal.color || "#B8E6D3";
+              const needed = isCompleted ? null : monthlyNeeded(goal);
 
               // Format date nicely
               let formattedDate = null;
@@ -321,7 +345,11 @@ export default function SavingsGoalsPage() {
                         className="grid size-10 shrink-0 place-items-center rounded-xl font-semibold"
                         style={{ backgroundColor: `${goalColor}40`, color: goalColor }}
                       >
-                        <Award className="size-5" />
+                        {goal.icon ? (
+                          <span className="text-xl leading-none select-none">{goal.icon}</span>
+                        ) : (
+                          <Award className="size-5" />
+                        )}
                       </span>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
@@ -336,9 +364,20 @@ export default function SavingsGoalsPage() {
                           )}
                         </div>
                         {formattedDate && (
-                          <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5 font-medium">
+                          <p className="text-[10px] text-muted-foreground flex flex-wrap items-center gap-1 mt-0.5 font-medium">
                             <Calendar className="size-3" />
                             Target: {formattedDate}
+                            {needed && (
+                              <span
+                                className={
+                                  needed.urgent
+                                    ? "font-semibold text-amber-600 dark:text-amber-500"
+                                    : "font-semibold text-mint-strong"
+                                }
+                              >
+                                · {needed.text}
+                              </span>
+                            )}
                           </p>
                         )}
                       </div>
@@ -465,6 +504,27 @@ export default function SavingsGoalsPage() {
                   onChange={(e) => setTargetDate(e.target.value)}
                   className="h-11 rounded-xl"
                 />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label>Ikon</Label>
+                <div className="flex flex-wrap gap-2">
+                  {presetEmojis.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => setSelectedEmoji(emoji)}
+                      aria-pressed={selectedEmoji === emoji}
+                      className={`size-9 rounded-xl border text-lg flex items-center justify-center transition-all ${
+                        selectedEmoji === emoji
+                          ? "bg-muted border-foreground dark:border-white"
+                          : "bg-card border-transparent hover:bg-muted/50"
+                      }`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Color Preset Picker */}
