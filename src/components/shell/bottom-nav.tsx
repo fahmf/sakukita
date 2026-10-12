@@ -2,22 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ReceiptText, PiggyBank, LayoutGrid, Plus } from "lucide-react";
+import { Home, ReceiptText, BarChart3, LayoutGrid, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
 
 // Each tab also owns the sub-pages reached from it, so the bar keeps showing
-// where the user is (e.g. Tabungan lights up "Rencana").
+// where the user is (e.g. Tabungan lights up "Lainnya").
 const tabs = [
   { href: "/dashboard", label: "Beranda", icon: Home, match: ["/dashboard"] },
   { href: "/transactions", label: "Riwayat", icon: ReceiptText, match: ["/transactions", "/calendar"] },
-  { href: "/budgets", label: "Rencana", icon: PiggyBank, match: ["/budgets", "/savings", "/debts"] },
+  { href: "/reports", label: "Laporan", icon: BarChart3, match: ["/reports"] },
   {
     href: "/more",
     label: "Lainnya",
     icon: LayoutGrid,
-    match: ["/more", "/reports", "/wallets", "/scheduled", "/settings"],
+    match: ["/more", "/budgets", "/savings", "/debts", "/wallets", "/scheduled", "/settings"],
   },
 ];
 

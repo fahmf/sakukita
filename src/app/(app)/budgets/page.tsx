@@ -288,6 +288,7 @@ export default function BudgetsPage() {
   return (
     <div className="max-w-md mx-auto min-h-dvh flex flex-col space-y-5 pb-20">
       <PageHeading
+        back="/more"
         title="Rencana"
         subtitle="Budget bulanan, tabungan, dan utang-piutang"
       />

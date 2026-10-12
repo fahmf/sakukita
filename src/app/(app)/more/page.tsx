@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import {
-  BarChart3,
   CalendarClock,
   CalendarDays,
   ChevronRight,
   PiggyBank,
   Scale,
   Settings,
+  Target,
   Tags,
   Trash2,
   Users,
@@ -22,7 +22,7 @@ type Tile = { href: string; label: string; hint: string; icon: LucideIcon; tone:
 
 // Features first, grouped by what people come for; account housekeeping last.
 const FEATURES: Tile[] = [
-  { href: "/reports", label: "Laporan", hint: "Arus kas & tren", icon: BarChart3, tone: "bg-mint-soft text-mint-strong" },
+  { href: "/budgets", label: "Rencana & Budget", hint: "Batas per kategori", icon: Target, tone: "bg-mint-soft text-mint-strong" },
   { href: "/wallets", label: "Dompet", hint: "Saldo per akun", icon: Wallet, tone: "bg-sky-50 text-sky-600 dark:bg-sky-950/30 dark:text-sky-400" },
   { href: "/savings", label: "Tabungan", hint: "Target impian", icon: PiggyBank, tone: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400" },
   { href: "/debts", label: "Utang & Piutang", hint: "Pinjaman keluarga", icon: Scale, tone: "bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400" },

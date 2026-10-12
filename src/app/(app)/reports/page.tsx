@@ -514,7 +514,6 @@ export default function ReportsPage() {
       </div>
 
       <PageHeading
-        back="/more"
         title="Laporan Keuangan"
         subtitle="Analisis arus kas dan kekayaan bersih"
       />
