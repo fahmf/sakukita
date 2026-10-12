@@ -28,6 +28,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   ArrowRightLeft,
+  BarChart3,
   ChevronLeft,
   ChevronRight,
   Calendar,
@@ -385,6 +386,16 @@ export default function DashboardPage() {
           </Card>
         </Link>
       </div>
+
+      {/* Laporan lives under "Lainnya" now; keep a one-tap way in from here. */}
+      <Link
+        href="/reports"
+        className="-mt-3 flex items-center justify-center gap-1 rounded-xl py-1.5 text-xs font-medium text-mint-strong hover:bg-mint-soft/40"
+      >
+        <BarChart3 className="size-3.5" />
+        Lihat laporan &amp; tren
+        <ChevronRight className="size-3.5" />
+      </Link>
 
       {/* 3b. Upcoming & due (scheduled transactions + debts with a due date) */}
       {upcomingItems.length > 0 && (

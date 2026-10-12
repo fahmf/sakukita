@@ -45,20 +45,9 @@ import {
   Plus,
   ChevronDown,
   ChevronRight,
-  CalendarClock,
-  Briefcase,
-  Gift,
-  Heart,
-  Car,
-  ShoppingBag,
-  Utensils,
-  Receipt,
-  CircleDot,
   Loader2,
   Trash2,
   Pencil,
-  Scale,
-  PiggyBank,
   LogOut,
   Sun,
   Moon,
@@ -369,7 +358,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeading title="Pengaturan" subtitle="Kelola data profil, keluarga, dan kategori" />
+      <PageHeading back="/more" title="Pengaturan" subtitle="Akun, keluarga, tampilan, dan kategori" />
 
       {/* Profile & Household Cards */}
       <div className="grid gap-3">
@@ -432,78 +421,6 @@ export default function SettingsPage() {
 
         <CycleStartDayCard />
 
-        <Link
-          href="/scheduled"
-          className="rounded-2xl border bg-card p-4 flex items-center justify-between hover:bg-muted/40 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
-              <CalendarClock className="size-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="font-semibold text-sm">Transaksi Terjadwal</p>
-              <p className="text-xs text-muted-foreground">
-                Catatan dengan tanggal di masa depan
-              </p>
-            </div>
-          </div>
-          <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
-        </Link>
-
-        <Link
-          href="/debts"
-          className="rounded-2xl border bg-card p-4 flex items-center justify-between hover:bg-muted/40 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
-              <Scale className="size-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="font-semibold text-sm">Utang & Piutang</p>
-              <p className="text-xs text-muted-foreground">
-                Pencatatan utang-piutang keluarga
-              </p>
-            </div>
-          </div>
-          <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
-        </Link>
-
-        <Link
-          href="/savings"
-          className="rounded-2xl border bg-card p-4 flex items-center justify-between hover:bg-muted/40 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
-              <PiggyBank className="size-5 text-mint-strong" />
-            </span>
-            <div className="min-w-0">
-              <p className="font-semibold text-sm">Tabungan Masa Depan</p>
-              <p className="text-xs text-muted-foreground">
-                Target impian & rencana tabungan keluarga
-              </p>
-            </div>
-          </div>
-          <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
-        </Link>
-
-        <Link
-          href="/settings/trash"
-          className="rounded-2xl border bg-card p-4 flex items-center justify-between hover:bg-muted/40 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
-              <Trash2 className="size-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="font-semibold text-sm">Tempat Sampah</p>
-              <p className="text-xs text-muted-foreground">
-                Transaksi terhapus disimpan 30 hari
-              </p>
-            </div>
-          </div>
-          <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
-        </Link>
-
         {/* Tema / Appearance Card */}
         <div className="rounded-2xl border bg-card p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -531,55 +448,10 @@ export default function SettingsPage() {
 
         {/* Notification preferences */}
         <NotificationSettingsCard />
-
-        {/* Troubleshoot / Reset Cache Card */}
-        <button
-          type="button"
-          onClick={() => setResetDialogOpen(true)}
-          className="w-full text-left rounded-2xl border border-amber-200 dark:border-amber-950/30 bg-card p-4 flex items-center justify-between hover:bg-amber-50/30 dark:hover:bg-amber-950/10 transition-colors cursor-pointer"
-        >
-          <div className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-full bg-amber-50 dark:bg-amber-950/20 text-amber-500">
-              <Database className="size-5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold text-sm text-amber-700 dark:text-amber-400">Atur Ulang Cache Database</p>
-              <p className="text-xs text-muted-foreground">
-                Hapus database lokal (IndexedDB) dan unduh ulang semua data dari server
-              </p>
-            </div>
-          </div>
-          <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
-        </button>
-
-        {/* Logout / Signout Card */}
-        <button
-          type="button"
-          onClick={handleLogout}
-          disabled={loggingOut}
-          className="w-full text-left rounded-2xl border border-red-200 dark:border-red-950/30 bg-card p-4 flex items-center justify-between hover:bg-red-50/30 dark:hover:bg-red-950/10 transition-colors cursor-pointer"
-        >
-          <div className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-full bg-red-50 dark:bg-red-950/20 text-red-500">
-              <LogOut className="size-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="font-semibold text-sm text-red-600 dark:text-red-400">Keluar Akun</p>
-              <p className="text-xs text-muted-foreground">
-                Keluar dari sesi Saku Kita aman
-              </p>
-            </div>
-          </div>
-          {loggingOut ? (
-            <Loader2 className="size-4 animate-spin text-red-500" />
-          ) : (
-            <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
-          )}
-        </button>
       </div>
 
       {/* Category Manager Section */}
-      <div className="space-y-3">
+      <div id="kategori" className="scroll-mt-20 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-muted-foreground">Daftar Kategori</h2>
 
@@ -1139,6 +1011,57 @@ export default function SettingsPage() {
             )}
           </div>
         )}
+      </div>
+
+      {/* Lanjutan: maintenance and sign-out, kept below everyday settings */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground">Lanjutan</h2>
+        <div className="grid gap-3">
+          {/* Troubleshoot / Reset Cache Card */}
+          <button
+            type="button"
+            onClick={() => setResetDialogOpen(true)}
+            className="w-full text-left rounded-2xl border border-amber-200 dark:border-amber-950/30 bg-card p-4 flex items-center justify-between hover:bg-amber-50/30 dark:hover:bg-amber-950/10 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <span className="grid size-11 place-items-center rounded-full bg-amber-50 dark:bg-amber-950/20 text-amber-500">
+                <Database className="size-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-sm text-amber-700 dark:text-amber-400">Muat Ulang Data dari Server</p>
+                <p className="text-xs text-muted-foreground">
+                  Hapus salinan lokal di perangkat ini lalu unduh ulang — jika data terasa tidak sinkron
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+          </button>
+
+          {/* Logout / Signout Card */}
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="w-full text-left rounded-2xl border border-red-200 dark:border-red-950/30 bg-card p-4 flex items-center justify-between hover:bg-red-50/30 dark:hover:bg-red-950/10 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <span className="grid size-11 place-items-center rounded-full bg-red-50 dark:bg-red-950/20 text-red-500">
+                <LogOut className="size-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="font-semibold text-sm text-red-600 dark:text-red-400">Keluar Akun</p>
+                <p className="text-xs text-muted-foreground">
+                  Keluar dari sesi Saku Kita aman
+                </p>
+              </div>
+            </div>
+            {loggingOut ? (
+              <Loader2 className="size-4 animate-spin text-red-500" />
+            ) : (
+              <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Dialog for Profile Edit */}

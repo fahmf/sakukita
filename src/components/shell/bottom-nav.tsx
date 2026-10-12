@@ -2,17 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, BarChart3, PiggyBank, Settings, Plus } from "lucide-react";
+import { Home, ReceiptText, PiggyBank, LayoutGrid, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
 
+// Each tab also owns the sub-pages reached from it, so the bar keeps showing
+// where the user is (e.g. Tabungan lights up "Rencana").
 const tabs = [
-  { href: "/dashboard", label: "Beranda", icon: Home },
-  { href: "/reports", label: "Laporan", icon: BarChart3 },
-  { href: "/budgets", label: "Budget", icon: PiggyBank },
-  { href: "/settings", label: "Atur", icon: Settings },
+  { href: "/dashboard", label: "Beranda", icon: Home, match: ["/dashboard"] },
+  { href: "/transactions", label: "Riwayat", icon: ReceiptText, match: ["/transactions", "/calendar"] },
+  { href: "/budgets", label: "Rencana", icon: PiggyBank, match: ["/budgets", "/savings", "/debts"] },
+  {
+    href: "/more",
+    label: "Lainnya",
+    icon: LayoutGrid,
+    match: ["/more", "/reports", "/wallets", "/scheduled", "/settings"],
+  },
 ];
+
+function isActive(pathname: string, match: string[]): boolean {
+  return match.some((m) => pathname === m || pathname.startsWith(`${m}/`));
+}
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -23,7 +34,7 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-1/2 z-30 w-full max-w-md -translate-x-1/2 border-t bg-background/95 backdrop-blur">
       <div className="relative grid grid-cols-5 items-center px-2 pb-[env(safe-area-inset-bottom)]">
         {tabs.slice(0, 2).map((tab) => (
-          <NavItem key={tab.href} {...tab} active={pathname === tab.href} />
+          <NavItem key={tab.href} {...tab} active={isActive(pathname, tab.match)} />
         ))}
 
         <div className="flex justify-center">
@@ -42,7 +53,7 @@ export function BottomNav() {
         </div>
 
         {tabs.slice(2).map((tab) => (
-          <NavItem key={tab.href} {...tab} active={pathname === tab.href} />
+          <NavItem key={tab.href} {...tab} active={isActive(pathname, tab.match)} />
         ))}
       </div>
     </nav>
@@ -63,6 +74,7 @@ function NavItem({
   return (
     <Link
       href={href}
+      aria-current={active ? "page" : undefined}
       className={cn(
         "flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors",
         active ? "text-mint-strong" : "text-muted-foreground",

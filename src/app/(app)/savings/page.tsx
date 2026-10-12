@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { useGoals, useCreateGoal, useUpdateGoal, useDeleteGoal } from "@/hooks/use-goals";
 import type { SavingsGoal } from "@/lib/supabase/types";
 import { useHousehold } from "@/components/providers/household-provider";
+import { BackButton } from "@/components/shared/back-button";
 import { PageHeading, EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
-  ArrowLeft,
   PiggyBank,
   Plus,
   Pencil,
@@ -59,7 +58,6 @@ function monthlyNeeded(goal: SavingsGoal): { text: string; urgent: boolean } | n
 
 export default function SavingsGoalsPage() {
   useHousehold();
-  const router = useRouter();
   const { data: goals = [], isLoading: loadingGoals } = useGoals();
   const createGoal = useCreateGoal();
   const updateGoal = useUpdateGoal();
@@ -232,16 +230,7 @@ export default function SavingsGoalsPage() {
     <div className="space-y-6">
       {/* 1. Header with back link */}
       <div className="flex items-center gap-2">
-        {/* Reached from both Budget and Pengaturan — go back to wherever the
-            user came from. */}
-        <button
-          type="button"
-          onClick={() => (window.history.length > 1 ? router.back() : router.push("/budgets"))}
-          className="grid size-9 place-items-center rounded-full hover:bg-muted transition-colors"
-          aria-label="Kembali"
-        >
-          <ArrowLeft className="size-4" />
-        </button>
+        <BackButton fallback="/budgets" />
         <PageHeading title="Tabungan Masa Depan" subtitle="Target impian & rencana tabungan" />
       </div>
 

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useDebts, useCreateDebt, useUpdateDebt, useDeleteDebt } from "@/hooks/use-debts";
 import { formatCurrency } from "@/lib/format";
+import { BackButton } from "@/components/shared/back-button";
 import { PageHeading } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,15 +20,12 @@ import {
   Plus,
   Loader2,
   Sparkles,
-  ChevronLeft,
   Info,
-  TrendingDown,
   Coins,
 } from "lucide-react";
 import { toast } from "sonner";
 import { parseAmountExpression } from "@/lib/calculator";
 import type { Debt } from "@/lib/supabase/types";
-import Link from "next/link";
 
 export default function DebtsPage() {
   const [activeTab, setActiveTab] = React.useState<"payable" | "receivable">("payable");
@@ -284,9 +282,7 @@ export default function DebtsPage() {
     <div className="max-w-md mx-auto min-h-dvh flex flex-col space-y-5 pb-20">
       {/* Page Header */}
       <div className="flex items-center gap-1.5">
-        <Link href="/settings" className="size-9 rounded-xl hover:bg-muted flex items-center justify-center border bg-card">
-          <ChevronLeft className="size-5 text-muted-foreground" />
-        </Link>
+        <BackButton fallback="/budgets" />
         <PageHeading
           title="Utang & Piutang"
           subtitle="Kelola kewajiban utang dan tagihan piutang"

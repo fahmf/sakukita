@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  ArrowLeft,
   ArrowRightLeft,
   Calendar,
   CalendarDays,
@@ -321,13 +320,6 @@ function AllTransactionsPage() {
     <div className="space-y-5">
       {/* 1. Header with Back Link */}
       <div className="flex items-center gap-2">
-        <Link
-          href="/dashboard"
-          className="grid size-9 place-items-center rounded-full hover:bg-muted transition-colors"
-          aria-label="Kembali ke beranda"
-        >
-          <ArrowLeft className="size-4" />
-        </Link>
         <PageHeading title="Riwayat Transaksi" subtitle="Semua catatan keuangan keluarga" />
         <Link
           href="/calendar"

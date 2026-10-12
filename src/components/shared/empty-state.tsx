@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { BackButton } from "./back-button";
 
 export function EmptyState({
   icon: Icon,
@@ -29,18 +30,24 @@ export function PageHeading({
   title,
   subtitle,
   action,
+  back,
 }: {
   title: string;
   subtitle?: string;
   action?: React.ReactNode;
+  /** Show a back arrow; the value is where it goes without in-app history. */
+  back?: string;
 }) {
   return (
     <div className="mb-4 flex items-end justify-between gap-3">
-      <div>
-        <h1 className="text-xl font-semibold">{title}</h1>
-        {subtitle && (
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
-        )}
+      <div className="flex min-w-0 items-center gap-2">
+        {back && <BackButton fallback={back} />}
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold">{title}</h1>
+          {subtitle && (
+            <p className="text-sm text-muted-foreground">{subtitle}</p>
+          )}
+        </div>
       </div>
       {action}
     </div>

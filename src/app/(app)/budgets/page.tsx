@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   PiggyBank,
+  Scale,
   ChevronLeft,
   ChevronRight,
   Plus,
@@ -287,25 +288,31 @@ export default function BudgetsPage() {
   return (
     <div className="max-w-md mx-auto min-h-dvh flex flex-col space-y-5 pb-20">
       <PageHeading
-        title="Budget"
-        subtitle="Batas pengeluaran per kategori, per siklus bulan"
+        title="Rencana"
+        subtitle="Budget bulanan, tabungan, dan utang-piutang"
       />
 
-      <Link
-        href="/savings"
-        className="flex items-center justify-between rounded-2xl border bg-card p-3.5 transition-colors hover:bg-muted/40"
-      >
-        <span className="flex items-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-xl bg-mint-soft text-mint-strong">
-            <PiggyBank className="size-4" />
-          </span>
-          <span>
-            <span className="block text-sm font-semibold text-foreground">Target Tabungan</span>
-            <span className="block text-xs text-muted-foreground">Rencana impian & dana darurat</span>
-          </span>
-        </span>
-        <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
-      </Link>
+      {/* Rencana = budgets here, plus the other two planning ledgers. */}
+      <div className="grid grid-cols-2 gap-3">
+        {[
+          { href: "/savings", label: "Tabungan", hint: "Target impian", icon: PiggyBank, tone: "bg-mint-soft text-mint-strong" },
+          { href: "/debts", label: "Utang & Piutang", hint: "Pinjaman keluarga", icon: Scale, tone: "bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400" },
+        ].map((t) => (
+          <Link
+            key={t.href}
+            href={t.href}
+            className="flex items-center gap-2.5 rounded-2xl border bg-card p-3 transition-colors hover:bg-muted/40"
+          >
+            <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${t.tone}`}>
+              <t.icon className="size-4" />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold text-foreground">{t.label}</span>
+              <span className="block truncate text-xs text-muted-foreground">{t.hint}</span>
+            </span>
+          </Link>
+        ))}
+      </div>
 
         <>
           {/* Month Navigator Header */}
