@@ -2,11 +2,10 @@
 
 import * as React from "react";
 import { useTransactions } from "@/hooks/use-transactions";
-import { useCategories, useCategoryLookup } from "@/hooks/use-categories";
-import Link from "next/link";
+import { useCategoryLookup } from "@/hooks/use-categories";
 import { useWallets, useWalletBalances } from "@/hooks/use-wallets";
 import { formatCurrency } from "@/lib/format";
-import { chartColor } from "@/lib/chart-colors";
+import { ExpenseBreakdown, type BreakdownItem } from "@/components/reports/expense-breakdown";
 import {
   currentFinancialMonth,
   shiftMonth,
@@ -31,26 +30,12 @@ import {
   Calendar,
   Wallet as WalletIcon,
   HelpCircle,
-  Tag,
   PieChart as PieIcon,
   ChevronRight,
   Info,
-  ListFilter,
 } from "lucide-react";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
-
-const ExpenseDonut = dynamic(
-  () => import("@/components/shared/report-charts").then((mod) => mod.ExpenseDonut),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-[200px] w-full bg-muted/40 animate-pulse rounded-2xl flex items-center justify-center text-xs text-muted-foreground">
-        Memuat grafik...
-      </div>
-    ),
-  }
-);
 
 const CumulativeCashflow = dynamic(
   () => import("@/components/shared/report-charts").then((mod) => mod.CumulativeCashflow),
@@ -83,7 +68,8 @@ export default function ReportsPage() {
   const [mounted, setMounted] = React.useState(false);
   const [period, setPeriod] = React.useState<PeriodFilter>("this-month");
   const [selectedWalletId, setSelectedWalletId] = React.useState<string>("all");
-  const [selectedParentCategoryId, setSelectedParentCategoryId] = React.useState<string | null>(null);
+  // Category row expanded in the spending breakdown (none until tapped)
+  const [openCategoryId, setOpenCategoryId] = React.useState<string | null>(null);
   const [selectedHeatmapDay, setSelectedHeatmapDay] = React.useState<{ date: Date; amount: number } | null>(null);
 
   React.useEffect(() => {
@@ -92,8 +78,9 @@ export default function ReportsPage() {
   }, []);
 
   // Fetch all categories, wallets, transactions
-  const { data: categories = [], isLoading: loadingCategories } = useCategories();
-  const { data: categoryLookup } = useCategoryLookup();
+  // Every category by id (archived included) — reports must still name and
+  // count spending in categories that were archived later.
+  const { data: categoryLookup, isLoading: loadingCategories } = useCategoryLookup();
   const { data: wallets = [], isLoading: loadingWallets } = useWallets();
   const { data: transactions = [], isLoading: loadingTxs } = useTransactions();
 
@@ -300,73 +287,61 @@ export default function ReportsPage() {
     [flatCategoryMap]
   );
 
-  // 1. Donut Chart Data: Expenses by Parent Category
-  const expenseDonutData = React.useMemo(() => {
-    const expenses = filteredTxs.filter((t) => t.type === "expense");
-    const parentSums = new Map<string, number>();
+  // 1. Spending by top-level category, each with its subcategory breakdown.
+  // Sorted largest first; unknown categories land in "Tanpa Kategori" so the
+  // rows always add up to total spending.
+  const expenseBreakdown = React.useMemo<BreakdownItem[]>(() => {
+    const parents = new Map<string, { amount: number; count: number; subs: Map<string, { amount: number; count: number }> }>();
 
-    expenses.forEach((t) => {
+    filteredTxs.forEach((t) => {
+      if (t.type !== "expense") return;
       const parentId = parentBucketOf(t.category_id);
-      parentSums.set(parentId, (parentSums.get(parentId) || 0) + t.amount);
+      const subId = t.category_id && flatCategoryMap.has(t.category_id) ? t.category_id : UNCATEGORIZED_ID;
+      const parent = parents.get(parentId) ?? { amount: 0, count: 0, subs: new Map() };
+      parent.amount += t.amount;
+      parent.count += 1;
+      const sub = parent.subs.get(subId) ?? { amount: 0, count: 0 };
+      sub.amount += t.amount;
+      sub.count += 1;
+      parent.subs.set(subId, sub);
+      parents.set(parentId, parent);
     });
 
-    const data = Array.from(parentSums.entries()).map(([id, value]) => ({
-      id,
-      name: bucketName(id),
-      value,
-    }));
+    return Array.from(parents.entries())
+      .map(([id, p]) => ({
+        id,
+        name: bucketName(id),
+        amount: p.amount,
+        count: p.count,
+        subs: Array.from(p.subs.entries())
+          .map(([subId, sub]) => ({
+            id: subId,
+            // Entries recorded on the parent itself rather than a subcategory
+            name: subId === id ? "Tanpa subkategori" : bucketName(subId),
+            amount: sub.amount,
+            count: sub.count,
+          }))
+          .sort((x, y) => y.amount - x.amount),
+      }))
+      .sort((x, y) => y.amount - x.amount);
+  }, [filteredTxs, flatCategoryMap, parentBucketOf, bucketName]);
 
-    // Sort from highest expense to lowest, then assign vivid, theme-aware
-    // colours by rank so adjacent slices stay easy to tell apart in dark mode.
-    return data
-      .sort((a, b) => b.value - a.value)
-      .map((item, index) => ({ ...item, color: chartColor(index) }));
-  }, [filteredTxs, parentBucketOf, bucketName]);
-
-  // Subcategory list breakdown for the selected parent slice
-  const subcategoryBreakdown = React.useMemo(() => {
-    if (!selectedParentCategoryId) return [];
-
-    const expenses = filteredTxs.filter((t) => t.type === "expense");
-    const subSums = new Map<string, number>();
-
-    expenses.forEach((t) => {
-      if (parentBucketOf(t.category_id) !== selectedParentCategoryId) return;
-      const key = t.category_id && flatCategoryMap.has(t.category_id) ? t.category_id : UNCATEGORIZED_ID;
-      subSums.set(key, (subSums.get(key) || 0) + t.amount);
-    });
-
-    const data = Array.from(subSums.entries()).map(([id, value]) => ({
-      id,
-      name: id === selectedParentCategoryId ? `${bucketName(id)} (tanpa sub)` : bucketName(id),
-      value,
-    }));
-
-    return data
-      .sort((a, b) => b.value - a.value)
-      .map((item, index) => ({ ...item, color: chartColor(index) }));
-  }, [selectedParentCategoryId, filteredTxs, flatCategoryMap, parentBucketOf, bucketName]);
-
-  // Deep link to the transaction list for the selected slice, matching the
-  // report's period where the list has an equivalent (it is per month).
-  const selectedSliceHref = React.useMemo(() => {
-    if (!selectedParentCategoryId || selectedParentCategoryId === UNCATEGORIZED_ID) return null;
-    const nowLabel = currentFinancialMonth();
-    const range =
-      period === "this-month"
-        ? `&bulan=${nowLabel}`
-        : period === "last-month"
-        ? `&bulan=${shiftMonth(nowLabel, -1)}`
-        : "&rentang=semua";
-    return `/transactions?kategori=${selectedParentCategoryId}${range}`;
-  }, [selectedParentCategoryId, period]);
-
-  // Set default selected slice once donut data loads
-  React.useEffect(() => {
-    if (expenseDonutData.length > 0 && !selectedParentCategoryId) {
-      setSelectedParentCategoryId(expenseDonutData[0].id);
-    }
-  }, [expenseDonutData, selectedParentCategoryId]);
+  // Deep link to the transaction list for a category, matching the report's
+  // period where the list has an equivalent (it is per month).
+  const categoryHref = React.useCallback(
+    (categoryId: string) => {
+      if (categoryId === UNCATEGORIZED_ID) return null;
+      const nowLabel = currentFinancialMonth();
+      const range =
+        period === "this-month"
+          ? `&bulan=${nowLabel}`
+          : period === "last-month"
+          ? `&bulan=${shiftMonth(nowLabel, -1)}`
+          : "&rentang=semua";
+      return `/transactions?kategori=${categoryId}${range}`;
+    },
+    [period]
+  );
 
   // 2. Daily/Monthly Cumulative Cashflow Line Chart Data
   const dailyCashflowData = React.useMemo(() => {
@@ -784,87 +759,27 @@ export default function ReportsPage() {
             )}
           </div>
 
-          {/* 1. Donut Chart - Expenses Distribution */}
+          {/* 1. Spending by category - ranked bars with inline subcategories */}
           <div className="rounded-2xl border bg-card p-4 space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
                 <PieIcon className="size-4 text-mint-strong" /> Distribusi Pengeluaran
               </h3>
-              <span className="text-[10px] text-muted-foreground font-semibold bg-muted px-2 py-0.5 rounded-lg">
-                Berdasarkan Kategori Utama
-              </span>
+              <span className="text-[10px] text-muted-foreground font-semibold">Ketuk untuk rincian</span>
             </div>
 
-            {expenseDonutData.length === 0 ? (
+            {expenseBreakdown.length === 0 ? (
               <div className="h-[120px] flex items-center justify-center text-xs text-muted-foreground border border-dashed rounded-xl bg-muted/10">
                 Tidak ada data pengeluaran pada periode ini.
               </div>
             ) : (
-              <div className="space-y-4">
-                {/* Recharts Pie Donut Container */}
-                <ExpenseDonut
-                  data={expenseDonutData}
-                  selectedParentCategoryId={selectedParentCategoryId}
-                  onSelectCategory={setSelectedParentCategoryId}
-                  totalSpent={stats.expense}
-                />
-
-                {/* Parent Categories interactive listing */}
-                <div className="grid grid-cols-2 gap-2">
-                  {expenseDonutData.map((item) => (
-                    <div
-                      key={item.id}
-                      onClick={() => setSelectedParentCategoryId(item.id)}
-                      className={`flex items-center justify-between p-2 rounded-xl border text-[11px] font-medium cursor-pointer transition-all hover:bg-muted/30 ${
-                        selectedParentCategoryId === item.id ? "bg-muted border-foreground/30 scale-[1.02]" : "bg-card border-transparent"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                        <span className="truncate text-foreground pr-1">{item.name}</span>
-                      </div>
-                      <span className="text-muted-foreground shrink-0">{formatCurrency(item.value)}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Subcategory breakdown slide-down list */}
-                {selectedParentCategoryId && subcategoryBreakdown.length > 0 && (
-                  <div className="border-t pt-3 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                    <div className="flex items-center justify-between px-1">
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                        <Tag className="size-3" /> Subkategori Rincian
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {bucketName(selectedParentCategoryId)}
-                      </span>
-                    </div>
-
-                    <div className="rounded-xl bg-muted/30 border p-3.5 space-y-2.5">
-                      {subcategoryBreakdown.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2">
-                            <span className="size-2 rounded-full" style={{ backgroundColor: item.color }} />
-                            <span className="font-medium text-foreground">{item.name}</span>
-                          </div>
-                          <span className="font-semibold text-muted-foreground">
-                            {formatCurrency(item.value)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    {selectedSliceHref && (
-                      <Link
-                        href={selectedSliceHref}
-                        className="flex h-9 items-center justify-center gap-1.5 rounded-xl text-xs font-semibold text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/40 transition-colors"
-                      >
-                        <ListFilter className="size-3.5" />
-                        Lihat transaksi {bucketName(selectedParentCategoryId)}
-                      </Link>
-                    )}
-                  </div>
-                )}
-              </div>
+              <ExpenseBreakdown
+                items={expenseBreakdown}
+                total={stats.expense}
+                openId={openCategoryId}
+                onToggle={(id) => setOpenCategoryId((current) => (current === id ? null : id))}
+                hrefFor={categoryHref}
+              />
             )}
           </div>
 
