@@ -28,20 +28,6 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   ArrowRightLeft,
-  Banknote,
-  Utensils,
-  Car,
-  ShoppingBag,
-  Gift,
-  Heart,
-  Receipt,
-  Briefcase,
-  TrendingUp,
-  Landmark,
-  Smartphone,
-  CreditCard,
-  PiggyBank,
-  Loader2,
   ChevronLeft,
   ChevronRight,
   Calendar,
@@ -352,48 +338,52 @@ export default function DashboardPage() {
 
       {/* 3. Income & Expense mini cards */}
       <div className="grid grid-cols-2 gap-3">
-        <Card className="rounded-2xl border bg-card p-4 space-y-1">
-          <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
-            <span className="grid size-5 place-items-center rounded-full bg-mint-soft text-mint-strong">
-              <ArrowUpRight className="size-3" />
-            </span>
-            Pemasukan
-          </div>
-          <p className="text-base font-bold text-income tracking-tight">
-            {loadingTx ? "..." : `+${formatCurrency(monthlyIncome).replace("Rp", "").trim()}`}
-          </p>
-        </Card>
-
-        <Card className="rounded-2xl border bg-card p-4 space-y-1">
-          <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
-            <span className="grid size-5 place-items-center rounded-full bg-red-50 dark:bg-red-950/20 text-expense">
-              <ArrowDownRight className="size-3" />
-            </span>
-            Pengeluaran
-          </div>
-          <p className="text-base font-bold text-expense tracking-tight">
-            {loadingTx ? "..." : `-${formatCurrency(monthlyExpense).replace("Rp", "").trim()}`}
-          </p>
-          {!loadingTx && expenseDelta && (
-            <p
-              className={`flex items-center gap-0.5 text-[10px] font-semibold ${
-                expenseDelta.pct > 0
-                  ? "text-expense"
-                  : expenseDelta.pct < 0
-                  ? "text-income"
-                  : "text-muted-foreground"
-              }`}
-            >
-              {expenseDelta.pct > 0 ? (
+        <Link href={`/transactions?bulan=${selectedMonth}&tipe=income`} className="block">
+          <Card className="h-full rounded-2xl border bg-card p-4 space-y-1 transition-colors hover:border-mint-strong/40">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
+              <span className="grid size-5 place-items-center rounded-full bg-mint-soft text-mint-strong">
                 <ArrowUpRight className="size-3" />
-              ) : expenseDelta.pct < 0 ? (
-                <ArrowDownRight className="size-3" />
-              ) : null}
-              {expenseDelta.pct > 0 ? "+" : ""}
-              {expenseDelta.pct}% vs bln lalu
+              </span>
+              Pemasukan
+            </div>
+            <p className="text-base font-bold text-income tracking-tight">
+              {loadingTx ? "..." : `+${formatCurrency(monthlyIncome).replace("Rp", "").trim()}`}
             </p>
-          )}
-        </Card>
+          </Card>
+        </Link>
+
+        <Link href={`/transactions?bulan=${selectedMonth}&tipe=expense`} className="block">
+          <Card className="h-full rounded-2xl border bg-card p-4 space-y-1 transition-colors hover:border-mint-strong/40">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
+              <span className="grid size-5 place-items-center rounded-full bg-red-50 dark:bg-red-950/20 text-expense">
+                <ArrowDownRight className="size-3" />
+              </span>
+              Pengeluaran
+            </div>
+            <p className="text-base font-bold text-expense tracking-tight">
+              {loadingTx ? "..." : `-${formatCurrency(monthlyExpense).replace("Rp", "").trim()}`}
+            </p>
+            {!loadingTx && expenseDelta && (
+              <p
+                className={`flex items-center gap-0.5 text-[10px] font-semibold ${
+                  expenseDelta.pct > 0
+                    ? "text-expense"
+                    : expenseDelta.pct < 0
+                    ? "text-income"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {expenseDelta.pct > 0 ? (
+                  <ArrowUpRight className="size-3" />
+                ) : expenseDelta.pct < 0 ? (
+                  <ArrowDownRight className="size-3" />
+                ) : null}
+                {expenseDelta.pct > 0 ? "+" : ""}
+                {expenseDelta.pct}% vs bln lalu
+              </p>
+            )}
+          </Card>
+        </Link>
       </div>
 
       {/* 3b. Upcoming & due (scheduled transactions + debts with a due date) */}
