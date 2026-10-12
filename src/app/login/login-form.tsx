@@ -77,7 +77,8 @@ export function LoginForm({ next, error: initialError }: { next: string; error?:
           : error.message);
         setLoading(null);
       } else {
-        window.location.href = next;
+        // Via the callback so first-time users are routed to onboarding.
+        window.location.href = callback(window.location.origin);
       }
     } else {
       // signup
@@ -97,7 +98,8 @@ export function LoginForm({ next, error: initialError }: { next: string; error?:
         setSuccess("Akun berhasil dibuat. Harap cek email untuk verifikasi.");
         setLoading(null);
       } else {
-        window.location.href = next;
+        // Via the callback so first-time users are routed to onboarding.
+        window.location.href = callback(window.location.origin);
       }
     }
   }

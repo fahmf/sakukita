@@ -2,10 +2,9 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { useCreateWallet, useWallets } from "@/hooks/use-wallets";
-import { useCategories } from "@/hooks/use-categories";
-import { useCreateTransaction } from "@/hooks/use-transactions";
-import { formatCurrency } from "@/lib/format";
+import { useCreateWallet } from "@/hooks/use-wallets";
+import { useUIStore } from "@/stores/ui-store";
+import { markOnboarded } from "@/lib/onboarding";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,8 +16,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Wallet, Smartphone, Sparkles, Check, CheckCircle2, ArrowRight } from "lucide-react";
+import { Wallet, Smartphone, Sparkles, Check, ArrowRight } from "lucide-react";
 import type { WalletType } from "@/lib/supabase/types";
+
+/** Chromium's install-prompt event (not in the standard DOM typings). */
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -26,31 +31,26 @@ export default function OnboardingPage() {
 
   // Step 1: Wallet States
   const createWallet = useCreateWallet();
-  const { data: wallets = [] } = useWallets();
   const [walletName, setWalletName] = React.useState("");
   const [walletType, setWalletType] = React.useState<WalletType>("cash");
   const [initialBalance, setInitialBalance] = React.useState("");
 
   // Step 2: PWA States
-  const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);
-  const [isIOS, setIsIOS] = React.useState(false);
+  const [deferredPrompt, setDeferredPrompt] = React.useState<BeforeInstallPromptEvent | null>(null);
+  // Only read on step 2, which never renders on the server, so the
+  // client-only user agent can't cause a hydration mismatch.
+  const [isIOS] = React.useState(
+    () => typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent)
+  );
 
-  // Step 3: Transaction States
-  const { data: categories = [] } = useCategories();
-  const createTx = useCreateTransaction();
-  const [trialSuccess, setTrialSuccess] = React.useState(false);
-  const [particles, setParticles] = React.useState<{ id: number; left: number; top: number; color: string }[]>([]);
+  // Step 3
+  const openQuickAdd = useUIStore((s) => s.openQuickAdd);
 
-  // Check user agent for iOS & listen for PWA install prompt
+  // Listen for the PWA install prompt
   React.useEffect(() => {
-    const ua = window.navigator.userAgent.toLowerCase();
-    if (ua.includes("iphone") || ua.includes("ipad") || ua.includes("ipod")) {
-      setIsIOS(true);
-    }
-
     const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e);
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
@@ -73,7 +73,7 @@ export default function OnboardingPage() {
       });
       toast.success("Dompet baru berhasil dibuat!");
       setCurrentStep(2);
-    } catch (err) {
+    } catch {
       toast.error("Gagal membuat dompet. Silakan coba lagi.");
     }
   };
@@ -94,65 +94,16 @@ export default function OnboardingPage() {
     setCurrentStep(3);
   };
 
-  // Step 3 Trial Transaction
-  const handleTrialTransaction = async () => {
-    const targetWallet = wallets[0]?.id;
-    // Find "Makanan" category
-    const flatCategories = categories.flatMap(p => [p, ...p.subcategories]);
-    const foodCat = flatCategories.find(c => c.name === "Makanan" && c.kind === "expense");
-    const targetCat = foodCat?.id || flatCategories.filter(c => c.kind === "expense")[0]?.id;
-
-    if (!targetWallet) {
-      toast.error("Silakan buat dompet di Langkah 1 terlebih dahulu.");
-      setCurrentStep(1);
-      return;
-    }
-
-    try {
-      await createTx.mutateAsync({
-        type: "expense",
-        amount: 25000,
-        occurred_at: new Date().toISOString(),
-        wallet_id: targetWallet,
-        category_id: targetCat || null,
-        note: "Belanja makan siang pertama (Trial)",
-      });
-
-      // Confetti effect
-      setTrialSuccess(true);
-      const newParticles = Array.from({ length: 40 }).map((_, i) => ({
-        id: i,
-        left: Math.random() * 100,
-        top: Math.random() * 50 + 20,
-        color: ["#B8E6D3", "#5FBF9A", "#E8A5A5", "#F4D2A6", "#C8A5E8"][Math.floor(Math.random() * 5)],
-      }));
-      setParticles(newParticles);
-
-      toast.success("Transaksi pertamamu tersimpan!");
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 2500);
-    } catch (err) {
-      toast.error("Gagal menyimpan transaksi trial.");
-    }
+  // Step 3: open the real quick-add form on the dashboard rather than saving
+  // a demo row — a "trial" expense would land in the family's actual books.
+  const finish = (recordFirst: boolean) => {
+    markOnboarded();
+    router.replace("/dashboard");
+    if (recordFirst) openQuickAdd("expense");
   };
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-10 bg-background text-foreground relative overflow-hidden">
-      {/* Confetti particles */}
-      {particles.map((p) => (
-        <span
-          key={p.id}
-          className="absolute size-2 rounded-full animate-bounce z-50 pointer-events-none"
-          style={{
-            left: `${p.left}%`,
-            top: `${p.top}%`,
-            backgroundColor: p.color,
-            transform: `scale(${Math.random() * 1.5 + 0.5})`,
-          }}
-        />
-      ))}
-
       <div className="w-full space-y-8">
         {/* Logo and Progress */}
         <div className="text-center space-y-4">
@@ -162,6 +113,13 @@ export default function OnboardingPage() {
             </span>
             <span className="text-xl font-semibold">Saku Kita</span>
           </div>
+          <button
+            type="button"
+            onClick={() => finish(false)}
+            className="absolute right-5 top-5 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            Lewati
+          </button>
 
           <div className="flex justify-center items-center gap-4">
             <span
@@ -321,46 +279,26 @@ export default function OnboardingPage() {
               </div>
               <h1 className="text-lg font-semibold">Coba Catat Transaksi Pertamamu</h1>
               <p className="text-xs text-muted-foreground">
-                Mari lakukan simulasi cepat untuk merasakan mudahnya mencatat di Saku Kita!
+                Ketik nominal, pilih kategori, simpan — biasanya kurang dari 5 detik.
               </p>
             </div>
 
-            {trialSuccess ? (
-              <div className="flex flex-col items-center gap-3 text-center py-6 animate-in zoom-in-95 duration-200">
-                <CheckCircle2 className="size-12 text-mint-strong" />
-                <div>
-                  <p className="font-semibold">Sukses Menyimpan!</p>
-                  <p className="text-xs text-muted-foreground">Mengarahkanmu ke dashboard utama...</p>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-xl border bg-muted p-4 space-y-3.5">
-                <div className="space-y-0.5 text-center">
-                  <span className="text-xs text-muted-foreground">Simulasi Pengeluaran</span>
-                  <p className="text-xl font-bold text-expense">{formatCurrency(25000)}</p>
-                </div>
-
-                <div className="grid grid-cols-2 text-xs border-t pt-3 gap-2">
-                  <div>
-                    <span className="text-muted-foreground block">Kategori</span>
-                    <span className="font-medium">🍔 Makanan</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground block">Sumber Dana</span>
-                    <span className="font-medium">{wallets[0]?.name || "Cash"}</span>
-                  </div>
-                </div>
-
-                <Button
-                  onClick={handleTrialTransaction}
-                  disabled={createTx.isPending}
-                  className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold w-full gap-2"
-                >
-                  <Check className="size-4" />
-                  Simpan Transaksi Pertama
-                </Button>
-              </div>
-            )}
+            <div className="space-y-2.5">
+              <Button
+                onClick={() => finish(true)}
+                className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold w-full gap-2"
+              >
+                <Check className="size-4" />
+                Catat Transaksi Pertama
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => finish(false)}
+                className="h-10 w-full rounded-xl text-xs text-muted-foreground"
+              >
+                Nanti saja, langsung ke Beranda
+              </Button>
+            </div>
           </div>
         )}
       </div>
