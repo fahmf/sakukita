@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useHousehold } from "@/components/providers/household-provider";
 import type { Transaction, TransactionType, ReceiptItem } from "@/lib/supabase/types";
+import Dexie from "dexie";
 import { db } from "@/lib/db/dexie";
 import { triggerSync } from "@/lib/db/sync";
 import { safeRandomUUID } from "@/lib/utils";
@@ -53,28 +54,33 @@ export function useTransactions(filters?: UseTransactionsFilters) {
     queryFn: async () => {
       if (!householdId) return [];
 
-      // 1. Fetch all transactions locally from IndexedDB
-      const allTxs = await db.transactions
-        .where("household_id")
-        .equals(householdId)
-        .toArray();
+      // 1. Read from IndexedDB. With a date range, walk only that slice of
+      // the [household_id+occurred_at] index instead of the whole history.
+      // occurred_at strings mix "Z" and "+00:00" suffixes, so the index
+      // bounds get a day of slack and the exact bounds are applied below.
+      const { start, end } = filters
+        ? getPeriodDates(filters.period, filters.startDate, filters.endDate)
+        : { start: null, end: null };
+      const DAY_MS = 86400000;
+      const allTxs =
+        start || end
+          ? await db.transactions
+              .where("[household_id+occurred_at]")
+              .between(
+                [householdId, start ? new Date(start.getTime() - DAY_MS).toISOString() : Dexie.minKey],
+                [householdId, end ? new Date(end.getTime() + DAY_MS).toISOString() : Dexie.maxKey],
+                true,
+                true
+              )
+              .toArray()
+          : await db.transactions.where("household_id").equals(householdId).toArray();
 
       // Filter active (not deleted and not scheduled) records
       let filtered = allTxs.filter((t) => !t.is_deleted && !t.is_scheduled);
 
-      // Sort by occurred_at descending (newest first). Past-dated entries all
-      // share 07:00 WIB, so break ties by entry time — otherwise the order
-      // within a day follows random UUIDs and a fresh entry can land mid-list.
-      filtered.sort(
-        (a, b) =>
-          new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime() ||
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-
       // 2. Apply filters locally
       if (filters) {
-        const { period, startDate, endDate, walletId, categoryId } = filters;
-        const { start, end } = getPeriodDates(period, startDate, endDate);
+        const { walletId, categoryId } = filters;
 
         if (start) {
           filtered = filtered.filter((t) => new Date(t.occurred_at).getTime() >= start.getTime());
@@ -91,6 +97,15 @@ export function useTransactions(filters?: UseTransactionsFilters) {
           filtered = filtered.filter((t) => t.category_id === categoryId);
         }
       }
+
+      // Sort by occurred_at descending (newest first). Past-dated entries all
+      // share 07:00 WIB, so break ties by entry time — otherwise the order
+      // within a day follows random UUIDs and a fresh entry can land mid-list.
+      filtered.sort(
+        (a, b) =>
+          new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime() ||
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
 
       // 3. Bulk-load lookup tables once, build Maps for O(1) resolution
       const [cats, wallets] = await Promise.all([
