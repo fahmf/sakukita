@@ -7,7 +7,7 @@ import { useTransactions, useDeleteTransaction, useRestoreTransaction } from "@/
 import { useWallets } from "@/hooks/use-wallets";
 import { useCategories } from "@/hooks/use-categories";
 import { formatCurrency, formatRelative } from "@/lib/format";
-import { currentFinancialMonth, financialMonthDateRange } from "@/lib/financial-month";
+import { currentFinancialMonth, financialMonthDateRange, financialMonthRangeLabel } from "@/lib/financial-month";
 import { useUIStore } from "@/stores/ui-store";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -344,9 +344,14 @@ function AllTransactionsPage() {
         >
           <ChevronLeft className="size-5" />
         </Button>
-        <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
-          <Calendar className="size-4 text-mint-strong" />
-          <span>{activeMonthName}</span>
+        <div className="flex flex-col items-center">
+          <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
+            <Calendar className="size-4 text-mint-strong" />
+            <span>{activeMonthName}</span>
+          </div>
+          <span className="text-[10px] font-medium text-muted-foreground">
+            {financialMonthRangeLabel(selectedMonth)}
+          </span>
         </div>
         <Button
           variant="ghost"

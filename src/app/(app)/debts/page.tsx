@@ -288,7 +288,7 @@ export default function DebtsPage() {
           <ChevronLeft className="size-5 text-muted-foreground" />
         </Link>
         <PageHeading
-          title="Hutang & Piutang"
+          title="Utang & Piutang"
           subtitle="Kelola kewajiban utang dan tagihan piutang"
         />
       </div>

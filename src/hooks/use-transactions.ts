@@ -520,7 +520,7 @@ export function usePurgeTransaction() {
       const localTx = await db.transactions.get(txId);
       if (!localTx) return txId;
       if (!localTx.is_deleted) {
-        throw new Error("Hanya transaksi di Recycle Bin yang bisa dihapus permanen");
+        throw new Error("Hanya transaksi di Tempat Sampah yang bisa dihapus permanen");
       }
 
       await db.transactions.delete(txId);

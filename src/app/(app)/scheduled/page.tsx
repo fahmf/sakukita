@@ -613,7 +613,7 @@ export default function ScheduledPage() {
           <DialogHeader>
             <DialogTitle>Batalkan transaksi terjadwal?</DialogTitle>
             <DialogDescription>
-              Transaksi akan dipindahkan ke Recycle Bin selama 30 hari sebelum
+              Transaksi akan dipindahkan ke Tempat Sampah selama 30 hari sebelum
               dihapus secara permanen.
             </DialogDescription>
           </DialogHeader>

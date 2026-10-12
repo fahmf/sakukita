@@ -126,3 +126,14 @@ export function occurredAtForDate(dateStr: string): string {
   if (dateStr === todayJakarta()) return new Date().toISOString();
   return new Date(`${dateStr}T00:00:00Z`).toISOString();
 }
+
+/**
+ * Short human label for the dates a financial month covers, e.g.
+ * "25 Sep – 24 Okt". Shown under month navigators so a label like "Oktober"
+ * doesn't read as the calendar month.
+ */
+export function financialMonthRangeLabel(monthStr: string): string {
+  const { start, end } = financialMonthDateRangeAsDates(monthStr);
+  const fmt = (d: Date) => d.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+  return `${fmt(start)} – ${fmt(end)}`;
+}

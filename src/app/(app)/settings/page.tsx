@@ -456,7 +456,7 @@ export default function SettingsPage() {
               <Scale className="size-5" />
             </span>
             <div className="min-w-0">
-              <p className="font-semibold text-sm">Hutang & Piutang</p>
+              <p className="font-semibold text-sm">Utang & Piutang</p>
               <p className="text-xs text-muted-foreground">
                 Pencatatan utang-piutang keluarga
               </p>
@@ -492,7 +492,7 @@ export default function SettingsPage() {
               <Trash2 className="size-5" />
             </span>
             <div className="min-w-0">
-              <p className="font-semibold text-sm">Recycle Bin</p>
+              <p className="font-semibold text-sm">Tempat Sampah</p>
               <p className="text-xs text-muted-foreground">
                 Transaksi terhapus disimpan 30 hari
               </p>

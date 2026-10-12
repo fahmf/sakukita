@@ -74,7 +74,7 @@ export default function TrashPage() {
           <ArrowLeft className="size-4" />
         </Link>
         <PageHeading
-          title="Recycle Bin"
+          title="Tempat Sampah"
           subtitle="Transaksi terhapus disimpan 30 hari sebelum dihapus permanen otomatis"
         />
       </div>

@@ -52,7 +52,18 @@ import {
 } from "lucide-react";
 import type { TransactionType } from "@/lib/supabase/types";
 import { compressImage } from "@/lib/image";
-import { jakartaDateKey, occurredAtForDate, todayJakarta } from "@/lib/financial-month";
+import {
+  financialMonthDateRangeAsDates,
+  financialMonthLabel,
+  jakartaDateKey,
+  occurredAtForDate,
+  shiftMonth,
+  todayJakarta,
+} from "@/lib/financial-month";
+import { db } from "@/lib/db/dexie";
+import { computeBudgetUsage, findApplicableBudget } from "@/lib/budget-usage";
+import { useHousehold } from "@/components/providers/household-provider";
+import type { HierarchicalCategory } from "@/hooks/use-categories";
 
 import { iconMap } from "@/lib/icons";
 
@@ -64,6 +75,60 @@ const keypadKeys = [
   "C", "0", "000", "-",
   "(", ")", "+", "OK"
 ];
+
+/**
+ * Budget feedback for the toast after saving an expense, e.g. "Sisa budget
+ * Makanan: Rp 320.000". Reads straight from Dexie, which already holds the
+ * row just written. Returns null when the category has no budget that month.
+ */
+async function budgetFeedback(
+  householdId: string,
+  categoryId: string,
+  occurredAtIso: string,
+  tree: HierarchicalCategory[]
+): Promise<{ text: string; over: boolean } | null> {
+  const [y, m, d] = jakartaDateKey(occurredAtIso).split("-").map(Number);
+  const month = financialMonthLabel(y, m - 1, d);
+  const prevMonth = shiftMonth(month, -1);
+
+  const budgets = await db.budgets
+    .where("[household_id+period_month]")
+    .anyOf([
+      [householdId, month],
+      [householdId, prevMonth],
+    ])
+    .toArray();
+  const budget = findApplicableBudget(categoryId, tree, budgets, month);
+  if (!budget) return null;
+  const prevBudget = budgets.find(
+    (b) => b.period_month === prevMonth && b.category_id === budget.category_id
+  );
+
+  // A day of slack on each side covers the WIB/UTC offset; rows outside the
+  // two cycles are dropped by computeBudgetUsage.
+  const from = financialMonthDateRangeAsDates(prevMonth).start;
+  from.setDate(from.getDate() - 1);
+  const to = financialMonthDateRangeAsDates(month).end;
+  to.setDate(to.getDate() + 1);
+  const txs = (
+    await db.transactions
+      .where("[household_id+occurred_at]")
+      .between([householdId, from.toISOString()], [householdId, to.toISOString()], true, true)
+      .toArray()
+  ).filter((t) => !t.is_deleted && !t.is_scheduled);
+
+  const usage = computeBudgetUsage(budget, prevBudget, tree, txs, prevMonth);
+  const name =
+    tree.flatMap((p) => [p, ...p.subcategories]).find((c) => c.id === budget.category_id)?.name ??
+    "kategori ini";
+  if (usage.remaining < 0) {
+    return { text: `Budget ${name} terlewati ${formatCurrency(-usage.remaining)}`, over: true };
+  }
+  return {
+    text: `Sisa budget ${name}: ${formatCurrency(usage.remaining)} (${usage.percent}% terpakai)`,
+    over: false,
+  };
+}
 
 export function QuickAddSheet() {
   const { quickAddOpen, closeQuickAdd, editingTransaction } = useUIStore();
@@ -90,6 +155,7 @@ function QuickAddForm() {
     setLastCategory,
   } = useUIStore();
 
+  const { householdId } = useHousehold();
   const { data: wallets = [] } = useWallets();
   const { data: categoriesTree = [] } = useCategories();
   const { data: categoryUsage } = useCategoryUsage();
@@ -515,7 +581,18 @@ function QuickAddForm() {
           tags: finalTags,
           receipt_items: scannedItems,
         });
-        toast.success(keepOpen ? "Tersimpan ✓ — lanjut catat berikutnya" : "Tersimpan ✓");
+        const title = keepOpen ? "Tersimpan ✓ — lanjut catat berikutnya" : "Tersimpan ✓";
+        const feedback =
+          type === "expense" && householdId && activeCategoryId && !isFutureDate
+            ? await budgetFeedback(householdId, activeCategoryId, occurredAtIso, categoriesTree).catch(
+                () => null
+              )
+            : null;
+        if (feedback?.over) {
+          toast.warning(title, { description: feedback.text });
+        } else {
+          toast.success(title, feedback ? { description: feedback.text } : undefined);
+        }
       }
 
       setLastWallet(activeWalletId);
@@ -663,8 +740,8 @@ function QuickAddForm() {
               </p>
             )}
             {isExpression && parsedAmount === 0 && amountExpr !== "" && (
-              <p className="text-xs text-expense animate-pulse">
-                Mengetik rumus...
+              <p className="text-xs text-muted-foreground">
+                Lanjutkan rumus…
               </p>
             )}
           </div>
@@ -716,6 +793,9 @@ function QuickAddForm() {
                 value={activeWalletId}
                 onValueChange={(val) => {
                   setSelectedWalletId(val);
+                  // The destination list hides the source wallet; drop a
+                  // destination that just became the source.
+                  if (val === selectedToWalletId) setSelectedToWalletId("");
                   setShowKeypad(false);
                 }}
               >
@@ -747,11 +827,13 @@ function QuickAddForm() {
                     <SelectValue placeholder="Pilih dompet" />
                   </SelectTrigger>
                   <SelectContent>
-                    {wallets.map((w) => (
-                      <SelectItem key={w.id} value={w.id}>
-                        {w.name}
-                      </SelectItem>
-                    ))}
+                    {wallets
+                      .filter((w) => w.id !== activeWalletId)
+                      .map((w) => (
+                        <SelectItem key={w.id} value={w.id}>
+                          {w.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>

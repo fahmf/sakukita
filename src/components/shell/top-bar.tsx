@@ -69,7 +69,7 @@ export function TopBar() {
         return (
           <div className="flex items-center gap-1 text-[10px] font-semibold text-mint-strong bg-mint-soft px-2.5 py-1 rounded-full animate-pulse border border-mint-strong/20 select-none shrink-0">
             <Loader2 className="size-3 animate-spin" />
-            <span>Syncing</span>
+            <span>Menyinkron</span>
           </div>
         );
       case "offline":
@@ -83,16 +83,17 @@ export function TopBar() {
         return (
           <div className="flex items-center gap-1 text-[10px] font-semibold text-expense bg-red-50 dark:bg-red-950/20 px-2.5 py-1 rounded-full border border-expense/20 shrink-0">
             <AlertCircle className="size-3" />
-            <span>Sync Error</span>
+            <span>Gagal sinkron</span>
           </div>
         );
       case "synced":
       default:
+        // All good is the normal state — keep it to a quiet icon so the top
+        // bar only draws attention when something actually needs it.
         return (
-          <div className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 px-2.5 py-1 rounded-full border border-emerald-500/20 select-none shrink-0">
-            <Cloud className="size-3 text-emerald-500" />
-            <span>Synced</span>
-          </div>
+          <span className="grid size-9 place-items-center rounded-full text-muted-foreground transition-colors group-hover:bg-muted group-hover:text-foreground">
+            <Cloud className="size-4.5" />
+          </span>
         );
     }
   };
@@ -127,7 +128,7 @@ export function TopBar() {
           className="group flex items-center gap-1 disabled:cursor-default"
         >
           {renderSyncBadge()}
-          {status !== "syncing" && (
+          {(status === "offline" || status === "error") && (
             <RefreshCw className="size-3 text-muted-foreground/60 transition-colors group-hover:text-foreground" />
           )}
         </button>

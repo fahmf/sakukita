@@ -7,7 +7,7 @@ import { useBudgets, useSetBudget, useDeleteBudget } from "@/hooks/use-budgets";
 import { useTransactions } from "@/hooks/use-transactions";
 import { useGoals, useCreateGoal, useUpdateGoal, useDeleteGoal } from "@/hooks/use-goals";
 import { formatCurrency } from "@/lib/format";
-import { currentFinancialMonth, shiftMonth, isInFinancialMonth } from "@/lib/financial-month";
+import { currentFinancialMonth, shiftMonth, isInFinancialMonth, financialMonthRangeLabel } from "@/lib/financial-month";
 import { PageHeading } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -521,9 +521,14 @@ export default function BudgetsPage() {
             >
               <ChevronLeft className="size-5" />
             </Button>
-            <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
-              <Calendar className="size-4 text-mint-strong" />
-              <span>{monthLabel}</span>
+            <div className="flex flex-col items-center">
+              <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
+                <Calendar className="size-4 text-mint-strong" />
+                <span>{monthLabel}</span>
+              </div>
+              <span className="text-[10px] font-medium text-muted-foreground">
+                {financialMonthRangeLabel(selectedMonth)}
+              </span>
             </div>
             <Button
               variant="ghost"
