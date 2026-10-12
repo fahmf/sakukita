@@ -3,9 +3,6 @@
 import * as React from "react";
 import {
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
   Tooltip,
   AreaChart,
   Area,
@@ -16,113 +13,6 @@ import {
   Line,
 } from "recharts";
 import { formatCurrency } from "@/lib/format";
-
-interface ExpenseDonutProps {
-  data: Array<{ id: string; name: string; value: number; color: string }>;
-  selectedParentCategoryId: string | null;
-  onSelectCategory: (id: string | null) => void;
-  totalSpent: number;
-}
-
-// Renders a bold percentage label centred on each slice that is large enough
-// to fit one. White text reads clearly over the saturated palette in both
-// light and dark mode.
-function renderPercentLabel(total: number) {
-  return function PercentLabel(props: any) {
-    const { cx, cy, midAngle, innerRadius, outerRadius, value } = props;
-    const percent = total > 0 ? value / total : 0;
-    if (percent < 0.08) return null; // skip slivers — they'd overlap
-
-    const RADIAN = Math.PI / 180;
-    const radius = innerRadius + (outerRadius - innerRadius) / 2;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-    return (
-      <text
-        x={x}
-        y={y}
-        fill="#ffffff"
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontSize={11}
-        fontWeight={700}
-        style={{ pointerEvents: "none", textShadow: "0 1px 2px rgba(0,0,0,0.35)" }}
-      >
-        {`${Math.round(percent * 100)}%`}
-      </text>
-    );
-  };
-}
-
-export function ExpenseDonut({
-  data,
-  selectedParentCategoryId,
-  onSelectCategory,
-  totalSpent,
-}: ExpenseDonutProps) {
-  const total = data.reduce((sum, d) => sum + d.value, 0);
-
-  return (
-    <div className="h-[200px] w-full relative">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius={52}
-            outerRadius={78}
-            paddingAngle={2}
-            dataKey="value"
-            stroke="hsl(var(--card))"
-            strokeWidth={2}
-            labelLine={false}
-            label={renderPercentLabel(total)}
-            onClick={(clickData: any) => {
-              const clickedId = clickData?.payload?.id || clickData?.id;
-              if (clickedId) onSelectCategory(clickedId);
-            }}
-          >
-            {data.map((entry, index) => {
-              const isSelected = selectedParentCategoryId === entry.id;
-              const isDimmed = selectedParentCategoryId !== null && !isSelected;
-              return (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={entry.color}
-                  className="cursor-pointer transition-opacity outline-none"
-                  style={{
-                    opacity: isDimmed ? 0.45 : 1,
-                    filter: isSelected ? "brightness(1.08)" : "none",
-                  }}
-                />
-              );
-            })}
-          </Pie>
-          <Tooltip
-            formatter={(value) => [formatCurrency(Number(value)), "Jumlah"]}
-            contentStyle={{
-              background: "var(--card)",
-              borderColor: "var(--border)",
-              borderRadius: "12px",
-              fontSize: "12px",
-              color: "var(--foreground)",
-            }}
-            itemStyle={{ color: "var(--foreground)" }}
-            labelStyle={{ color: "var(--foreground)" }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-        <span className="text-[10px] text-muted-foreground font-semibold uppercase">Total</span>
-        <span className="text-xs font-bold text-foreground truncate max-w-[100px]">
-          {formatCurrency(totalSpent)}
-        </span>
-      </div>
-    </div>
-  );
-}
 
 interface CumulativeCashflowProps {
   data: Array<any>;
