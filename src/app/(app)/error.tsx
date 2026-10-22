@@ -27,7 +27,7 @@ export default function AppError({
         </p>
       </div>
       {error.digest && (
-        <p className="text-[10px] text-muted-foreground/50 font-mono">
+        <p className="text-xs text-muted-foreground/50 font-mono">
           Kode: {error.digest}
         </p>
       )}
@@ -42,7 +42,7 @@ export default function AppError({
         </Button>
         <Button
           onClick={() => window.location.href = "/dashboard"}
-          className="gap-2 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90"
+          className="gap-2 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90"
         >
           Ke Beranda
         </Button>

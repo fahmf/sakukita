@@ -44,7 +44,7 @@ export function BottomNav() {
             aria-disabled={!allowed}
             onClick={() => (allowed ? openQuickAdd("expense") : viewOnlyToast())}
             className={cn(
-              "-mt-6 grid size-14 place-items-center rounded-full bg-mint-strong text-white shadow-lg shadow-mint-strong/30 transition-transform active:scale-95",
+              "-mt-6 grid size-14 place-items-center rounded-full bg-mint-strong text-on-mint shadow-lg shadow-mint-strong/30 transition-transform active:scale-95",
               !allowed && "opacity-60"
             )}
           >

@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useTransactions, useDeleteTransaction, useRestoreTransaction } from "@/hooks/use-transactions";
 import { useWallets } from "@/hooks/use-wallets";
 import { useCategories } from "@/hooks/use-categories";
-import { formatCurrency, formatRelative } from "@/lib/format";
+import { formatCurrency, formatGrouped } from "@/lib/format";
 import { currentFinancialMonth, financialMonthDateRange, financialMonthRangeLabel } from "@/lib/financial-month";
 import { useUIStore } from "@/stores/ui-store";
 import { Button } from "@/components/ui/button";
@@ -22,18 +22,15 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  ArrowRightLeft,
   Calendar,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   Search,
-  Pencil,
-  Trash2,
   FilterX,
 } from "lucide-react";
 import { TransactionDetailDialog } from "@/components/transaction/transaction-detail-dialog";
-import { iconMap } from "@/lib/icons";
+import { TransactionRow } from "@/components/transaction/transaction-row";
 import { TransactionListSkeleton } from "@/components/shared/skeletons";
 
 type TypeFilter = "all" | "expense" | "income" | "transfer";
@@ -361,7 +358,7 @@ function AllTransactionsPage() {
             <Calendar className="size-4 text-mint-strong" />
             <span>{activeMonthName}</span>
           </div>
-          <span className="text-[10px] font-medium text-muted-foreground">
+          <span className="text-xs font-medium text-muted-foreground">
             {financialMonthRangeLabel(selectedMonth)}
           </span>
         </div>
@@ -499,7 +496,7 @@ function AllTransactionsPage() {
         <Card className="rounded-2xl border bg-card p-4 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                 {selectedCategory.parentName ? `${selectedCategory.parentName} ›` : "Kategori"}
               </p>
               <p className="font-semibold text-sm truncate">{selectedCategory.name}</p>
@@ -573,106 +570,22 @@ function AllTransactionsPage() {
             {groupedTransactions.map((group) => (
               <div key={group.label} className="space-y-2">
                 {/* Date Group Header */}
-                <div className="flex justify-between items-center px-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                <div className="flex justify-between items-center px-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   <span>{group.label}</span>
                   <span className={group.net > 0 ? "text-income" : group.net < 0 ? "text-expense" : ""}>
-                    Net: {group.net >= 0 ? "+" : ""}{formatCurrency(group.net).replace("Rp", "").trim()}
+                    Net: {group.net >= 0 ? "+" : ""}{formatGrouped(group.net)}
                   </span>
                 </div>
 
                 {/* Group transactions */}
                 <div className="grid gap-2">
-                  {group.txs.map((tx) => {
-                    const isExpense = tx.type === "expense";
-                    const isIncome = tx.type === "income";
-                    const isTransfer = tx.type === "transfer";
-
-                    let bgColor = "#C4C4C4";
-                    const hasMappedIcon = !isTransfer && tx.category && iconMap[tx.category.icon || ""];
-                    const categoryIcon = tx.category?.icon || "🏷️";
-
-                    if (isTransfer) {
-                      bgColor = "#A8A29E";
-                    } else if (tx.category) {
-                      bgColor = tx.category.color || "#C4C4C4";
-                    }
-
-                    return (
-                      <div
-                        key={tx.id}
-                        className="flex items-center justify-between rounded-2xl border bg-card p-3.5 transition-all hover:border-mint-strong/20 min-w-0"
-                      >
-                        <div
-                          onClick={() => setSelectedTxForDetail(tx)}
-                          className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer select-none active:opacity-75"
-                        >
-                          <span
-                            className="grid size-9 shrink-0 place-items-center rounded-xl text-white font-semibold"
-                            style={{ backgroundColor: bgColor }}
-                          >
-                            {isTransfer ? (
-                              <ArrowRightLeft className="size-4" />
-                            ) : hasMappedIcon ? (
-                              React.createElement(iconMap[tx.category!.icon || ""], { className: "size-4" })
-                            ) : (
-                              <span className="text-base select-none leading-none">{categoryIcon}</span>
-                            )}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <p className="font-semibold text-sm text-foreground truncate">
-                              {isTransfer
-                                ? `Transfer ke ${tx.to_wallet?.name}`
-                                : tx.note || tx.category?.name || "Lain-lain"}
-                            </p>
-                            <p className="text-xs text-muted-foreground font-medium">
-                              {tx.wallet?.name} · {formatRelative(tx.occurred_at)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0 pl-2">
-                          <div
-                            onClick={() => setSelectedTxForDetail(tx)}
-                            className="text-right cursor-pointer select-none pr-1 active:opacity-75"
-                          >
-                            <p
-                              className={`font-bold text-sm tracking-tight ${
-                                isIncome ? "text-income" : isExpense ? "text-expense" : "text-foreground"
-                              }`}
-                            >
-                              {isIncome ? "+" : isExpense ? "-" : ""}
-                              {formatCurrency(tx.amount).replace("Rp", "").trim()}
-                            </p>
-                          </div>
-
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              if (!allowed) {
-                                viewOnlyToast();
-                              } else {
-                                openEditTransaction(tx);
-                              }
-                            }}
-                            className="size-8 rounded-lg text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50 transition-colors"
-                            aria-label="Ubah transaksi"
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleQuickDelete(tx)}
-                            className="size-8 rounded-lg text-muted-foreground hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
-                            aria-label="Hapus transaksi"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {group.txs.map((tx) => (
+                    <TransactionRow
+                      key={tx.id}
+                      tx={tx}
+                      onOpen={setSelectedTxForDetail}
+                    />
+                  ))}
                 </div>
               </div>
             ))}

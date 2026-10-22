@@ -91,7 +91,7 @@ export function NotificationSettingsCard() {
           <Button
             size="sm"
             onClick={handleEnable}
-            className="rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 shrink-0"
+            className="rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 shrink-0"
           >
             Aktifkan
           </Button>

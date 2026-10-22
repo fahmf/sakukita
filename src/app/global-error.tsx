@@ -29,13 +29,13 @@ export default function GlobalError({
             </p>
           </div>
           {error.digest && (
-            <p className="text-[10px] text-muted-foreground/50 font-mono">
+            <p className="text-xs text-muted-foreground/50 font-mono">
               Kode: {error.digest}
             </p>
           )}
           <Button
             onClick={reset}
-            className="gap-2 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90"
+            className="gap-2 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90"
           >
             <RotateCcw className="size-4" />
             Muat Ulang

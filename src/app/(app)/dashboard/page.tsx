@@ -13,7 +13,7 @@ import {
 import { useBudgets } from "@/hooks/use-budgets";
 import { useCategories } from "@/hooks/use-categories";
 import { useDebts } from "@/hooks/use-debts";
-import { formatCurrency, formatRelative, formatDateShort } from "@/lib/format";
+import { formatCurrency, formatDateShort, formatGrouped } from "@/lib/format";
 import {
   currentFinancialMonth,
   financialMonthDateRange,
@@ -27,17 +27,15 @@ import {
   Plus,
   ArrowUpRight,
   ArrowDownRight,
-  ArrowRightLeft,
   ChevronLeft,
   ChevronRight,
   Calendar,
   CalendarClock,
-  Trash2,
-  Pencil,
   Wallet,
 } from "lucide-react";
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
 import { TransactionDetailDialog } from "@/components/transaction/transaction-detail-dialog";
+import { TransactionRow } from "@/components/transaction/transaction-row";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { iconMap } from "@/lib/icons";
@@ -265,7 +263,42 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* 1. Header & Month Navigator */}
+      {/* 1. Current household balance (all wallets, not month-scoped) */}
+      <Link href="/wallets" className="block transition-all">
+        <Card className="rounded-2xl border bg-card p-5 text-center space-y-1 hover:border-mint-strong/40 transition-all cursor-pointer">
+          <span className="text-xs text-muted-foreground font-medium">Saldo Keluarga Saat Ini</span>
+          {loadingBalances ? (
+            <NetWorthSkeleton />
+          ) : (
+            <p className="text-3xl font-extrabold text-foreground tracking-tight">
+              {formatCurrency(totalNetWorth)}
+            </p>
+          )}
+          {!loadingBalances && hasDebtPosition && (
+            <div className="flex items-center justify-center gap-3 pt-1 text-[11px] font-semibold">
+              {receivables > 0 && (
+                <span className="text-income">
+                  + Piutang {formatGrouped(receivables)}
+                </span>
+              )}
+              {payables > 0 && (
+                <span className="text-expense">
+                  − Utang {formatGrouped(payables)}
+                </span>
+              )}
+            </div>
+          )}
+          <span className="inline-flex items-center justify-center gap-1 pt-1.5 text-[11px] font-medium text-mint-strong">
+            <Wallet className="size-3" />
+            Kelola &amp; tambah dompet
+            <ChevronRight className="size-3" />
+          </span>
+        </Card>
+      </Link>
+
+      {/* 2. Month navigator — sits below the balance on purpose: the balance is
+          "right now" and never changes with the month, everything below this
+          bar is scoped to the selected financial month. */}
       <div className="flex items-center justify-between bg-card border rounded-2xl p-3 shadow-xs">
         <Button
           variant="ghost"
@@ -278,7 +311,7 @@ export default function DashboardPage() {
         </Button>
         <div className="flex flex-col items-center">
           <span className="font-semibold text-foreground text-sm">{activeMonthName}</span>
-          <span className="text-[10px] font-medium text-muted-foreground">
+          <span className="text-xs font-medium text-muted-foreground">
             {financialMonthRangeLabel(selectedMonth)}
           </span>
         </div>
@@ -303,39 +336,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 2. Total Net Worth Monokrom Card */}
-      <Link href="/wallets" className="block transition-all">
-        <Card className="rounded-2xl border bg-card p-5 text-center space-y-1 hover:border-mint-strong/40 transition-all cursor-pointer">
-          <span className="text-xs text-muted-foreground font-medium">Saldo Keluarga Saat Ini</span>
-          {loadingBalances ? (
-            <NetWorthSkeleton />
-          ) : (
-            <p className="text-3xl font-extrabold text-foreground tracking-tight">
-              {formatCurrency(totalNetWorth)}
-            </p>
-          )}
-          {!loadingBalances && hasDebtPosition && (
-            <div className="flex items-center justify-center gap-3 pt-1 text-[11px] font-semibold">
-              {receivables > 0 && (
-                <span className="text-income">
-                  + Piutang {formatCurrency(receivables).replace("Rp", "").trim()}
-                </span>
-              )}
-              {payables > 0 && (
-                <span className="text-expense">
-                  − Utang {formatCurrency(payables).replace("Rp", "").trim()}
-                </span>
-              )}
-            </div>
-          )}
-          <span className="inline-flex items-center justify-center gap-1 pt-1.5 text-[11px] font-medium text-mint-strong">
-            <Wallet className="size-3" />
-            Kelola &amp; tambah dompet
-            <ChevronRight className="size-3" />
-          </span>
-        </Card>
-      </Link>
-
       {/* 3. Income & Expense mini cards */}
       <div className="grid grid-cols-2 gap-3">
         <Link href={`/transactions?bulan=${selectedMonth}&tipe=income`} className="block">
@@ -347,7 +347,7 @@ export default function DashboardPage() {
               Pemasukan
             </div>
             <p className="text-base font-bold text-income tracking-tight">
-              {loadingTx ? "..." : `+${formatCurrency(monthlyIncome).replace("Rp", "").trim()}`}
+              {loadingTx ? "..." : `+${formatGrouped(monthlyIncome)}`}
             </p>
           </Card>
         </Link>
@@ -355,17 +355,17 @@ export default function DashboardPage() {
         <Link href={`/transactions?bulan=${selectedMonth}&tipe=expense`} className="block">
           <Card className="h-full rounded-2xl border bg-card p-4 space-y-1 transition-colors hover:border-mint-strong/40">
             <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
-              <span className="grid size-5 place-items-center rounded-full bg-red-50 dark:bg-red-950/20 text-expense">
+              <span className="grid size-5 place-items-center rounded-full bg-expense-soft text-expense">
                 <ArrowDownRight className="size-3" />
               </span>
               Pengeluaran
             </div>
             <p className="text-base font-bold text-expense tracking-tight">
-              {loadingTx ? "..." : `-${formatCurrency(monthlyExpense).replace("Rp", "").trim()}`}
+              {loadingTx ? "..." : `-${formatGrouped(monthlyExpense)}`}
             </p>
             {!loadingTx && expenseDelta && (
               <p
-                className={`flex items-center gap-0.5 text-[10px] font-semibold ${
+                className={`flex items-center gap-0.5 text-xs font-semibold ${
                   expenseDelta.pct > 0
                     ? "text-expense"
                     : expenseDelta.pct < 0
@@ -405,7 +405,7 @@ export default function DashboardPage() {
                     <span
                       className={`grid size-9 shrink-0 place-items-center rounded-xl ${
                         it.kind === "debt"
-                          ? "bg-amber-50 text-amber-600 dark:bg-amber-950/20"
+                          ? "bg-warning-soft text-warning-strong"
                           : "bg-mint-soft text-mint-strong"
                       }`}
                     >
@@ -418,7 +418,7 @@ export default function DashboardPage() {
                           due.tone === "overdue"
                             ? "text-expense"
                             : due.tone === "today" || due.tone === "soon"
-                            ? "text-amber-600 dark:text-amber-500"
+                            ? "text-warning-strong"
                             : "text-muted-foreground"
                         }`}
                       >
@@ -432,7 +432,7 @@ export default function DashboardPage() {
                     }`}
                   >
                     {it.flow === "in" ? "+" : it.flow === "out" ? "-" : ""}
-                    {formatCurrency(it.amount).replace("Rp", "").trim()}
+                    {formatGrouped(it.amount)}
                   </p>
                 </Link>
               );
@@ -485,12 +485,12 @@ export default function DashboardPage() {
                         b.status === "over"
                           ? "font-semibold text-expense"
                           : b.status === "near"
-                          ? "font-semibold text-amber-600 dark:text-amber-500"
+                          ? "font-semibold text-warning-strong"
                           : "text-muted-foreground"
                       }`}
                     >
                       {b.percent}% · {b.remaining >= 0 ? "Sisa" : "Lewat"}{" "}
-                      {formatCurrency(Math.abs(b.remaining)).replace("Rp", "").trim()}
+                      {formatGrouped(Math.abs(b.remaining))}
                     </span>
                   </div>
                   <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
@@ -499,7 +499,7 @@ export default function DashboardPage() {
                         b.status === "over"
                           ? "bg-expense"
                           : b.status === "near"
-                          ? "bg-amber-500"
+                          ? "bg-warning-strong"
                           : "bg-mint-strong"
                       }`}
                       style={{ width: `${b.progress}%` }}
@@ -522,7 +522,7 @@ export default function DashboardPage() {
             href={`/transactions?bulan=${selectedMonth}`}
             className="text-xs text-mint-strong hover:underline"
           >
-            Riwayat lengkap →
+            Lihat semua →
           </Link>
         </div>
 
@@ -542,110 +542,26 @@ export default function DashboardPage() {
             <Button
               size="sm"
               onClick={() => openQuickAdd("expense")}
-              className="bg-mint-strong text-white hover:bg-mint-strong/90 rounded-xl"
+              className="bg-mint-strong text-on-mint hover:bg-mint-strong/90 rounded-xl"
             >
               Catat Sekarang
             </Button>
           </Card>
         ) : (
           <div className="grid gap-2.5">
-            {displayedTransactions.map((tx) => {
-                const isExpense = tx.type === "expense";
-                const isIncome = tx.type === "income";
-                const isTransfer = tx.type === "transfer";
-
-                let bgColor = "#C4C4C4";
-                const hasMappedIcon = !isTransfer && tx.category && iconMap[tx.category.icon || ""];
-                const categoryIcon = tx.category?.icon || "🏷️";
-
-                if (isTransfer) {
-                  bgColor = "#A8A29E";
-                } else if (tx.category) {
-                  bgColor = tx.category.color || "#C4C4C4";
-                }
-
-                return (
-                  <div
-                    key={tx.id}
-                    className="flex items-center justify-between rounded-2xl border bg-card p-3.5 transition-all hover:border-mint-strong/20 min-w-0"
-                  >
-                    <div 
-                      onClick={() => setSelectedTxForDetail(tx)}
-                      className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer select-none active:opacity-70 transition-opacity"
-                    >
-                      <span
-                        className="grid size-9 shrink-0 place-items-center rounded-xl text-white font-semibold"
-                        style={{ backgroundColor: bgColor }}
-                      >
-                        {isTransfer ? (
-                          <ArrowRightLeft className="size-4" />
-                        ) : hasMappedIcon ? (
-                          React.createElement(iconMap[tx.category!.icon || ""], { className: "size-4" })
-                        ) : (
-                          <span className="text-base select-none leading-none">{categoryIcon}</span>
-                        )}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-sm text-foreground truncate">
-                          {isTransfer
-                            ? `Transfer ke ${tx.to_wallet?.name}`
-                            : tx.note || tx.category?.name || "Lain-lain"}
-                        </p>
-                        <p className="text-xs text-muted-foreground font-medium">
-                          {tx.wallet?.name} · {formatRelative(tx.occurred_at)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0 pl-2">
-                      <div 
-                        onClick={() => setSelectedTxForDetail(tx)}
-                        className="text-right cursor-pointer select-none pr-1 active:opacity-70 transition-opacity"
-                      >
-                        <p
-                          className={`font-bold text-sm tracking-tight ${
-                            isIncome ? "text-income" : isExpense ? "text-expense" : "text-foreground"
-                          }`}
-                        >
-                          {isIncome ? "+" : isExpense ? "-" : ""}
-                          {formatCurrency(tx.amount).replace("Rp", "").trim()}
-                        </p>
-                      </div>
-
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          if (!allowed) {
-                            viewOnlyToast();
-                          } else {
-                            openEditTransaction(tx);
-                          }
-                        }}
-                        className="size-8 rounded-lg text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50 transition-colors"
-                        aria-label="Ubah transaksi"
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleQuickDelete(tx)}
-                        className="size-8 rounded-lg text-muted-foreground hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
-                        aria-label="Hapus transaksi"
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
+            {displayedTransactions.map((tx) => (
+              <TransactionRow
+                key={tx.id}
+                tx={tx}
+                onOpen={setSelectedTxForDetail}
+              />
+            ))}
 
             {transactions.length > 10 && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => router.push("/transactions")}
+                onClick={() => router.push(`/transactions?bulan=${selectedMonth}`)}
                 className="w-full text-xs text-mint-strong hover:bg-mint-soft/50 py-2.5 mt-1 rounded-xl font-semibold"
               >
                 Lihat Semua ({transactions.length} Transaksi)

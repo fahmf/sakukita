@@ -722,7 +722,7 @@ function QuickAddForm() {
                   type="button"
                   disabled={isScanning}
                   onClick={handleScanClick}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 grid size-8 place-items-center rounded-lg text-mint-strong hover:bg-mint-soft/60 transition-colors disabled:opacity-60"
+                  className="absolute hit-area-44 left-0 top-1/2 -translate-y-1/2 grid size-8 place-items-center rounded-lg text-mint-strong hover:bg-mint-soft/60 transition-colors disabled:opacity-60"
                   title="Scan struk dengan AI"
                   aria-label="Scan struk dengan AI"
                 >
@@ -749,7 +749,7 @@ function QuickAddForm() {
               <button
                 type="button"
                 onClick={() => setShowKeypad(!showKeypad)}
-                className="absolute right-0 top-1/2 -translate-y-1/2 grid size-8 place-items-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                className="absolute hit-area-44 right-0 top-1/2 -translate-y-1/2 grid size-8 place-items-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
                 title={showKeypad ? "Sembunyikan keypad" : "Tampilkan keypad"}
                 aria-label={showKeypad ? "Sembunyikan keypad" : "Tampilkan keypad"}
               >
@@ -935,7 +935,7 @@ function QuickAddForm() {
             <Label className="text-xs font-semibold text-muted-foreground">
               Tanggal
               {isFutureDate && (
-                <span className="ml-1 rounded-full bg-mint-soft px-1.5 py-0.5 text-[10px] font-semibold text-mint-strong">
+                <span className="ml-1 rounded-full bg-mint-soft px-1.5 py-0.5 text-xs font-semibold text-mint-strong">
                   Terjadwal
                 </span>
               )}
@@ -1039,18 +1039,20 @@ function QuickAddForm() {
           {scannedItems && scannedItems.length > 0 && (
             <div className="rounded-2xl border border-border bg-card overflow-hidden">
               <div className="flex w-full items-center justify-between p-3.5 text-left">
-                <div
+                <button
+                  type="button"
                   onClick={() => setScannedItemsOpen(!scannedItemsOpen)}
-                  className="flex flex-1 items-center gap-2 cursor-pointer select-none"
+                  aria-expanded={scannedItemsOpen}
+                  className="flex flex-1 items-center gap-2 text-left select-none"
                 >
                   <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-mint-soft/50 text-mint-strong">
                     <FileText className="size-4" />
                   </div>
                   <div>
                     <span className="text-xs font-semibold text-foreground">Detail Struk Terdeteksi</span>
-                    <p className="text-[10px] text-muted-foreground">{scannedItems.length} item terdaftar</p>
+                    <p className="text-xs text-muted-foreground">{scannedItems.length} item terdaftar</p>
                   </div>
-                </div>
+                </button>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -1061,6 +1063,7 @@ function QuickAddForm() {
                     }}
                     className="p-1 text-muted-foreground hover:text-expense rounded-md hover:bg-destructive/10 transition-colors"
                     title="Hapus data struk"
+                    aria-label="Hapus data struk"
                   >
                     <Trash2 className="size-3.5" />
                   </button>
@@ -1069,6 +1072,8 @@ function QuickAddForm() {
                     onClick={() => setScannedItemsOpen(!scannedItemsOpen)}
                     className="p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
                     title={scannedItemsOpen ? "Tutup detail" : "Buka detail"}
+                    aria-label={scannedItemsOpen ? "Tutup detail struk" : "Buka detail struk"}
+                    aria-expanded={scannedItemsOpen}
                   >
                     {scannedItemsOpen ? (
                       <ChevronUp className="size-4" />
@@ -1106,7 +1111,7 @@ function QuickAddForm() {
               let btnClass = "h-11 rounded-xl font-bold text-sm transition-all active:scale-95 duration-75 flex items-center justify-center ";
 
               if (key === "⌫" || key === "C") {
-                btnClass += "bg-red-50 text-expense dark:bg-red-950/20 dark:text-red-400 hover:bg-red-100/50";
+                btnClass += "bg-expense-soft text-expense dark:text-red-400 hover:bg-red-100/50";
               } else if (isOperator) {
                 btnClass += "bg-muted text-foreground hover:bg-muted/80";
               } else {
@@ -1134,13 +1139,13 @@ function QuickAddForm() {
           {!editingTransaction && (
             <label className="flex shrink-0 cursor-pointer select-none flex-col items-center gap-1">
               <Switch checked={keepOpen} onCheckedChange={setKeepOpen} aria-label="Simpan lalu tambah lagi" />
-              <span className="text-[10px] font-medium leading-none text-muted-foreground">Tambah lagi</span>
+              <span className="text-xs font-medium leading-none text-muted-foreground">Tambah lagi</span>
             </label>
           )}
           <Button
             type="submit"
             disabled={createTx.isPending || updateTx.isPending || parsedAmount <= 0}
-            className="flex-1 h-12 bg-mint-strong text-white hover:bg-mint-strong/90 rounded-xl font-semibold gap-1.5"
+            className="flex-1 h-12 bg-mint-strong text-on-mint hover:bg-mint-strong/90 rounded-xl font-semibold gap-1.5"
           >
             {createTx.isPending || updateTx.isPending ? (
               "Menyimpan..."

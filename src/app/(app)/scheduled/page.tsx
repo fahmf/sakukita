@@ -331,7 +331,7 @@ export default function ScheduledPage() {
         {activeTab === "recurring" && (
           <Button
             onClick={handleOpenAddDialog}
-            className="bg-mint-strong hover:bg-mint-strong/90 text-white rounded-xl h-11 px-4 text-sm font-semibold flex items-center justify-center gap-1.5 self-start sm:self-auto"
+            className="bg-mint-strong hover:bg-mint-strong/90 text-on-mint rounded-xl h-11 px-4 text-sm font-semibold flex items-center justify-center gap-1.5 self-start sm:self-auto"
           >
             <Plus className="size-4" />
             Tambah Berulang
@@ -428,7 +428,7 @@ export default function ScheduledPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="rounded-xl gap-1 text-xs h-8 border-mint-strong/20 hover:border-mint-strong/40 text-mint-strong hover:bg-mint-soft/20"
+                                className="relative hit-area-44 rounded-xl gap-1 text-xs h-8 border-mint-strong/20 hover:border-mint-strong/40 text-mint-strong hover:bg-mint-soft/20"
                                 onClick={() => handleMaterializeScheduled(t.id)}
                                 disabled={materialize.isPending}
                                 aria-label="Jadikan aktif sekarang"
@@ -439,7 +439,7 @@ export default function ScheduledPage() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="rounded-xl text-xs h-8 text-expense hover:text-expense hover:bg-red-50/50 dark:hover:bg-red-950/20"
+                                className="relative hit-area-44 rounded-xl text-xs h-8 text-expense hover:text-expense hover:bg-red-50/50 dark:hover:bg-red-950/20"
                                 onClick={() => setConfirmCancel(t.id)}
                                 disabled={cancelTx.isPending}
                                 aria-label="Batalkan"
@@ -528,7 +528,7 @@ export default function ScheduledPage() {
                               {t.note || catName || (isTransfer ? "Transfer Berulang" : "Transaksi Berkala")}
                             </p>
                             {!t.is_active && (
-                              <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-bold">
+                              <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-bold">
                                 Nonaktif
                               </span>
                             )}
@@ -550,7 +550,7 @@ export default function ScheduledPage() {
                               {getRecurrenceLabel(t.frequency, t.interval)}
                             </span>
                             {t.is_active && t.next_materialize_at && (
-                              <span className="flex items-center gap-1 text-amber-600 dark:text-amber-500">
+                              <span className="flex items-center gap-1 text-warning-strong">
                                 <Calendar className="size-3" />
                                 Jt Tempo: {formatDate(t.next_materialize_at)}
                               </span>
@@ -579,7 +579,7 @@ export default function ScheduledPage() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="size-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted"
+                            className="relative hit-area-44 size-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted"
                             onClick={() => handleOpenEditDialog(t)}
                             aria-label="Ubah jadwal"
                           >
@@ -588,7 +588,7 @@ export default function ScheduledPage() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="size-8 rounded-xl text-expense hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20"
+                            className="relative hit-area-44 size-8 rounded-xl text-expense hover:text-expense hover:bg-expense-soft"
                             onClick={() => setConfirmDeleteRecurring(t.id)}
                             aria-label="Hapus jadwal"
                           >
@@ -627,7 +627,7 @@ export default function ScheduledPage() {
               Kembali
             </Button>
             <Button
-              className="rounded-xl h-11 bg-expense text-white hover:bg-expense/90"
+              className="rounded-xl h-11 bg-expense text-on-expense hover:bg-expense/90"
               onClick={handleCancelScheduled}
               disabled={cancelTx.isPending}
             >
@@ -695,9 +695,9 @@ export default function ScheduledPage() {
                       className={`py-2 text-xs font-semibold rounded-lg transition-all capitalize ${
                         type === t
                           ? t === "expense"
-                            ? "bg-expense text-white shadow-sm"
+                            ? "bg-expense text-on-expense shadow-sm"
                             : t === "income"
-                            ? "bg-mint-strong text-white shadow-sm"
+                            ? "bg-mint-strong text-on-mint shadow-sm"
                             : "bg-blue-500 text-white shadow-sm"
                           : "text-muted-foreground hover:bg-muted/40"
                       } ${!!editingTemplate ? "opacity-60 cursor-not-allowed" : ""}`}
@@ -856,7 +856,7 @@ export default function ScheduledPage() {
               <Button
                 type="submit"
                 disabled={createRecurring.isPending || updateRecurring.isPending}
-                className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold w-full"
+                className="h-11 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 font-semibold w-full"
               >
                 {createRecurring.isPending || updateRecurring.isPending
                   ? "Menyimpan..."

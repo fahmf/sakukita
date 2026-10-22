@@ -147,7 +147,7 @@ export function CycleStartDayCard() {
             <Button
               onClick={handleConfirm}
               disabled={saving}
-              className="rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90"
+              className="rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90"
             >
               {saving && <Loader2 className="mr-1.5 size-4 animate-spin" />}
               Ubah

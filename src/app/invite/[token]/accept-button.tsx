@@ -38,7 +38,7 @@ export function AcceptInviteButton({ token }: { token: string }) {
     <Button
       onClick={accept}
       disabled={pending}
-      className="h-12 w-full rounded-2xl bg-mint-strong text-base font-semibold text-white hover:bg-mint-strong/90"
+      className="h-12 w-full rounded-2xl bg-mint-strong text-base font-semibold text-on-mint hover:bg-mint-strong/90"
     >
       {pending ? (
         <>

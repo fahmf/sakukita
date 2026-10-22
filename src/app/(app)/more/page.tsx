@@ -3,7 +3,6 @@
 import Link from "next/link";
 import {
   CalendarClock,
-  CalendarDays,
   ChevronRight,
   PiggyBank,
   Scale,
@@ -21,13 +20,14 @@ import { useHousehold } from "@/components/providers/household-provider";
 type Tile = { href: string; label: string; hint: string; icon: LucideIcon; tone: string };
 
 // Features first, grouped by what people come for; account housekeeping last.
+// Kalender is deliberately absent: it is a view of Riwayat (reached from the
+// Riwayat page and the Beranda month bar) and lights up that tab.
 const FEATURES: Tile[] = [
   { href: "/budgets", label: "Rencana & Budget", hint: "Batas per kategori", icon: Target, tone: "bg-mint-soft text-mint-strong" },
   { href: "/wallets", label: "Dompet", hint: "Saldo per akun", icon: Wallet, tone: "bg-sky-50 text-sky-600 dark:bg-sky-950/30 dark:text-sky-400" },
   { href: "/savings", label: "Tabungan", hint: "Target impian", icon: PiggyBank, tone: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400" },
   { href: "/debts", label: "Utang & Piutang", hint: "Pinjaman keluarga", icon: Scale, tone: "bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400" },
   { href: "/scheduled", label: "Terjadwal", hint: "Tagihan & berulang", icon: CalendarClock, tone: "bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-400" },
-  { href: "/calendar", label: "Kalender", hint: "Transaksi per hari", icon: CalendarDays, tone: "bg-rose-50 text-rose-600 dark:bg-rose-950/30 dark:text-rose-400" },
 ];
 
 const MANAGE: Tile[] = [

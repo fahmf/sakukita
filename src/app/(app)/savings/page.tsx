@@ -246,7 +246,7 @@ export default function SavingsGoalsPage() {
           action={
             <Button
               onClick={handleOpenAdd}
-              className="bg-mint-strong text-white hover:bg-mint-strong/90 rounded-xl"
+              className="bg-mint-strong text-on-mint hover:bg-mint-strong/90 rounded-xl"
             >
               <Plus className="size-4 mr-1.5" /> Buat Target Baru
             </Button>
@@ -258,7 +258,7 @@ export default function SavingsGoalsPage() {
           <Card className="rounded-2xl border bg-card p-5 space-y-4">
             <div className="flex justify-between items-center">
               <div>
-                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                <span className="text-xs uppercase font-bold text-muted-foreground tracking-wider">
                   Total Tabungan Terkumpul
                 </span>
                 <p className="text-3xl font-extrabold text-foreground tracking-tight mt-0.5">
@@ -346,21 +346,21 @@ export default function SavingsGoalsPage() {
                             {goal.name}
                           </p>
                           {isCompleted && (
-                            <span className="flex items-center gap-0.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                            <span className="flex items-center gap-0.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-xs font-bold px-1.5 py-0.5 rounded-full">
                               <CheckCircle2 className="size-3" />
                               Selesai
                             </span>
                           )}
                         </div>
                         {formattedDate && (
-                          <p className="text-[10px] text-muted-foreground flex flex-wrap items-center gap-1 mt-0.5 font-medium">
+                          <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-1 mt-0.5 font-medium">
                             <Calendar className="size-3" />
                             Target: {formattedDate}
                             {needed && (
                               <span
                                 className={
                                   needed.urgent
-                                    ? "font-semibold text-amber-600 dark:text-amber-500"
+                                    ? "font-semibold text-warning-strong"
                                     : "font-semibold text-mint-strong"
                                 }
                               >
@@ -373,13 +373,13 @@ export default function SavingsGoalsPage() {
                     </div>
 
                     {/* Edit/Delete actions */}
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => handleOpenEdit(goal)}
-                        className="size-8 rounded-lg text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/30 transition-all"
-                        aria-label="Edit target"
+                        className="relative hit-area-44 size-8 rounded-lg text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/30 transition-all"
+                        aria-label="Ubah target"
                       >
                         <Pencil className="size-3.5" />
                       </Button>
@@ -387,7 +387,7 @@ export default function SavingsGoalsPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleOpenDelete(goal)}
-                        className="size-8 rounded-lg text-muted-foreground hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20 transition-all"
+                        className="relative hit-area-44 size-8 rounded-lg text-muted-foreground hover:text-expense hover:bg-expense-soft transition-all"
                         aria-label="Hapus target"
                       >
                         <Trash2 className="size-3.5" />
@@ -540,7 +540,7 @@ export default function SavingsGoalsPage() {
                 <Button
                   type="submit"
                   disabled={createGoal.isPending || updateGoal.isPending || !name.trim() || !targetAmount}
-                  className="h-11 w-full bg-mint-strong text-white hover:bg-mint-strong/90 rounded-xl font-semibold"
+                  className="h-11 w-full bg-mint-strong text-on-mint hover:bg-mint-strong/90 rounded-xl font-semibold"
                 >
                   {createGoal.isPending || updateGoal.isPending 
                     ? "Menyimpan..." 
@@ -582,7 +582,7 @@ export default function SavingsGoalsPage() {
                 <Button
                   type="submit"
                   disabled={updateGoal.isPending || !addAmount}
-                  className="h-11 w-full bg-mint-strong text-white hover:bg-mint-strong/90 rounded-xl font-semibold"
+                  className="h-11 w-full bg-mint-strong text-on-mint hover:bg-mint-strong/90 rounded-xl font-semibold"
                 >
                   {updateGoal.isPending ? "Menyimpan..." : "Tambahkan Rencana"}
                 </Button>
@@ -611,7 +611,7 @@ export default function SavingsGoalsPage() {
                 Batal
               </Button>
               <Button
-                className="rounded-xl h-11 bg-expense text-white hover:bg-expense/90"
+                className="rounded-xl h-11 bg-expense text-on-expense hover:bg-expense/90"
                 onClick={handleDeleteConfirm}
                 disabled={deleteGoal.isPending}
               >

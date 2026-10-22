@@ -208,7 +208,7 @@ export default function HouseholdSettingsPage() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="size-8 rounded-full text-expense hover:bg-red-50 hover:text-expense dark:hover:bg-red-950/20"
+                        className="relative hit-area-44 size-8 rounded-full text-expense hover:bg-expense-soft hover:text-expense"
                         onClick={() => setConfirmRemove(m.user_id)}
                         aria-label="Hapus anggota"
                       >
@@ -265,13 +265,13 @@ export default function HouseholdSettingsPage() {
                         {formatRelative(inv.expires_at)}
                       </p>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0">
                       {isActive && (
                         <>
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="size-8 rounded-full"
+                            className="relative hit-area-44 size-8 rounded-full"
                             onClick={() => copyLink(link)}
                             aria-label="Salin link undangan"
                           >
@@ -280,7 +280,7 @@ export default function HouseholdSettingsPage() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="size-8 rounded-full text-expense hover:bg-red-50 hover:text-expense dark:hover:bg-red-950/20"
+                            className="relative hit-area-44 size-8 rounded-full text-expense hover:bg-expense-soft hover:text-expense"
                             onClick={() => revokeInvite.mutate(inv.id)}
                             disabled={revokeInvite.isPending}
                             aria-label="Cabut undangan"
@@ -332,7 +332,7 @@ export default function HouseholdSettingsPage() {
                     <p className="text-xs font-medium text-foreground leading-normal pr-1 break-words">
                       {message}
                     </p>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {dateStr}
                     </p>
                   </div>
@@ -360,7 +360,7 @@ export default function HouseholdSettingsPage() {
               </div>
               <Button
                 onClick={() => copyLink(generatedLink)}
-                className="h-11 w-full rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90"
+                className="h-11 w-full rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90"
               >
                 <Copy className="size-4 mr-2" /> Salin link
               </Button>
@@ -406,7 +406,7 @@ export default function HouseholdSettingsPage() {
               <DialogFooter className="pt-2">
                 <Button
                   type="submit"
-                  className="h-11 w-full rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold"
+                  className="h-11 w-full rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 font-semibold"
                   disabled={createInvite.isPending}
                 >
                   {createInvite.isPending ? "Membuat..." : "Buat link undangan"}
@@ -438,7 +438,7 @@ export default function HouseholdSettingsPage() {
               Batal
             </Button>
             <Button
-              className="rounded-xl h-11 bg-expense text-white hover:bg-expense/90"
+              className="rounded-xl h-11 bg-expense text-on-expense hover:bg-expense/90"
               onClick={handleRemoveMember}
               disabled={removeMember.isPending}
             >

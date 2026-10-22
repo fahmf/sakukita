@@ -331,7 +331,7 @@ export default function BudgetsPage() {
                 <Calendar className="size-4 text-mint-strong" />
                 <span>{monthLabel}</span>
               </div>
-              <span className="text-[10px] font-medium text-muted-foreground">
+              <span className="text-xs font-medium text-muted-foreground">
                 {financialMonthRangeLabel(selectedMonth)}
               </span>
             </div>
@@ -375,7 +375,7 @@ export default function BudgetsPage() {
                         type="button"
                         onClick={handleCopyBudgets}
                         disabled={copying}
-                        className="h-10 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold text-xs gap-1.5"
+                        className="h-10 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 font-semibold text-xs gap-1.5"
                       >
                         {copying ? (
                           <Loader2 className="size-3.5 animate-spin" />
@@ -412,7 +412,7 @@ export default function BudgetsPage() {
                                     {item.category.name}
                                   </p>
                                   {item.category.parent_id !== null && (
-                                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-md text-muted-foreground">
+                                    <span className="text-xs bg-muted px-1.5 py-0.5 rounded-md text-muted-foreground">
                                       Sub
                                     </span>
                                   )}
@@ -458,7 +458,7 @@ export default function BudgetsPage() {
                             </div>
 
                             {/* Limit warnings / indicators */}
-                            <div className="flex justify-between items-center text-[10px] font-medium">
+                            <div className="flex justify-between items-center text-xs font-medium">
                               <span
                                 className="px-1.5 py-0.5 rounded-md"
                                 style={{
@@ -469,12 +469,12 @@ export default function BudgetsPage() {
                                 {Math.round(item.progressPercent)}% limit
                               </span>
                               {overspent ? (
-                                <span className="text-red-500 font-semibold flex items-center gap-0.5">
+                                <span className="text-expense font-semibold flex items-center gap-0.5">
                                   <TrendingDown className="size-3" />
                                   Melebihi limit {formatCurrency(Math.abs(item.remaining))}
                                 </span>
                               ) : isNearLimit ? (
-                                <span className="text-amber-500 font-semibold">
+                                <span className="text-warning-strong font-semibold">
                                   Mendekati limit! Sisa {formatCurrency(item.remaining)}
                                 </span>
                               ) : (
@@ -520,13 +520,13 @@ export default function BudgetsPage() {
                                 {item.category.name}
                               </p>
                               {item.category.parent_id !== null && (
-                                <span className="text-[9px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                                <span className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
                                   Sub
                                 </span>
                               )}
                             </div>
                             {item.spent > 0 && (
-                              <p className="text-[10px] text-muted-foreground">
+                              <p className="text-xs text-muted-foreground">
                                 Terpakai {formatCurrency(item.spent)} bulan ini
                               </p>
                             )}
@@ -536,7 +536,7 @@ export default function BudgetsPage() {
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          className="size-8 rounded-xl bg-muted/60 text-muted-foreground hover:bg-mint-strong hover:text-white shrink-0"
+                          className="relative hit-area-44 size-8 rounded-xl bg-muted/60 text-muted-foreground hover:bg-mint-strong hover:text-on-mint shrink-0"
                         >
                           <Plus className="size-4" />
                         </Button>
@@ -596,7 +596,7 @@ export default function BudgetsPage() {
                       Akumulasi Sisa Bulan Lalu
                     </Label>
                   </div>
-                  <p className="text-[10px] text-muted-foreground leading-normal">
+                  <p className="text-xs text-muted-foreground leading-normal">
                     Jika aktif, sisa dana tak terpakai di bulan lalu otomatis ditambahkan ke batas limit bulan ini.
                   </p>
                 </div>
@@ -611,7 +611,7 @@ export default function BudgetsPage() {
                 <Button
                   type="submit"
                   disabled={setBudgetMutation.isPending}
-                  className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold"
+                  className="h-11 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 font-semibold"
                 >
                   {setBudgetMutation.isPending ? "Menyimpan..." : "Simpan Batas Limit"}
                 </Button>
@@ -623,7 +623,7 @@ export default function BudgetsPage() {
                     variant="ghost"
                     onClick={handleDeleteBudget}
                     disabled={deleteBudgetMutation.isPending}
-                    className="h-10 rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 text-xs font-semibold"
+                    className="h-10 rounded-xl text-expense hover:text-expense hover:bg-expense-soft text-xs font-semibold"
                   >
                     {deleteBudgetMutation.isPending ? "Menghapus..." : "Hapus Batas Limit"}
                   </Button>

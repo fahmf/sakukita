@@ -158,7 +158,7 @@ export function LoginForm({ next, error: initialError }: { next: string; error?:
 
         <Button
           type="submit"
-          className="h-11 w-full gap-2 mt-2 bg-mint-strong hover:bg-mint-strong/90 text-white rounded-xl"
+          className="h-11 w-full gap-2 mt-2 bg-mint-strong hover:bg-mint-strong/90 text-on-mint rounded-xl"
           disabled={loading !== null || !email || !password}
         >
           {loading === "submit" && <Loader2 className="size-4 animate-spin" />}
