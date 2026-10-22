@@ -128,11 +128,11 @@ export default function TrashPage() {
                     {sign}
                     {formatCurrency(Number(t.amount))}
                   </span>
-                  <div className="flex gap-1">
+                  <div className="flex gap-2">
                     <Button
                       size="sm"
                       variant="outline"
-                      className="rounded-xl gap-1 text-xs h-8"
+                      className="relative hit-area-44 rounded-xl gap-1 text-xs h-8"
                       onClick={() => handleRestore(t.id)}
                       disabled={restore.isPending}
                       aria-label={`Pulihkan transaksi ${t.note ?? ""}`}
@@ -143,7 +143,7 @@ export default function TrashPage() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="rounded-xl text-xs h-8 text-expense hover:text-expense"
+                      className="relative hit-area-44 rounded-xl text-xs h-8 text-expense hover:text-expense"
                       onClick={() => setConfirmId(t.id)}
                       disabled={purge.isPending}
                       aria-label={`Hapus permanen transaksi ${t.note ?? ""}`}
@@ -178,7 +178,7 @@ export default function TrashPage() {
               Batal
             </Button>
             <Button
-              className="rounded-xl h-11 bg-expense text-white hover:bg-expense/90"
+              className="rounded-xl h-11 bg-expense text-on-expense hover:bg-expense/90"
               onClick={handlePurge}
               disabled={purge.isPending}
             >

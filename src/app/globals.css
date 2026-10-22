@@ -65,6 +65,12 @@
    * holds 4.5:1 on white where amber-600 only reaches ~3.2:1. */
   --color-warning-strong: #b45309;
   --color-warning-soft: #fffbeb;
+  --color-expense-soft: #fef2f2;
+  /* Text/icon colour on a solid mint-strong / expense fill (FAB, primary and
+   * destructive buttons). White in light mode; in dark mode the fills are the
+   * lighter pastels, so white would drop to ~2:1 and a deep tint is used. */
+  --color-on-mint: #ffffff;
+  --color-on-expense: #ffffff;
 }
 
 :root {
@@ -142,6 +148,12 @@
   --color-expense: #e8a5a5;
   --color-warning-strong: #f59e0b;
   --color-warning-soft: rgb(69 26 3 / 0.3);
+  /* Pastel surfaces would glare on the dark card — use deep tints instead. */
+  --color-mint: #1f4d3f;
+  --color-mint-soft: #12352b;
+  --color-expense-soft: rgb(69 10 10 / 0.35);
+  --color-on-mint: #04261c;
+  --color-on-expense: #450a0a;
 }
 
 @layer base {
@@ -201,5 +213,21 @@
   scrollbar-width: none;
   &::-webkit-scrollbar {
     display: none;
+  }
+}
+
+/* Grows an icon button's tap target to 44x44 without changing how it looks.
+ * The element must be positioned (add `relative` unless it is already
+ * absolute); neighbours should keep a small gap so the enlarged areas don't
+ * swallow each other. */
+@utility hit-area-44 {
+  &::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
   }
 }

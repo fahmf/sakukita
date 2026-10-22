@@ -35,7 +35,7 @@ export default function GlobalError({
           )}
           <Button
             onClick={reset}
-            className="gap-2 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90"
+            className="gap-2 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90"
           >
             <RotateCcw className="size-4" />
             Muat Ulang

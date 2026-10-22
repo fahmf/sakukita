@@ -315,7 +315,7 @@ export function TransactionDetailDialog({
                 if (onDelete) onDelete(tx);
               }
             }}
-            className="flex-1 h-11 rounded-xl font-semibold gap-1.5 text-xs text-expense hover:bg-red-50 dark:hover:bg-red-950/20"
+            className="flex-1 h-11 rounded-xl font-semibold gap-1.5 text-xs text-expense hover:bg-expense-soft"
           >
             <Trash2 className="size-3.5" />
             Hapus

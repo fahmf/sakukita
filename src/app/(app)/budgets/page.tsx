@@ -375,7 +375,7 @@ export default function BudgetsPage() {
                         type="button"
                         onClick={handleCopyBudgets}
                         disabled={copying}
-                        className="h-10 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold text-xs gap-1.5"
+                        className="h-10 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 font-semibold text-xs gap-1.5"
                       >
                         {copying ? (
                           <Loader2 className="size-3.5 animate-spin" />
@@ -536,7 +536,7 @@ export default function BudgetsPage() {
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          className="size-8 rounded-xl bg-muted/60 text-muted-foreground hover:bg-mint-strong hover:text-white shrink-0"
+                          className="relative hit-area-44 size-8 rounded-xl bg-muted/60 text-muted-foreground hover:bg-mint-strong hover:text-on-mint shrink-0"
                         >
                           <Plus className="size-4" />
                         </Button>
@@ -611,7 +611,7 @@ export default function BudgetsPage() {
                 <Button
                   type="submit"
                   disabled={setBudgetMutation.isPending}
-                  className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold"
+                  className="h-11 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 font-semibold"
                 >
                   {setBudgetMutation.isPending ? "Menyimpan..." : "Simpan Batas Limit"}
                 </Button>
@@ -623,7 +623,7 @@ export default function BudgetsPage() {
                     variant="ghost"
                     onClick={handleDeleteBudget}
                     disabled={deleteBudgetMutation.isPending}
-                    className="h-10 rounded-xl text-expense hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20 text-xs font-semibold"
+                    className="h-10 rounded-xl text-expense hover:text-expense hover:bg-expense-soft text-xs font-semibold"
                   >
                     {deleteBudgetMutation.isPending ? "Menghapus..." : "Hapus Batas Limit"}
                   </Button>

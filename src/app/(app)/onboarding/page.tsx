@@ -204,7 +204,7 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex flex-col gap-2 pt-2">
-                <Button type="submit" disabled={createWallet.isPending} className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold w-full">
+                <Button type="submit" disabled={createWallet.isPending} className="h-11 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 font-semibold w-full">
                   {createWallet.isPending ? "Membuat..." : "Buat & Lanjut"}
                 </Button>
                 <Button
@@ -253,7 +253,7 @@ export default function OnboardingPage() {
 
             <div className="flex flex-col gap-2 pt-2">
               {!isIOS && deferredPrompt ? (
-                <Button onClick={handleInstallClick} className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold w-full">
+                <Button onClick={handleInstallClick} className="h-11 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 font-semibold w-full">
                   Instal Aplikasi Saku
                 </Button>
               ) : null}
@@ -286,7 +286,7 @@ export default function OnboardingPage() {
             <div className="space-y-2.5">
               <Button
                 onClick={() => finish(true)}
-                className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold w-full gap-2"
+                className="h-11 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 font-semibold w-full gap-2"
               >
                 <Check className="size-4" />
                 Catat Transaksi Pertama

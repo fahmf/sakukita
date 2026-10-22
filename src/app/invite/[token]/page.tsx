@@ -64,7 +64,7 @@ function ErrorShell({ title, message }: { title: string; message: string }) {
       <p className="text-sm text-muted-foreground">{message}</p>
       <Link
         href="/dashboard"
-        className="rounded-xl bg-mint-strong px-4 py-2 text-sm font-semibold text-white hover:bg-mint-strong/90"
+        className="rounded-xl bg-mint-strong px-4 py-2 text-sm font-semibold text-on-mint hover:bg-mint-strong/90"
       >
         Kembali ke dashboard
       </Link>

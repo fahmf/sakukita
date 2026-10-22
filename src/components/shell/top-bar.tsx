@@ -81,7 +81,7 @@ export function TopBar() {
         );
       case "error":
         return (
-          <div className="flex items-center gap-1 text-xs font-semibold text-expense bg-red-50 dark:bg-red-950/20 px-2.5 py-1 rounded-full border border-expense/20 shrink-0">
+          <div className="flex items-center gap-1 text-xs font-semibold text-expense bg-expense-soft px-2.5 py-1 rounded-full border border-expense/20 shrink-0">
             <AlertCircle className="size-3" />
             <span>Gagal sinkron</span>
           </div>

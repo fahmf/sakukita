@@ -584,8 +584,6 @@ function AllTransactionsPage() {
                       key={tx.id}
                       tx={tx}
                       onOpen={setSelectedTxForDetail}
-                      onEdit={(t) => (allowed ? openEditTransaction(t) : viewOnlyToast())}
-                      onDelete={handleQuickDelete}
                     />
                   ))}
                 </div>

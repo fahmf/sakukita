@@ -722,7 +722,7 @@ function QuickAddForm() {
                   type="button"
                   disabled={isScanning}
                   onClick={handleScanClick}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 grid size-8 place-items-center rounded-lg text-mint-strong hover:bg-mint-soft/60 transition-colors disabled:opacity-60"
+                  className="absolute hit-area-44 left-0 top-1/2 -translate-y-1/2 grid size-8 place-items-center rounded-lg text-mint-strong hover:bg-mint-soft/60 transition-colors disabled:opacity-60"
                   title="Scan struk dengan AI"
                   aria-label="Scan struk dengan AI"
                 >
@@ -749,7 +749,7 @@ function QuickAddForm() {
               <button
                 type="button"
                 onClick={() => setShowKeypad(!showKeypad)}
-                className="absolute right-0 top-1/2 -translate-y-1/2 grid size-8 place-items-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                className="absolute hit-area-44 right-0 top-1/2 -translate-y-1/2 grid size-8 place-items-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
                 title={showKeypad ? "Sembunyikan keypad" : "Tampilkan keypad"}
                 aria-label={showKeypad ? "Sembunyikan keypad" : "Tampilkan keypad"}
               >
@@ -1111,7 +1111,7 @@ function QuickAddForm() {
               let btnClass = "h-11 rounded-xl font-bold text-sm transition-all active:scale-95 duration-75 flex items-center justify-center ";
 
               if (key === "⌫" || key === "C") {
-                btnClass += "bg-red-50 text-expense dark:bg-red-950/20 dark:text-red-400 hover:bg-red-100/50";
+                btnClass += "bg-expense-soft text-expense dark:text-red-400 hover:bg-red-100/50";
               } else if (isOperator) {
                 btnClass += "bg-muted text-foreground hover:bg-muted/80";
               } else {
@@ -1145,7 +1145,7 @@ function QuickAddForm() {
           <Button
             type="submit"
             disabled={createTx.isPending || updateTx.isPending || parsedAmount <= 0}
-            className="flex-1 h-12 bg-mint-strong text-white hover:bg-mint-strong/90 rounded-xl font-semibold gap-1.5"
+            className="flex-1 h-12 bg-mint-strong text-on-mint hover:bg-mint-strong/90 rounded-xl font-semibold gap-1.5"
           >
             {createTx.isPending || updateTx.isPending ? (
               "Menyimpan..."

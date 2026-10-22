@@ -627,7 +627,7 @@ export default function SettingsPage() {
                           disabled={mergeCategory.isPending}
                           onClick={() => (mergeConfirm ? handleMergeCategory() : setMergeConfirm(true))}
                           className={`w-full h-10 rounded-xl text-xs font-semibold ${
-                            mergeConfirm ? "bg-expense text-white hover:bg-expense/90" : ""
+                            mergeConfirm ? "bg-expense text-on-expense hover:bg-expense/90" : ""
                           }`}
                         >
                           {mergeCategory.isPending
@@ -645,7 +645,7 @@ export default function SettingsPage() {
                   <Button
                     type="submit"
                     disabled={createCategory.isPending || updateCategory.isPending || !name}
-                    className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold w-full"
+                    className="h-11 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 font-semibold w-full"
                   >
                     {createCategory.isPending || updateCategory.isPending
                       ? "Menyimpan..."
@@ -668,7 +668,7 @@ export default function SettingsPage() {
           <div className="space-y-4">
             {/* EXPENSE CATEGORIES */}
             <div className="space-y-2">
-              <span className="text-xs font-semibold text-expense bg-red-50 dark:bg-red-950/20 px-2.5 py-1 rounded-full">
+              <span className="text-xs font-semibold text-expense bg-expense-soft px-2.5 py-1 rounded-full">
                 Pengeluaran
               </span>
               <div className="rounded-2xl border bg-card overflow-hidden divide-y">
@@ -701,10 +701,10 @@ export default function SettingsPage() {
                           
                           <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                             {/* Action Buttons (visible on hover) */}
-                            <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-2 opacity-85 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 transition-opacity">
                               <Link
                                 href={`/transactions?kategori=${parent.id}&rentang=semua`}
-                                className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50"
+                                className="relative hit-area-44 grid size-8 place-items-center rounded-lg text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50"
                                 aria-label={`Lihat transaksi ${parent.name}`}
                                 title="Lihat transaksi"
                               >
@@ -713,7 +713,7 @@ export default function SettingsPage() {
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
+                                className="relative hit-area-44 size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
                                 onClick={() => handleOpenEdit(parent)}
                                 aria-label={`Ubah kategori ${parent.name}`}
                               >
@@ -722,7 +722,7 @@ export default function SettingsPage() {
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="size-8 rounded-lg text-muted-foreground hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20"
+                                className="relative hit-area-44 size-8 rounded-lg text-muted-foreground hover:text-expense hover:bg-expense-soft"
                                 onClick={() => handleArchiveCategory(parent.id)}
                                 aria-label={`Arsipkan kategori ${parent.name}`}
                               >
@@ -784,10 +784,10 @@ export default function SettingsPage() {
                                   </span>
                                   <span className="truncate text-sm font-medium text-foreground">{sub.name}</span>
                                 </div>
-                                <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover/sub:opacity-100 md:group-focus-within/sub:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center gap-2 opacity-85 md:opacity-0 md:group-hover/sub:opacity-100 md:group-focus-within/sub:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                                   <Link
                                     href={`/transactions?kategori=${sub.id}&rentang=semua`}
-                                    className="grid size-7 place-items-center rounded-md text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50"
+                                    className="relative hit-area-44 grid size-7 place-items-center rounded-md text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50"
                                     aria-label={`Lihat transaksi ${sub.name}`}
                                     title="Lihat transaksi"
                                   >
@@ -796,7 +796,7 @@ export default function SettingsPage() {
                                   <Button
                                     size="icon"
                                     variant="ghost"
-                                    className="size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+                                    className="relative hit-area-44 size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
                                     onClick={() => handleOpenEdit(sub)}
                                     aria-label={`Ubah subkategori ${sub.name}`}
                                   >
@@ -805,7 +805,7 @@ export default function SettingsPage() {
                                   <Button
                                     size="icon"
                                     variant="ghost"
-                                    className="size-7 rounded-md text-muted-foreground hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20"
+                                    className="relative hit-area-44 size-7 rounded-md text-muted-foreground hover:text-expense hover:bg-expense-soft"
                                     onClick={() => handleArchiveCategory(sub.id)}
                                     aria-label={`Arsipkan subkategori ${sub.name}`}
                                   >
@@ -857,10 +857,10 @@ export default function SettingsPage() {
                           
                           <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                             {/* Action Buttons (visible on hover) */}
-                            <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-2 opacity-85 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 transition-opacity">
                               <Link
                                 href={`/transactions?kategori=${parent.id}&rentang=semua`}
-                                className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50"
+                                className="relative hit-area-44 grid size-8 place-items-center rounded-lg text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50"
                                 aria-label={`Lihat transaksi ${parent.name}`}
                                 title="Lihat transaksi"
                               >
@@ -869,7 +869,7 @@ export default function SettingsPage() {
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
+                                className="relative hit-area-44 size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
                                 onClick={() => handleOpenEdit(parent)}
                                 aria-label={`Ubah kategori ${parent.name}`}
                               >
@@ -878,7 +878,7 @@ export default function SettingsPage() {
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="size-8 rounded-lg text-muted-foreground hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20"
+                                className="relative hit-area-44 size-8 rounded-lg text-muted-foreground hover:text-expense hover:bg-expense-soft"
                                 onClick={() => handleArchiveCategory(parent.id)}
                                 aria-label={`Arsipkan kategori ${parent.name}`}
                               >
@@ -940,10 +940,10 @@ export default function SettingsPage() {
                                   </span>
                                   <span className="truncate text-sm font-medium text-foreground">{sub.name}</span>
                                 </div>
-                                <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover/sub:opacity-100 md:group-focus-within/sub:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center gap-2 opacity-85 md:opacity-0 md:group-hover/sub:opacity-100 md:group-focus-within/sub:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                                   <Link
                                     href={`/transactions?kategori=${sub.id}&rentang=semua`}
-                                    className="grid size-7 place-items-center rounded-md text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50"
+                                    className="relative hit-area-44 grid size-7 place-items-center rounded-md text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50"
                                     aria-label={`Lihat transaksi ${sub.name}`}
                                     title="Lihat transaksi"
                                   >
@@ -952,7 +952,7 @@ export default function SettingsPage() {
                                   <Button
                                     size="icon"
                                     variant="ghost"
-                                    className="size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+                                    className="relative hit-area-44 size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
                                     onClick={() => handleOpenEdit(sub)}
                                     aria-label={`Ubah subkategori ${sub.name}`}
                                   >
@@ -961,7 +961,7 @@ export default function SettingsPage() {
                                   <Button
                                     size="icon"
                                     variant="ghost"
-                                    className="size-7 rounded-md text-muted-foreground hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20"
+                                    className="relative hit-area-44 size-7 rounded-md text-muted-foreground hover:text-expense hover:bg-expense-soft"
                                     onClick={() => handleArchiveCategory(sub.id)}
                                     aria-label={`Arsipkan subkategori ${sub.name}`}
                                   >
@@ -1065,7 +1065,7 @@ export default function SettingsPage() {
             className="w-full text-left rounded-2xl border border-red-200 dark:border-red-950/30 bg-card p-4 flex items-center justify-between hover:bg-red-50/30 dark:hover:bg-red-950/10 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-3">
-              <span className="grid size-11 place-items-center rounded-full bg-red-50 dark:bg-red-950/20 text-red-500">
+              <span className="grid size-11 place-items-center rounded-full bg-expense-soft text-expense">
                 <LogOut className="size-5" />
               </span>
               <div className="min-w-0">
@@ -1107,7 +1107,7 @@ export default function SettingsPage() {
                 <Button
                   type="submit"
                   disabled={savingProfile || !newDisplayName.trim()}
-                  className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold w-full"
+                  className="h-11 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 font-semibold w-full"
                 >
                   {savingProfile ? "Menyimpan..." : "Simpan Perubahan"}
                 </Button>
@@ -1140,7 +1140,7 @@ export default function SettingsPage() {
                 <Button
                   type="submit"
                   disabled={savingHousehold || !newHouseholdName.trim()}
-                  className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold w-full"
+                  className="h-11 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 font-semibold w-full"
                 >
                   {savingHousehold ? "Menyimpan..." : "Simpan Perubahan"}
                 </Button>
@@ -1188,7 +1188,7 @@ export default function SettingsPage() {
               </Button>
               <Button
                 type="button"
-                className="rounded-xl h-11 px-4 bg-expense text-white hover:bg-expense/90 flex-1 md:flex-none"
+                className="rounded-xl h-11 px-4 bg-expense text-on-expense hover:bg-expense/90 flex-1 md:flex-none"
                 onClick={confirmArchive}
                 disabled={archiveCategory.isPending}
               >

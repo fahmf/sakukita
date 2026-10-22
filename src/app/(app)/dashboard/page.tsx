@@ -355,7 +355,7 @@ export default function DashboardPage() {
         <Link href={`/transactions?bulan=${selectedMonth}&tipe=expense`} className="block">
           <Card className="h-full rounded-2xl border bg-card p-4 space-y-1 transition-colors hover:border-mint-strong/40">
             <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
-              <span className="grid size-5 place-items-center rounded-full bg-red-50 dark:bg-red-950/20 text-expense">
+              <span className="grid size-5 place-items-center rounded-full bg-expense-soft text-expense">
                 <ArrowDownRight className="size-3" />
               </span>
               Pengeluaran
@@ -542,7 +542,7 @@ export default function DashboardPage() {
             <Button
               size="sm"
               onClick={() => openQuickAdd("expense")}
-              className="bg-mint-strong text-white hover:bg-mint-strong/90 rounded-xl"
+              className="bg-mint-strong text-on-mint hover:bg-mint-strong/90 rounded-xl"
             >
               Catat Sekarang
             </Button>
@@ -554,8 +554,6 @@ export default function DashboardPage() {
                 key={tx.id}
                 tx={tx}
                 onOpen={setSelectedTxForDetail}
-                onEdit={(t) => (allowed ? openEditTransaction(t) : viewOnlyToast())}
-                onDelete={handleQuickDelete}
               />
             ))}
 

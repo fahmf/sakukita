@@ -168,7 +168,7 @@ export function HouseholdSwitcher() {
             <DialogFooter className="pt-2">
               <Button
                 type="submit"
-                className="h-11 w-full rounded-xl bg-mint-strong font-semibold text-white hover:bg-mint-strong/90"
+                className="h-11 w-full rounded-xl bg-mint-strong font-semibold text-on-mint hover:bg-mint-strong/90"
                 disabled={createHousehold.isPending || switchHousehold.isPending}
               >
                 {createHousehold.isPending ? "Membuat..." : "Buat & beralih"}

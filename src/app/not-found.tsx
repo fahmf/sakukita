@@ -27,7 +27,7 @@ export default function NotFound() {
         </div>
 
         <div className="flex flex-col gap-2.5 pt-4">
-          <Button asChild className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 w-full transition-all shadow-sm">
+          <Button asChild className="h-11 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 w-full transition-all shadow-sm">
             <Link href="/dashboard" className="flex items-center justify-center gap-2 font-medium">
               <Home className="size-4" />
               Kembali ke Dashboard

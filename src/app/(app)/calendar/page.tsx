@@ -207,7 +207,7 @@ export default function CalendarPage() {
               >
                 <span
                   className={`grid size-5 place-items-center rounded-full text-[11px] font-semibold ${
-                    isToday ? "bg-mint-strong text-white" : "text-foreground"
+                    isToday ? "bg-mint-strong text-on-mint" : "text-foreground"
                   }`}
                 >
                   {date.getDate()}

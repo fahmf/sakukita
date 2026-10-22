@@ -259,7 +259,7 @@ export default function DebtsPage() {
 
     if (diffDays < 0) {
       return (
-        <span className="text-expense font-bold bg-red-50 dark:bg-red-950/20 px-1.5 py-0.5 rounded-md animate-pulse">
+        <span className="text-expense font-bold bg-expense-soft px-1.5 py-0.5 rounded-md animate-pulse">
           • Terlambat {Math.abs(diffDays)} hari
         </span>
       );
@@ -343,7 +343,7 @@ export default function DebtsPage() {
         </div>
         <Button
           onClick={handleOpenCreateDebt}
-          className="h-8 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 gap-1.5 text-xs font-semibold px-3"
+          className="h-8 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 gap-1.5 text-xs font-semibold px-3"
         >
           <Plus className="size-3.5" /> Catatan Baru
         </Button>
@@ -371,7 +371,7 @@ export default function DebtsPage() {
               </div>
               <Button
                 onClick={handleOpenCreateDebt}
-                className="h-9 px-4 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 text-xs font-semibold gap-1.5"
+                className="h-9 px-4 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 text-xs font-semibold gap-1.5"
               >
                 <Plus className="size-4" /> Tambah Catatan Baru
               </Button>
@@ -403,7 +403,7 @@ export default function DebtsPage() {
                             debt.is_completed
                               ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20 dark:text-emerald-400"
                               : debt.type === "payable"
-                              ? "bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400"
+                              ? "bg-expense-soft text-red-600 dark:text-red-400"
                               : "bg-mint-soft text-mint-strong dark:bg-mint-soft/10 dark:text-mint-soft"
                           }`}>
                             {debt.is_completed ? "Lunas" : `${Math.round(percent)}% Terbayar`}
@@ -522,7 +522,7 @@ export default function DebtsPage() {
                 <Button
                   type="submit"
                   disabled={updateDebtMutation.isPending}
-                  className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold"
+                  className="h-11 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 font-semibold"
                 >
                   {updateDebtMutation.isPending ? "Memproses..." : "Konfirmasi Pembayaran"}
                 </Button>
@@ -622,7 +622,7 @@ export default function DebtsPage() {
               <Button
                 type="submit"
                 disabled={createDebtMutation.isPending || updateDebtMutation.isPending}
-                className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold"
+                className="h-11 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 font-semibold"
               >
                 {createDebtMutation.isPending || updateDebtMutation.isPending ? "Menyimpan..." : "Simpan Catatan"}
               </Button>
@@ -633,7 +633,7 @@ export default function DebtsPage() {
                   variant="ghost"
                   onClick={handleDeleteDebt}
                   disabled={deleteDebtMutation.isPending}
-                  className="h-10 rounded-xl text-expense hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20 text-xs font-semibold"
+                  className="h-10 rounded-xl text-expense hover:text-expense hover:bg-expense-soft text-xs font-semibold"
                 >
                   {deleteDebtMutation.isPending ? "Menghapus..." : "Hapus Catatan"}
                 </Button>

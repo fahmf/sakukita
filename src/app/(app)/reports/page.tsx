@@ -576,7 +576,7 @@ export default function ReportsPage() {
           <Button
             onClick={() => window.print()}
             disabled={isLoading || filteredTxs.length === 0}
-            className="h-10 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 gap-2 text-xs font-semibold"
+            className="h-10 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 gap-2 text-xs font-semibold"
           >
             <PieIcon className="size-4" />
             Cetak PDF

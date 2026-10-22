@@ -179,7 +179,7 @@ export default function WalletsPage() {
           <Button
             size="sm"
             onClick={openCreate}
-            className="bg-mint-strong text-white hover:bg-mint-strong/90 rounded-xl gap-1.5"
+            className="bg-mint-strong text-on-mint hover:bg-mint-strong/90 rounded-xl gap-1.5"
           >
             <Plus className="size-4" />
             Tambah
@@ -345,7 +345,7 @@ export default function WalletsPage() {
               <Button
                 type="submit"
                 disabled={isSaving || !name.trim()}
-                className="h-11 rounded-xl bg-mint-strong text-white hover:bg-mint-strong/90 font-semibold w-full"
+                className="h-11 rounded-xl bg-mint-strong text-on-mint hover:bg-mint-strong/90 font-semibold w-full"
               >
                 {isSaving ? "Menyimpan..." : editingWallet ? "Simpan Perubahan" : "Buat Dompet"}
               </Button>
@@ -354,7 +354,7 @@ export default function WalletsPage() {
                   type="button"
                   variant="ghost"
                   onClick={() => setConfirmArchive(editingWallet)}
-                  className="h-11 w-full rounded-xl text-expense hover:bg-red-50 hover:text-expense dark:hover:bg-red-950/20 gap-1.5"
+                  className="h-11 w-full rounded-xl text-expense hover:bg-expense-soft hover:text-expense gap-1.5"
                 >
                   <Archive className="size-4" />
                   Arsipkan Dompet
@@ -384,7 +384,7 @@ export default function WalletsPage() {
               Batal
             </Button>
             <Button
-              className="rounded-xl h-11 bg-expense text-white hover:bg-expense/90"
+              className="rounded-xl h-11 bg-expense text-on-expense hover:bg-expense/90"
               onClick={handleArchive}
               disabled={archiveWallet.isPending}
             >
