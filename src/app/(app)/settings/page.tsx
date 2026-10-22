@@ -701,7 +701,7 @@ export default function SettingsPage() {
                           
                           <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                             {/* Action Buttons (visible on hover) */}
-                            <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 transition-opacity">
                               <Link
                                 href={`/transactions?kategori=${parent.id}&rentang=semua`}
                                 className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50"
@@ -715,6 +715,7 @@ export default function SettingsPage() {
                                 variant="ghost"
                                 className="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
                                 onClick={() => handleOpenEdit(parent)}
+                                aria-label={`Ubah kategori ${parent.name}`}
                               >
                                 <Pencil className="size-3.5" />
                               </Button>
@@ -723,13 +724,20 @@ export default function SettingsPage() {
                                 variant="ghost"
                                 className="size-8 rounded-lg text-muted-foreground hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20"
                                 onClick={() => handleArchiveCategory(parent.id)}
+                                aria-label={`Arsipkan kategori ${parent.name}`}
                               >
                                 <Trash2 className="size-3.5" />
                               </Button>
                             </div>
                             
                             {hasSubs && (
-                              <span className="flex items-center gap-1.5 text-muted-foreground">
+                              <button
+                                type="button"
+                                onClick={() => toggleParent(parent.id)}
+                                aria-expanded={isExpanded}
+                                aria-label={`${isExpanded ? "Tutup" : "Buka"} subkategori ${parent.name}`}
+                                className="flex items-center gap-1.5 rounded-lg p-1 text-muted-foreground hover:text-foreground"
+                              >
                                 <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums">
                                   {parent.subcategories.length}
                                 </span>
@@ -738,7 +746,7 @@ export default function SettingsPage() {
                                 ) : (
                                   <ChevronRight className="size-4" />
                                 )}
-                              </span>
+                              </button>
                             )}
                           </div>
                         </div>
@@ -776,7 +784,7 @@ export default function SettingsPage() {
                                   </span>
                                   <span className="truncate text-sm font-medium text-foreground">{sub.name}</span>
                                 </div>
-                                <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover/sub:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover/sub:opacity-100 md:group-focus-within/sub:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                                   <Link
                                     href={`/transactions?kategori=${sub.id}&rentang=semua`}
                                     className="grid size-7 place-items-center rounded-md text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50"
@@ -790,6 +798,7 @@ export default function SettingsPage() {
                                     variant="ghost"
                                     className="size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
                                     onClick={() => handleOpenEdit(sub)}
+                                    aria-label={`Ubah subkategori ${sub.name}`}
                                   >
                                     <Pencil className="size-3" />
                                   </Button>
@@ -798,6 +807,7 @@ export default function SettingsPage() {
                                     variant="ghost"
                                     className="size-7 rounded-md text-muted-foreground hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20"
                                     onClick={() => handleArchiveCategory(sub.id)}
+                                    aria-label={`Arsipkan subkategori ${sub.name}`}
                                   >
                                     <Trash2 className="size-3" />
                                   </Button>
@@ -847,7 +857,7 @@ export default function SettingsPage() {
                           
                           <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                             {/* Action Buttons (visible on hover) */}
-                            <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 transition-opacity">
                               <Link
                                 href={`/transactions?kategori=${parent.id}&rentang=semua`}
                                 className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50"
@@ -861,6 +871,7 @@ export default function SettingsPage() {
                                 variant="ghost"
                                 className="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
                                 onClick={() => handleOpenEdit(parent)}
+                                aria-label={`Ubah kategori ${parent.name}`}
                               >
                                 <Pencil className="size-3.5" />
                               </Button>
@@ -869,13 +880,20 @@ export default function SettingsPage() {
                                 variant="ghost"
                                 className="size-8 rounded-lg text-muted-foreground hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20"
                                 onClick={() => handleArchiveCategory(parent.id)}
+                                aria-label={`Arsipkan kategori ${parent.name}`}
                               >
                                 <Trash2 className="size-3.5" />
                               </Button>
                             </div>
                             
                             {hasSubs && (
-                              <span className="flex items-center gap-1.5 text-muted-foreground">
+                              <button
+                                type="button"
+                                onClick={() => toggleParent(parent.id)}
+                                aria-expanded={isExpanded}
+                                aria-label={`${isExpanded ? "Tutup" : "Buka"} subkategori ${parent.name}`}
+                                className="flex items-center gap-1.5 rounded-lg p-1 text-muted-foreground hover:text-foreground"
+                              >
                                 <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums">
                                   {parent.subcategories.length}
                                 </span>
@@ -884,7 +902,7 @@ export default function SettingsPage() {
                                 ) : (
                                   <ChevronRight className="size-4" />
                                 )}
-                              </span>
+                              </button>
                             )}
                           </div>
                         </div>
@@ -922,7 +940,7 @@ export default function SettingsPage() {
                                   </span>
                                   <span className="truncate text-sm font-medium text-foreground">{sub.name}</span>
                                 </div>
-                                <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover/sub:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center gap-1 opacity-85 md:opacity-0 md:group-hover/sub:opacity-100 md:group-focus-within/sub:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                                   <Link
                                     href={`/transactions?kategori=${sub.id}&rentang=semua`}
                                     className="grid size-7 place-items-center rounded-md text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50"
@@ -936,6 +954,7 @@ export default function SettingsPage() {
                                     variant="ghost"
                                     className="size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
                                     onClick={() => handleOpenEdit(sub)}
+                                    aria-label={`Ubah subkategori ${sub.name}`}
                                   >
                                     <Pencil className="size-3" />
                                   </Button>
@@ -944,6 +963,7 @@ export default function SettingsPage() {
                                     variant="ghost"
                                     className="size-7 rounded-md text-muted-foreground hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20"
                                     onClick={() => handleArchiveCategory(sub.id)}
+                                    aria-label={`Arsipkan subkategori ${sub.name}`}
                                   >
                                     <Trash2 className="size-3" />
                                   </Button>
@@ -1024,7 +1044,7 @@ export default function SettingsPage() {
             className="w-full text-left rounded-2xl border border-amber-200 dark:border-amber-950/30 bg-card p-4 flex items-center justify-between hover:bg-amber-50/30 dark:hover:bg-amber-950/10 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-3">
-              <span className="grid size-11 place-items-center rounded-full bg-amber-50 dark:bg-amber-950/20 text-amber-500">
+              <span className="grid size-11 place-items-center rounded-full bg-amber-50 dark:bg-amber-950/20 text-warning-strong">
                 <Database className="size-5" />
               </span>
               <div className="min-w-0 flex-1">

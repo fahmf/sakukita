@@ -91,7 +91,7 @@ export function TopBar() {
         // All good is the normal state — keep it to a quiet icon so the top
         // bar only draws attention when something actually needs it.
         return (
-          <span className="grid size-9 place-items-center rounded-full text-muted-foreground transition-colors group-hover:bg-muted group-hover:text-foreground">
+          <span className="grid size-11 place-items-center rounded-full text-muted-foreground transition-colors group-hover:bg-muted group-hover:text-foreground">
             <Cloud className="size-4.5" />
           </span>
         );
@@ -114,18 +114,18 @@ export function TopBar() {
       : "Ketuk untuk sinkron";
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between border-b bg-background/95 px-4 py-3 backdrop-blur">
+    <header className="sticky top-0 z-30 flex items-center justify-between border-b bg-background/95 px-4 py-2 backdrop-blur">
       <div className="min-w-0 flex-1 mr-2">
         <HouseholdSwitcher />
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-0.5">
         <button
           type="button"
           onClick={handleManualSync}
           disabled={status === "syncing"}
           title={syncTitle}
           aria-label={syncTitle}
-          className="group flex items-center gap-1 disabled:cursor-default"
+          className="group flex min-h-11 items-center gap-1 disabled:cursor-default"
         >
           {renderSyncBadge()}
           {(status === "offline" || status === "error") && (
@@ -137,7 +137,7 @@ export function TopBar() {
           aria-label="Notifikasi"
           onClick={handleBell}
           title={perm === "granted" ? "Notifikasi aktif" : "Aktifkan notifikasi"}
-          className="grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
+          className="grid size-11 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
         >
           {perm === "granted" ? (
             <BellRing className="size-5 text-mint-strong" />

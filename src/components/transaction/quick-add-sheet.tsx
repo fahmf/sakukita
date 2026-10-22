@@ -1039,9 +1039,11 @@ function QuickAddForm() {
           {scannedItems && scannedItems.length > 0 && (
             <div className="rounded-2xl border border-border bg-card overflow-hidden">
               <div className="flex w-full items-center justify-between p-3.5 text-left">
-                <div
+                <button
+                  type="button"
                   onClick={() => setScannedItemsOpen(!scannedItemsOpen)}
-                  className="flex flex-1 items-center gap-2 cursor-pointer select-none"
+                  aria-expanded={scannedItemsOpen}
+                  className="flex flex-1 items-center gap-2 text-left select-none"
                 >
                   <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-mint-soft/50 text-mint-strong">
                     <FileText className="size-4" />
@@ -1050,7 +1052,7 @@ function QuickAddForm() {
                     <span className="text-xs font-semibold text-foreground">Detail Struk Terdeteksi</span>
                     <p className="text-xs text-muted-foreground">{scannedItems.length} item terdaftar</p>
                   </div>
-                </div>
+                </button>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -1061,6 +1063,7 @@ function QuickAddForm() {
                     }}
                     className="p-1 text-muted-foreground hover:text-expense rounded-md hover:bg-destructive/10 transition-colors"
                     title="Hapus data struk"
+                    aria-label="Hapus data struk"
                   >
                     <Trash2 className="size-3.5" />
                   </button>
@@ -1069,6 +1072,8 @@ function QuickAddForm() {
                     onClick={() => setScannedItemsOpen(!scannedItemsOpen)}
                     className="p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
                     title={scannedItemsOpen ? "Tutup detail" : "Buka detail"}
+                    aria-label={scannedItemsOpen ? "Tutup detail struk" : "Buka detail struk"}
+                    aria-expanded={scannedItemsOpen}
                   >
                     {scannedItemsOpen ? (
                       <ChevronUp className="size-4" />

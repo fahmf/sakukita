@@ -469,7 +469,7 @@ export default function BudgetsPage() {
                                 {Math.round(item.progressPercent)}% limit
                               </span>
                               {overspent ? (
-                                <span className="text-red-500 font-semibold flex items-center gap-0.5">
+                                <span className="text-expense font-semibold flex items-center gap-0.5">
                                   <TrendingDown className="size-3" />
                                   Melebihi limit {formatCurrency(Math.abs(item.remaining))}
                                 </span>
@@ -623,7 +623,7 @@ export default function BudgetsPage() {
                     variant="ghost"
                     onClick={handleDeleteBudget}
                     disabled={deleteBudgetMutation.isPending}
-                    className="h-10 rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 text-xs font-semibold"
+                    className="h-10 rounded-xl text-expense hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20 text-xs font-semibold"
                   >
                     {deleteBudgetMutation.isPending ? "Menghapus..." : "Hapus Batas Limit"}
                   </Button>

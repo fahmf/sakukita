@@ -13,7 +13,7 @@ import {
 import { useBudgets } from "@/hooks/use-budgets";
 import { useCategories } from "@/hooks/use-categories";
 import { useDebts } from "@/hooks/use-debts";
-import { formatCurrency, formatRelative, formatDateShort, formatGrouped } from "@/lib/format";
+import { formatCurrency, formatDateShort, formatGrouped } from "@/lib/format";
 import {
   currentFinancialMonth,
   financialMonthDateRange,
@@ -27,17 +27,15 @@ import {
   Plus,
   ArrowUpRight,
   ArrowDownRight,
-  ArrowRightLeft,
   ChevronLeft,
   ChevronRight,
   Calendar,
   CalendarClock,
-  Trash2,
-  Pencil,
   Wallet,
 } from "lucide-react";
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
 import { TransactionDetailDialog } from "@/components/transaction/transaction-detail-dialog";
+import { TransactionRow } from "@/components/transaction/transaction-row";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { iconMap } from "@/lib/icons";
@@ -551,92 +549,15 @@ export default function DashboardPage() {
           </Card>
         ) : (
           <div className="grid gap-2.5">
-            {displayedTransactions.map((tx) => {
-                const isExpense = tx.type === "expense";
-                const isIncome = tx.type === "income";
-                const isTransfer = tx.type === "transfer";
-
-                let bgColor = "#C4C4C4";
-                const hasMappedIcon = !isTransfer && tx.category && iconMap[tx.category.icon || ""];
-                const categoryIcon = tx.category?.icon || "🏷️";
-
-                if (isTransfer) {
-                  bgColor = "#A8A29E";
-                } else if (tx.category) {
-                  bgColor = tx.category.color || "#C4C4C4";
-                }
-
-                return (
-                  <div
-                    key={tx.id}
-                    className="flex items-center justify-between rounded-2xl border bg-card p-3.5 transition-all hover:border-mint-strong/20 min-w-0"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setSelectedTxForDetail(tx)}
-                      className="flex items-center gap-3 min-w-0 flex-1 text-left select-none active:opacity-70 transition-opacity"
-                    >
-                      <span
-                        className="grid size-9 shrink-0 place-items-center rounded-xl text-white font-semibold"
-                        style={{ backgroundColor: bgColor }}
-                      >
-                        {isTransfer ? (
-                          <ArrowRightLeft className="size-4" />
-                        ) : hasMappedIcon ? (
-                          React.createElement(iconMap[tx.category!.icon || ""], { className: "size-4" })
-                        ) : (
-                          <span className="text-base select-none leading-none">{categoryIcon}</span>
-                        )}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-sm text-foreground truncate">
-                          {isTransfer
-                            ? `Transfer ke ${tx.to_wallet?.name}`
-                            : tx.note || tx.category?.name || "Lain-lain"}
-                        </p>
-                        <p className="text-xs text-muted-foreground font-medium">
-                          {tx.wallet?.name} · {formatRelative(tx.occurred_at)}
-                        </p>
-                      </div>
-                      <p
-                        className={`shrink-0 pl-1 text-right font-bold text-sm tracking-tight ${
-                          isIncome ? "text-income" : isExpense ? "text-expense" : "text-foreground"
-                        }`}
-                      >
-                        {isIncome ? "+" : isExpense ? "-" : ""}
-                        {formatGrouped(tx.amount)}
-                      </p>
-                    </button>
-                    <div className="flex items-center gap-1 flex-shrink-0 pl-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          if (!allowed) {
-                            viewOnlyToast();
-                          } else {
-                            openEditTransaction(tx);
-                          }
-                        }}
-                        className="size-8 rounded-lg text-muted-foreground hover:text-mint-strong hover:bg-mint-soft/50 transition-colors"
-                        aria-label="Ubah transaksi"
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleQuickDelete(tx)}
-                        className="size-8 rounded-lg text-muted-foreground hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
-                        aria-label="Hapus transaksi"
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
+            {displayedTransactions.map((tx) => (
+              <TransactionRow
+                key={tx.id}
+                tx={tx}
+                onOpen={setSelectedTxForDetail}
+                onEdit={(t) => (allowed ? openEditTransaction(t) : viewOnlyToast())}
+                onDelete={handleQuickDelete}
+              />
+            ))}
 
             {transactions.length > 10 && (
               <Button

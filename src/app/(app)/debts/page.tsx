@@ -259,7 +259,7 @@ export default function DebtsPage() {
 
     if (diffDays < 0) {
       return (
-        <span className="text-red-500 font-bold bg-red-50 dark:bg-red-950/20 px-1.5 py-0.5 rounded-md animate-pulse">
+        <span className="text-expense font-bold bg-red-50 dark:bg-red-950/20 px-1.5 py-0.5 rounded-md animate-pulse">
           • Terlambat {Math.abs(diffDays)} hari
         </span>
       );
@@ -494,7 +494,7 @@ export default function DebtsPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total Sisa Kewajiban:</span>
-                  <span className="font-semibold text-red-500">{formatCurrency(paymentDebt.remaining_amount)}</span>
+                  <span className="font-semibold text-expense">{formatCurrency(paymentDebt.remaining_amount)}</span>
                 </div>
               </div>
 
@@ -633,7 +633,7 @@ export default function DebtsPage() {
                   variant="ghost"
                   onClick={handleDeleteDebt}
                   disabled={deleteDebtMutation.isPending}
-                  className="h-10 rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 text-xs font-semibold"
+                  className="h-10 rounded-xl text-expense hover:text-expense hover:bg-red-50 dark:hover:bg-red-950/20 text-xs font-semibold"
                 >
                   {deleteDebtMutation.isPending ? "Menghapus..." : "Hapus Catatan"}
                 </Button>

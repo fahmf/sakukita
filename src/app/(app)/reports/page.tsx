@@ -722,7 +722,7 @@ export default function ReportsPage() {
                   <span className="text-xs font-bold text-muted-foreground uppercase">
                     Detail {selectedHeatmapDay.date.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                   </span>
-                  <span className={`text-xs font-bold ${selectedHeatmapDay.amount > 0 ? "text-red-500" : "text-muted-foreground"}`}>
+                  <span className={`text-xs font-bold ${selectedHeatmapDay.amount > 0 ? "text-expense" : "text-muted-foreground"}`}>
                     {selectedHeatmapDay.amount > 0 ? formatCurrency(selectedHeatmapDay.amount) : "Tidak ada pengeluaran"}
                   </span>
                 </div>
@@ -749,7 +749,7 @@ export default function ReportsPage() {
                               </span>
                             </div>
                           </div>
-                          <span className="text-red-500 shrink-0 font-bold">{formatCurrency(t.amount)}</span>
+                          <span className="text-expense shrink-0 font-bold">{formatCurrency(t.amount)}</span>
                         </div>
                       );
                     })}
