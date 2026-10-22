@@ -935,7 +935,7 @@ function QuickAddForm() {
             <Label className="text-xs font-semibold text-muted-foreground">
               Tanggal
               {isFutureDate && (
-                <span className="ml-1 rounded-full bg-mint-soft px-1.5 py-0.5 text-[10px] font-semibold text-mint-strong">
+                <span className="ml-1 rounded-full bg-mint-soft px-1.5 py-0.5 text-xs font-semibold text-mint-strong">
                   Terjadwal
                 </span>
               )}
@@ -1048,7 +1048,7 @@ function QuickAddForm() {
                   </div>
                   <div>
                     <span className="text-xs font-semibold text-foreground">Detail Struk Terdeteksi</span>
-                    <p className="text-[10px] text-muted-foreground">{scannedItems.length} item terdaftar</p>
+                    <p className="text-xs text-muted-foreground">{scannedItems.length} item terdaftar</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1134,7 +1134,7 @@ function QuickAddForm() {
           {!editingTransaction && (
             <label className="flex shrink-0 cursor-pointer select-none flex-col items-center gap-1">
               <Switch checked={keepOpen} onCheckedChange={setKeepOpen} aria-label="Simpan lalu tambah lagi" />
-              <span className="text-[10px] font-medium leading-none text-muted-foreground">Tambah lagi</span>
+              <span className="text-xs font-medium leading-none text-muted-foreground">Tambah lagi</span>
             </label>
           )}
           <Button

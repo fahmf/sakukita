@@ -110,7 +110,7 @@ export function TransactionDetailDialog({
         <div className="py-5 space-y-6">
           {/* 1. Large Premium Amount Display */}
           <div className="text-center space-y-1">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
               {isTransfer ? "Nominal Transfer" : isIncome ? "Pemasukan" : "Pengeluaran"}
             </span>
             <p
@@ -156,7 +156,7 @@ export function TransactionDetailDialog({
 
           {/* 3. Note Container: Elegant Memo/Index-Card Style */}
           <div className="space-y-1.5">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">
               Catatan
             </span>
             <div className="bg-muted/30 dark:bg-muted/10 border border-dashed border-border/80 rounded-2xl p-4 min-h-[4.5rem] flex items-center justify-start relative overflow-hidden group">
@@ -170,7 +170,7 @@ export function TransactionDetailDialog({
           {/* 3a. Tags */}
           {tx.tags && tx.tags.length > 0 && (
             <div className="space-y-1.5">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">
                 Tag
               </span>
               <div className="flex flex-wrap gap-1.5">
@@ -194,7 +194,7 @@ export function TransactionDetailDialog({
                 onClick={() => setReceiptOpen(!receiptOpen)}
                 className="flex items-center justify-between w-full group"
               >
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <Receipt className="size-3 text-mint-strong" />
                   Detail Struk ({tx.receipt_items.length} item)
                 </span>
@@ -233,7 +233,7 @@ export function TransactionDetailDialog({
           <div className="grid grid-cols-2 gap-4 text-xs border-t pt-4">
             {/* Wallet Info */}
             <div className="space-y-1">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">
                 {isTransfer ? "Dompet Asal" : "Dompet"}
               </span>
               <div className="flex items-center gap-1.5 font-semibold text-foreground">
@@ -245,7 +245,7 @@ export function TransactionDetailDialog({
             {/* Target Wallet (Transfer only) */}
             {isTransfer && tx.to_wallet && (
               <div className="space-y-1">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">
                   Dompet Tujuan
                 </span>
                 <div className="flex items-center gap-1.5 font-semibold text-foreground">
@@ -257,7 +257,7 @@ export function TransactionDetailDialog({
 
             {/* Date Info */}
             <div className="space-y-1 col-span-2">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">
                 Waktu Transaksi
               </span>
               <div className="flex items-center gap-1.5 text-foreground font-semibold">
@@ -272,7 +272,7 @@ export function TransactionDetailDialog({
             {/* Actor Info (if available, e.g. from local profile or Supabase join) */}
             {tx.created_by && (
               <div className="space-y-1 col-span-2">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">
                   Dicatat Oleh
                 </span>
                 <div className="flex items-center gap-1.5 text-foreground font-semibold">

@@ -258,7 +258,7 @@ export default function SavingsGoalsPage() {
           <Card className="rounded-2xl border bg-card p-5 space-y-4">
             <div className="flex justify-between items-center">
               <div>
-                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                <span className="text-xs uppercase font-bold text-muted-foreground tracking-wider">
                   Total Tabungan Terkumpul
                 </span>
                 <p className="text-3xl font-extrabold text-foreground tracking-tight mt-0.5">
@@ -346,21 +346,21 @@ export default function SavingsGoalsPage() {
                             {goal.name}
                           </p>
                           {isCompleted && (
-                            <span className="flex items-center gap-0.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                            <span className="flex items-center gap-0.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-xs font-bold px-1.5 py-0.5 rounded-full">
                               <CheckCircle2 className="size-3" />
                               Selesai
                             </span>
                           )}
                         </div>
                         {formattedDate && (
-                          <p className="text-[10px] text-muted-foreground flex flex-wrap items-center gap-1 mt-0.5 font-medium">
+                          <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-1 mt-0.5 font-medium">
                             <Calendar className="size-3" />
                             Target: {formattedDate}
                             {needed && (
                               <span
                                 className={
                                   needed.urgent
-                                    ? "font-semibold text-amber-600 dark:text-amber-500"
+                                    ? "font-semibold text-warning-strong"
                                     : "font-semibold text-mint-strong"
                                 }
                               >

@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useTransactions, useDeleteTransaction, useRestoreTransaction } from "@/hooks/use-transactions";
 import { useWallets } from "@/hooks/use-wallets";
 import { useCategories } from "@/hooks/use-categories";
-import { formatCurrency, formatRelative } from "@/lib/format";
+import { formatCurrency, formatRelative, formatGrouped } from "@/lib/format";
 import { currentFinancialMonth, financialMonthDateRange, financialMonthRangeLabel } from "@/lib/financial-month";
 import { useUIStore } from "@/stores/ui-store";
 import { Button } from "@/components/ui/button";
@@ -361,7 +361,7 @@ function AllTransactionsPage() {
             <Calendar className="size-4 text-mint-strong" />
             <span>{activeMonthName}</span>
           </div>
-          <span className="text-[10px] font-medium text-muted-foreground">
+          <span className="text-xs font-medium text-muted-foreground">
             {financialMonthRangeLabel(selectedMonth)}
           </span>
         </div>
@@ -499,7 +499,7 @@ function AllTransactionsPage() {
         <Card className="rounded-2xl border bg-card p-4 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                 {selectedCategory.parentName ? `${selectedCategory.parentName} ›` : "Kategori"}
               </p>
               <p className="font-semibold text-sm truncate">{selectedCategory.name}</p>
@@ -573,10 +573,10 @@ function AllTransactionsPage() {
             {groupedTransactions.map((group) => (
               <div key={group.label} className="space-y-2">
                 {/* Date Group Header */}
-                <div className="flex justify-between items-center px-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                <div className="flex justify-between items-center px-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   <span>{group.label}</span>
                   <span className={group.net > 0 ? "text-income" : group.net < 0 ? "text-expense" : ""}>
-                    Net: {group.net >= 0 ? "+" : ""}{formatCurrency(group.net).replace("Rp", "").trim()}
+                    Net: {group.net >= 0 ? "+" : ""}{formatGrouped(group.net)}
                   </span>
                 </div>
 
@@ -640,7 +640,7 @@ function AllTransactionsPage() {
                               }`}
                             >
                               {isIncome ? "+" : isExpense ? "-" : ""}
-                              {formatCurrency(tx.amount).replace("Rp", "").trim()}
+                              {formatGrouped(tx.amount)}
                             </p>
                           </div>
 

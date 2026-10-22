@@ -332,7 +332,7 @@ export default function HouseholdSettingsPage() {
                     <p className="text-xs font-medium text-foreground leading-normal pr-1 break-words">
                       {message}
                     </p>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {dateStr}
                     </p>
                   </div>

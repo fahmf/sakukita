@@ -528,7 +528,7 @@ export default function ScheduledPage() {
                               {t.note || catName || (isTransfer ? "Transfer Berulang" : "Transaksi Berkala")}
                             </p>
                             {!t.is_active && (
-                              <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-bold">
+                              <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-bold">
                                 Nonaktif
                               </span>
                             )}
@@ -550,7 +550,7 @@ export default function ScheduledPage() {
                               {getRecurrenceLabel(t.frequency, t.interval)}
                             </span>
                             {t.is_active && t.next_materialize_at && (
-                              <span className="flex items-center gap-1 text-amber-600 dark:text-amber-500">
+                              <span className="flex items-center gap-1 text-warning-strong">
                                 <Calendar className="size-3" />
                                 Jt Tempo: {formatDate(t.next_materialize_at)}
                               </span>

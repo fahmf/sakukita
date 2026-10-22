@@ -499,15 +499,15 @@ export default function ReportsPage() {
         
         <div className="grid grid-cols-3 gap-4 rounded-xl border border-stone-200 bg-stone-50 p-4 text-xs">
           <div>
-            <span className="text-[10px] font-bold text-stone-500 uppercase block">Total Pemasukan</span>
+            <span className="text-xs font-bold text-stone-500 uppercase block">Total Pemasukan</span>
             <p className="text-sm font-bold text-emerald-600 mt-0.5">{formatCurrency(stats.income)}</p>
           </div>
           <div>
-            <span className="text-[10px] font-bold text-stone-500 uppercase block">Total Pengeluaran</span>
+            <span className="text-xs font-bold text-stone-500 uppercase block">Total Pengeluaran</span>
             <p className="text-sm font-bold text-red-600 mt-0.5">{formatCurrency(stats.expense)}</p>
           </div>
           <div>
-            <span className="text-[10px] font-bold text-stone-500 uppercase block">Arus Kas Bersih</span>
+            <span className="text-xs font-bold text-stone-500 uppercase block">Arus Kas Bersih</span>
             <p className={`text-sm font-bold mt-0.5 ${stats.net >= 0 ? "text-emerald-600" : "text-red-600"}`}>{formatCurrency(stats.net)}</p>
           </div>
         </div>
@@ -523,7 +523,7 @@ export default function ReportsPage() {
         <div className="grid grid-cols-2 gap-3">
           {/* Period Range Select */}
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-semibold text-muted-foreground uppercase flex items-center gap-1">
+            <label className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1">
               <Calendar className="size-3 text-mint-strong" /> Rentang Waktu
             </label>
             <Select value={period} onValueChange={(val: PeriodFilter) => setPeriod(val)}>
@@ -541,7 +541,7 @@ export default function ReportsPage() {
 
           {/* Wallet Select Filter */}
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-semibold text-muted-foreground uppercase flex items-center gap-1">
+            <label className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1">
               <WalletIcon className="size-3 text-mint-strong" /> Filter Dompet
             </label>
             <Select value={selectedWalletId} onValueChange={(val) => setSelectedWalletId(val)}>
@@ -594,7 +594,7 @@ export default function ReportsPage() {
           {/* Dynamic Cashflow Cards Grid */}
           <div className="grid grid-cols-3 gap-2.5">
             <div className="rounded-xl border bg-card p-3 flex flex-col justify-between h-20">
-              <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+              <span className="text-xs text-muted-foreground font-semibold flex items-center gap-1">
                 <TrendingUp className="size-3 text-emerald-500" /> Masuk
               </span>
               <p className="text-[13px] font-bold text-emerald-600 dark:text-emerald-400 truncate">
@@ -602,7 +602,7 @@ export default function ReportsPage() {
               </p>
             </div>
             <div className="rounded-xl border bg-card p-3 flex flex-col justify-between h-20">
-              <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+              <span className="text-xs text-muted-foreground font-semibold flex items-center gap-1">
                 <TrendingDown className="size-3 text-red-500" /> Keluar
               </span>
               <p className="text-[13px] font-bold text-red-600 dark:text-red-400 truncate">
@@ -610,7 +610,7 @@ export default function ReportsPage() {
               </p>
             </div>
             <div className="rounded-xl border bg-card p-3 flex flex-col justify-between h-20">
-              <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+              <span className="text-xs text-muted-foreground font-semibold flex items-center gap-1">
                 <Scale className="size-3 text-mint-strong" /> Bersih
               </span>
               <p className={`text-[13px] font-bold truncate ${stats.net >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
@@ -625,7 +625,7 @@ export default function ReportsPage() {
               <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
                 <Calendar className="size-4 text-mint-strong" /> Kerapatan Pengeluaran Harian
               </h3>
-              <span className="text-[10px] text-muted-foreground font-semibold bg-muted px-2 py-0.5 rounded-lg">
+              <span className="text-xs text-muted-foreground font-semibold bg-muted px-2 py-0.5 rounded-lg">
                 3 Bulan Terakhir
               </span>
             </div>
@@ -719,7 +719,7 @@ export default function ReportsPage() {
             {selectedHeatmapDay && (
               <div className="rounded-xl border bg-muted/20 dark:bg-muted/5 p-3 space-y-2 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between border-b pb-1.5 border-muted-foreground/10">
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                  <span className="text-xs font-bold text-muted-foreground uppercase">
                     Detail {selectedHeatmapDay.date.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                   </span>
                   <span className={`text-xs font-bold ${selectedHeatmapDay.amount > 0 ? "text-red-500" : "text-muted-foreground"}`}>
@@ -728,7 +728,7 @@ export default function ReportsPage() {
                 </div>
 
                 {selectedDayTxs.length === 0 ? (
-                  <p className="text-[10px] text-muted-foreground text-center py-2">
+                  <p className="text-xs text-muted-foreground text-center py-2">
                     Tidak ada catatan pengeluaran untuk hari ini.
                   </p>
                 ) : (
@@ -744,7 +744,7 @@ export default function ReportsPage() {
                             </span>
                             <div className="truncate flex flex-col">
                               <span className="text-foreground truncate">{t.note || t.category?.name || "Pengeluaran"}</span>
-                              <span className="text-[9px] text-muted-foreground truncate">
+                              <span className="text-xs text-muted-foreground truncate">
                                 {t.wallet?.name} {t.category?.name ? `• ${t.category.name}` : ""}
                               </span>
                             </div>
@@ -765,7 +765,7 @@ export default function ReportsPage() {
               <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
                 <PieIcon className="size-4 text-mint-strong" /> Distribusi Pengeluaran
               </h3>
-              <span className="text-[10px] text-muted-foreground font-semibold">Ketuk untuk rincian</span>
+              <span className="text-xs text-muted-foreground font-semibold">Ketuk untuk rincian</span>
             </div>
 
             {expenseBreakdown.length === 0 ? (

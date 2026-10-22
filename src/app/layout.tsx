@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from "@/components/query-provider";
 
@@ -27,7 +28,11 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#FAFAF9",
+  // Matches --background in each palette so the browser chrome blends in.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -46,8 +51,12 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <QueryProvider>{children}</QueryProvider>
-        <Toaster position="top-center" />
+        {/* Puts .light/.dark on <html> (system by default) — both the token
+            palette and every `dark:` utility key off that class. */}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <QueryProvider>{children}</QueryProvider>
+          <Toaster position="top-center" />
+        </ThemeProvider>
         
         {/* PWA Service Worker Auto-Registration */}
         <script

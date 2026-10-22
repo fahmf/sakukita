@@ -331,7 +331,7 @@ export default function BudgetsPage() {
                 <Calendar className="size-4 text-mint-strong" />
                 <span>{monthLabel}</span>
               </div>
-              <span className="text-[10px] font-medium text-muted-foreground">
+              <span className="text-xs font-medium text-muted-foreground">
                 {financialMonthRangeLabel(selectedMonth)}
               </span>
             </div>
@@ -412,7 +412,7 @@ export default function BudgetsPage() {
                                     {item.category.name}
                                   </p>
                                   {item.category.parent_id !== null && (
-                                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-md text-muted-foreground">
+                                    <span className="text-xs bg-muted px-1.5 py-0.5 rounded-md text-muted-foreground">
                                       Sub
                                     </span>
                                   )}
@@ -458,7 +458,7 @@ export default function BudgetsPage() {
                             </div>
 
                             {/* Limit warnings / indicators */}
-                            <div className="flex justify-between items-center text-[10px] font-medium">
+                            <div className="flex justify-between items-center text-xs font-medium">
                               <span
                                 className="px-1.5 py-0.5 rounded-md"
                                 style={{
@@ -474,7 +474,7 @@ export default function BudgetsPage() {
                                   Melebihi limit {formatCurrency(Math.abs(item.remaining))}
                                 </span>
                               ) : isNearLimit ? (
-                                <span className="text-amber-500 font-semibold">
+                                <span className="text-warning-strong font-semibold">
                                   Mendekati limit! Sisa {formatCurrency(item.remaining)}
                                 </span>
                               ) : (
@@ -520,13 +520,13 @@ export default function BudgetsPage() {
                                 {item.category.name}
                               </p>
                               {item.category.parent_id !== null && (
-                                <span className="text-[9px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                                <span className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
                                   Sub
                                 </span>
                               )}
                             </div>
                             {item.spent > 0 && (
-                              <p className="text-[10px] text-muted-foreground">
+                              <p className="text-xs text-muted-foreground">
                                 Terpakai {formatCurrency(item.spent)} bulan ini
                               </p>
                             )}
@@ -596,7 +596,7 @@ export default function BudgetsPage() {
                       Akumulasi Sisa Bulan Lalu
                     </Label>
                   </div>
-                  <p className="text-[10px] text-muted-foreground leading-normal">
+                  <p className="text-xs text-muted-foreground leading-normal">
                     Jika aktif, sisa dana tak terpakai di bulan lalu otomatis ditambahkan ke batas limit bulan ini.
                   </p>
                 </div>

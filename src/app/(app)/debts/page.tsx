@@ -265,7 +265,7 @@ export default function DebtsPage() {
       );
     } else if (diffDays === 0) {
       return (
-        <span className="text-amber-500 font-bold bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded-md">
+        <span className="text-warning-strong font-bold bg-warning-soft px-1.5 py-0.5 rounded-md">
           • Jatuh tempo hari ini
         </span>
       );
@@ -316,7 +316,7 @@ export default function DebtsPage() {
       {/* Statistics Rings */}
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl border bg-card p-4 space-y-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+          <span className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1">
             <Coins className="size-3 text-mint-strong" /> Total Belum Lunas
           </span>
           <p className="text-[15px] font-extrabold text-foreground truncate">
@@ -324,7 +324,7 @@ export default function DebtsPage() {
           </p>
         </div>
         <div className="rounded-2xl border bg-card p-4 space-y-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+          <span className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1">
             <Sparkles className="size-3 text-emerald-500" /> Selesai / Lunas
           </span>
           <p className="text-[15px] font-extrabold text-emerald-600 dark:text-emerald-400 truncate">
@@ -399,7 +399,7 @@ export default function DebtsPage() {
                           <h4 className="font-bold text-sm text-foreground truncate pr-2">
                             {debt.name}
                           </h4>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg shrink-0 ${
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-lg shrink-0 ${
                             debt.is_completed
                               ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20 dark:text-emerald-400"
                               : debt.type === "payable"
@@ -420,7 +420,7 @@ export default function DebtsPage() {
                         
                         {/* Due Date Indicator */}
                         {(debt.due_date || debt.is_completed) && (
-                          <div className="flex items-center gap-1 text-[9px] text-muted-foreground/80 mt-1 select-none flex-wrap">
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground/80 mt-1 select-none flex-wrap">
                             <Calendar className="size-3 text-mint-strong" />
                             {debt.due_date && (
                               <span>Hingga {new Date(debt.due_date).toLocaleDateString("id-ID", { month: "short", day: "numeric", year: "numeric" })}</span>
@@ -431,7 +431,7 @@ export default function DebtsPage() {
 
                         {/* Note */}
                         {debt.note && (
-                          <div className="flex items-start gap-1 text-[9px] text-muted-foreground/60 mt-1 italic border-l pl-2 border-muted-foreground/20 leading-normal">
+                          <div className="flex items-start gap-1 text-xs text-muted-foreground/60 mt-1 italic border-l pl-2 border-muted-foreground/20 leading-normal">
                             <Info className="size-2.5 shrink-0 mt-0.5 text-muted-foreground/50" />
                             <span className="truncate">{debt.note}</span>
                           </div>

@@ -6,7 +6,7 @@ import { useTransactions, useDeleteTransaction, useRestoreTransaction } from "@/
 import type { TransactionWithDetails } from "@/hooks/use-transactions";
 import { useUIStore } from "@/stores/ui-store";
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatGrouped } from "@/lib/format";
 import { BackButton } from "@/components/shared/back-button";
 import { PageHeading } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
@@ -182,7 +182,7 @@ export default function CalendarPage() {
 
       {/* Calendar grid */}
       <Card className="rounded-2xl border bg-card p-3">
-        <div className="grid grid-cols-7 gap-1 pb-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        <div className="grid grid-cols-7 gap-1 pb-1.5 text-center text-xs font-bold uppercase tracking-wider text-muted-foreground">
           {WEEKDAYS.map((d) => (
             <div key={d}>{d}</div>
           ))}
@@ -239,7 +239,7 @@ export default function CalendarPage() {
               }`}
             >
               Net: {selectedEntry.income - selectedEntry.expense >= 0 ? "+" : "-"}
-              {formatCurrency(Math.abs(selectedEntry.income - selectedEntry.expense)).replace("Rp", "").trim()}
+              {formatGrouped(Math.abs(selectedEntry.income - selectedEntry.expense))}
             </span>
           )}
         </div>
@@ -298,7 +298,7 @@ export default function CalendarPage() {
                     }`}
                   >
                     {isIncome ? "+" : isExpense ? "-" : ""}
-                    {formatCurrency(tx.amount).replace("Rp", "").trim()}
+                    {formatGrouped(tx.amount)}
                   </p>
                 </button>
               );

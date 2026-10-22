@@ -67,21 +67,21 @@ export function TopBar() {
     switch (status) {
       case "syncing":
         return (
-          <div className="flex items-center gap-1 text-[10px] font-semibold text-mint-strong bg-mint-soft px-2.5 py-1 rounded-full animate-pulse border border-mint-strong/20 select-none shrink-0">
+          <div className="flex items-center gap-1 text-xs font-semibold text-mint-strong bg-mint-soft px-2.5 py-1 rounded-full animate-pulse border border-mint-strong/20 select-none shrink-0">
             <Loader2 className="size-3 animate-spin" />
             <span>Menyinkron</span>
           </div>
         );
       case "offline":
         return (
-          <div className="flex items-center gap-1 text-[10px] font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full border select-none shrink-0">
+          <div className="flex items-center gap-1 text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full border select-none shrink-0">
             <CloudOff className="size-3" />
             <span>Offline</span>
           </div>
         );
       case "error":
         return (
-          <div className="flex items-center gap-1 text-[10px] font-semibold text-expense bg-red-50 dark:bg-red-950/20 px-2.5 py-1 rounded-full border border-expense/20 shrink-0">
+          <div className="flex items-center gap-1 text-xs font-semibold text-expense bg-red-50 dark:bg-red-950/20 px-2.5 py-1 rounded-full border border-expense/20 shrink-0">
             <AlertCircle className="size-3" />
             <span>Gagal sinkron</span>
           </div>

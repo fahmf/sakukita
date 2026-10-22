@@ -238,7 +238,7 @@ export default function WalletsPage() {
                   <div className="text-right">
                     <p className="font-semibold text-sm">{formatCurrency(balance)}</p>
                     {wallet.exclude_from_networth && (
-                      <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                      <span className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
                         Bukan Kekayaan
                       </span>
                     )}

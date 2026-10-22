@@ -730,7 +730,7 @@ export default function SettingsPage() {
                             
                             {hasSubs && (
                               <span className="flex items-center gap-1.5 text-muted-foreground">
-                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tabular-nums">
+                                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums">
                                   {parent.subcategories.length}
                                 </span>
                                 {isExpanded ? (
@@ -876,7 +876,7 @@ export default function SettingsPage() {
                             
                             {hasSubs && (
                               <span className="flex items-center gap-1.5 text-muted-foreground">
-                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tabular-nums">
+                                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums">
                                   {parent.subcategories.length}
                                 </span>
                                 {isExpanded ? (
@@ -986,7 +986,7 @@ export default function SettingsPage() {
                             </span>
                             <div className="min-w-0">
                               <p className="truncate text-sm text-muted-foreground">{label}</p>
-                              <p className="text-[10px] text-muted-foreground/70">
+                              <p className="text-xs text-muted-foreground/70">
                                 {cat.kind === "income" ? "Pemasukan" : "Pengeluaran"}
                               </p>
                             </div>
@@ -1184,7 +1184,7 @@ export default function SettingsPage() {
         <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
           <DialogContent className="sm:max-w-md rounded-2xl">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+              <DialogTitle className="flex items-center gap-2 text-warning-strong">
                 <AlertTriangle className="size-5" /> Atur Ulang Cache Database?
               </DialogTitle>
             </DialogHeader>
@@ -1192,7 +1192,7 @@ export default function SettingsPage() {
               <p>
                 Tindakan ini akan menghapus semua database lokal (IndexedDB) di perangkat ini dan mengunduh ulang data segar dari server Supabase.
               </p>
-              <p className="font-semibold text-amber-600 dark:text-amber-400">
+              <p className="font-semibold text-warning-strong">
                 Peringatan: Data offline yang belum tersinkronisasi ke server (dalam antrean sync) mungkin akan hilang. Gunakan ini hanya jika aplikasi mengalami glitch atau sinkronisasi macet.
               </p>
             </div>
@@ -1208,7 +1208,7 @@ export default function SettingsPage() {
               </Button>
               <Button
                 type="button"
-                className="rounded-xl h-11 px-4 bg-amber-600 text-white hover:bg-amber-700 flex-1 md:flex-none flex items-center justify-center gap-2"
+                className="rounded-xl h-11 px-4 bg-amber-700 text-white hover:bg-amber-800 flex-1 md:flex-none flex items-center justify-center gap-2"
                 onClick={handleResetCache}
                 disabled={resetting}
               >
