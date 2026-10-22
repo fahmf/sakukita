@@ -57,7 +57,9 @@ export function ExpenseBreakdown({ items, total, openId, onToggle, hrefFor }: Ex
         </p>
       </div>
 
-      {/* Proportion strip: one segment per category, same order as the list */}
+      {/* Proportion strip: one segment per category, same order as the list.
+          Bars use foreground at partial opacity (not muted-foreground) so they
+          keep ≥3:1 against the muted track in both themes. */}
       <div className="flex h-3.5 gap-0.5 overflow-hidden rounded-md" aria-label="Porsi tiap kategori">
         {items.map((item, index) => {
           const isOpen = openId === item.id;
@@ -74,8 +76,8 @@ export function ExpenseBreakdown({ items, total, openId, onToggle, hrefFor }: Ex
                 isOpen
                   ? "bg-mint-strong"
                   : index % 2 === 0
-                  ? "bg-muted-foreground/25"
-                  : "bg-muted-foreground/40"
+                  ? "bg-foreground/45"
+                  : "bg-foreground/65"
               }`}
             />
           );
@@ -114,7 +116,7 @@ export function ExpenseBreakdown({ items, total, openId, onToggle, hrefFor }: Ex
                 </span>
                 <span className="col-span-2 h-2 overflow-hidden rounded bg-muted" aria-hidden>
                   <span
-                    className={`block h-full rounded ${isOpen ? "bg-mint-strong" : "bg-muted-foreground/40"}`}
+                    className={`block h-full rounded ${isOpen ? "bg-mint-strong" : "bg-foreground/50"}`}
                     style={{ width: `${total > 0 ? (item.amount / total) * 100 : 0}%` }}
                   />
                 </span>
