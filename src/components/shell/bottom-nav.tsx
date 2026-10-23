@@ -10,7 +10,7 @@ import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
 // Each tab also owns the sub-pages reached from it, so the bar keeps showing
 // where the user is (e.g. Tabungan lights up "Lainnya").
 const tabs = [
-  { href: "/dashboard", label: "Beranda", icon: Home, match: ["/dashboard"] },
+  { href: "/dashboard", label: "Beranda", icon: Home, match: ["/dashboard", "/pet"] },
   { href: "/transactions", label: "Riwayat", icon: ReceiptText, match: ["/transactions", "/calendar"] },
   { href: "/reports", label: "Laporan", icon: BarChart3, match: ["/reports"] },
   {
@@ -76,11 +76,18 @@ function NavItem({
       href={href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors",
+        "flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors",
         active ? "text-mint-strong" : "text-muted-foreground",
       )}
     >
-      <Icon className="size-5" />
+      <span
+        className={cn(
+          "grid h-7 w-12 place-items-center rounded-full transition-colors",
+          active && "bg-mint-soft",
+        )}
+      >
+        <Icon className="size-5" />
+      </span>
       {label}
     </Link>
   );

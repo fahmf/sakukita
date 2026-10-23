@@ -36,11 +36,12 @@ import {
 import { useCanEdit, viewOnlyToast } from "@/components/shared/edit-guard";
 import { TransactionDetailDialog } from "@/components/transaction/transaction-detail-dialog";
 import { TransactionRow } from "@/components/transaction/transaction-row";
+import { PetCard } from "@/components/pet/pet-card";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { iconMap } from "@/lib/icons";
 import { computeBudgetUsage } from "@/lib/budget-usage";
-import { TransactionListSkeleton, BudgetCardSkeleton, NetWorthSkeleton } from "@/components/shared/skeletons";
+import { TransactionListSkeleton, BudgetCardSkeleton } from "@/components/shared/skeletons";
 
 export default function DashboardPage() {
   const { openQuickAdd, openEditTransaction } = useUIStore();
@@ -265,36 +266,43 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* 1. Current household balance (all wallets, not month-scoped) */}
       <Link href="/wallets" className="block transition-all">
-        <Card className="rounded-2xl border bg-card p-5 text-center space-y-1 hover:border-mint-strong/40 transition-all cursor-pointer">
-          <span className="text-xs text-muted-foreground font-medium">Saldo Keluarga Saat Ini</span>
+        {/* Fixed emerald→teal (both ~5.5:1 behind white text) so the headline
+            card is colourful in either theme without new tokens. */}
+        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-emerald-700 via-emerald-700 to-teal-700 p-5 text-center text-white space-y-1 shadow-md shadow-emerald-900/20 transition-all cursor-pointer hover:brightness-105">
+          <span aria-hidden className="pointer-events-none absolute -right-8 -top-10 size-32 rounded-full bg-white/10" />
+          <span aria-hidden className="pointer-events-none absolute -bottom-12 -left-6 size-28 rounded-full bg-white/5" />
+          <span className="relative text-xs text-white/85 font-medium">Saldo Keluarga Saat Ini</span>
           {loadingBalances ? (
-            <NetWorthSkeleton />
+            <div className="relative mx-auto h-9 w-48 animate-pulse rounded-xl bg-white/20" />
           ) : (
-            <p className="text-3xl font-extrabold text-foreground tracking-tight">
+            <p className="relative text-3xl font-extrabold text-white tracking-tight">
               {formatCurrency(totalNetWorth)}
             </p>
           )}
           {!loadingBalances && hasDebtPosition && (
-            <div className="flex items-center justify-center gap-3 pt-1 text-[11px] font-semibold">
+            <div className="relative flex items-center justify-center gap-3 pt-1 text-xs font-semibold">
               {receivables > 0 && (
-                <span className="text-income">
+                <span className="text-emerald-100">
                   + Piutang {formatGrouped(receivables)}
                 </span>
               )}
               {payables > 0 && (
-                <span className="text-expense">
+                <span className="text-rose-100">
                   − Utang {formatGrouped(payables)}
                 </span>
               )}
             </div>
           )}
-          <span className="inline-flex items-center justify-center gap-1 pt-1.5 text-[11px] font-medium text-mint-strong">
+          <span className="relative inline-flex items-center justify-center gap-1 self-center rounded-full bg-white/15 px-3 py-1 mt-1.5 text-xs font-semibold text-white">
             <Wallet className="size-3" />
             Kelola &amp; tambah dompet
             <ChevronRight className="size-3" />
           </span>
         </Card>
       </Link>
+
+      {/* 1b. Household pet — fed by recording transactions */}
+      <PetCard />
 
       {/* 2. Month navigator — sits below the balance on purpose: the balance is
           "right now" and never changes with the month, everything below this
@@ -339,9 +347,9 @@ export default function DashboardPage() {
       {/* 3. Income & Expense mini cards */}
       <div className="grid grid-cols-2 gap-3">
         <Link href={`/transactions?bulan=${selectedMonth}&tipe=income`} className="block">
-          <Card className="h-full rounded-2xl border bg-card p-4 space-y-1 transition-colors hover:border-mint-strong/40">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
-              <span className="grid size-5 place-items-center rounded-full bg-mint-soft text-mint-strong">
+          <Card className="h-full rounded-2xl border border-mint-strong/20 bg-mint-soft p-4 space-y-1 transition-colors hover:border-mint-strong/40">
+            <div className="flex items-center gap-1 text-xs text-foreground/75 font-medium">
+              <span className="grid size-5 place-items-center rounded-full bg-mint-strong text-on-mint">
                 <ArrowUpRight className="size-3" />
               </span>
               Pemasukan
@@ -353,9 +361,9 @@ export default function DashboardPage() {
         </Link>
 
         <Link href={`/transactions?bulan=${selectedMonth}&tipe=expense`} className="block">
-          <Card className="h-full rounded-2xl border bg-card p-4 space-y-1 transition-colors hover:border-mint-strong/40">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
-              <span className="grid size-5 place-items-center rounded-full bg-expense-soft text-expense">
+          <Card className="h-full rounded-2xl border border-expense/20 bg-expense-soft p-4 space-y-1 transition-colors hover:border-expense/40">
+            <div className="flex items-center gap-1 text-xs text-foreground/75 font-medium">
+              <span className="grid size-5 place-items-center rounded-full bg-expense text-on-expense">
                 <ArrowDownRight className="size-3" />
               </span>
               Pengeluaran

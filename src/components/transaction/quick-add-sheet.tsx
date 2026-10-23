@@ -5,6 +5,8 @@ import { useUIStore } from "@/stores/ui-store";
 import { useWallets } from "@/hooks/use-wallets";
 import { useCategories, useCategoryUsage } from "@/hooks/use-categories";
 import { useCreateTransaction, useUpdateTransaction } from "@/hooks/use-transactions";
+import { loadPetState } from "@/hooks/use-pet";
+import { usePetPrefs } from "@/hooks/use-pet-prefs";
 import { parseAmountExpression } from "@/lib/calculator";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "sonner";
@@ -162,6 +164,7 @@ function QuickAddForm() {
   } = useUIStore();
 
   const { householdId } = useHousehold();
+  const [petPrefs] = usePetPrefs();
   const { data: wallets = [] } = useWallets();
   const { data: categoriesTree = [] } = useCategories();
   const { data: categoryUsage } = useCategoryUsage();
@@ -612,6 +615,9 @@ function QuickAddForm() {
         });
         toast.success("Transaksi berhasil diubah ✓");
       } else {
+        // Was the pet still hungry today? Checked before saving so the first
+        // entry of the day can celebrate feeding it.
+        const petBefore = await loadPetState(householdId).catch(() => null);
         await createTx.mutateAsync({
           type,
           amount: parsedAmount,
@@ -634,6 +640,13 @@ function QuickAddForm() {
           toast.warning(title, { description: feedback.text });
         } else {
           toast.success(title, feedback ? { description: feedback.text } : undefined);
+        }
+        if (petBefore && !petBefore.fedToday) {
+          const streak = petBefore.streak + 1;
+          toast(`Nyam! ${petPrefs.name} kenyang 🍙`, {
+            description:
+              streak > 1 ? `Streak ${streak} hari berturut-turut 🔥` : "Hari pertama streak dimulai 🔥",
+          });
         }
       }
 
