@@ -52,8 +52,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         {/* Puts .light/.dark on <html> (system by default) — both the token
-            palette and every `dark:` utility key off that class. */}
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+            palette and every `dark:` utility key off that class. color-scheme
+            is set in globals.css instead (see the auto-dark note there). */}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem enableColorScheme={false} disableTransitionOnChange>
           <QueryProvider>{children}</QueryProvider>
           <Toaster position="top-center" />
         </ThemeProvider>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   CalendarClock,
+  Heart,
   ChevronRight,
   PiggyBank,
   Scale,
@@ -23,6 +24,7 @@ type Tile = { href: string; label: string; hint: string; icon: LucideIcon; tone:
 // Kalender is deliberately absent: it is a view of Riwayat (reached from the
 // Riwayat page and the Beranda month bar) and lights up that tab.
 const FEATURES: Tile[] = [
+  { href: "/pet", label: "Peliharaan", hint: "Beri makan tiap hari", icon: Heart, tone: "bg-pink-50 text-pink-600 dark:bg-pink-950/30 dark:text-pink-400" },
   { href: "/budgets", label: "Rencana & Budget", hint: "Batas per kategori", icon: Target, tone: "bg-mint-soft text-mint-strong" },
   { href: "/wallets", label: "Dompet", hint: "Saldo per akun", icon: Wallet, tone: "bg-sky-50 text-sky-600 dark:bg-sky-950/30 dark:text-sky-400" },
   { href: "/savings", label: "Tabungan", hint: "Target impian", icon: PiggyBank, tone: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400" },
