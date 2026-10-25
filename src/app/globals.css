@@ -169,6 +169,15 @@
 :root.dark {
   color-scheme: dark;
 }
+/* Some force-dark heuristics only look for a prefers-color-scheme rule in the
+ * stylesheet to decide a site handles dark mode itself (theme switching here
+ * is done with a class from JS, which they can't see). This rule is that
+ * signal; the real palette still comes from .dark. */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    color-scheme: dark;
+  }
+}
 
 @layer base {
   * {

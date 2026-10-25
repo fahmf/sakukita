@@ -5,6 +5,7 @@ import { useUIStore } from "@/stores/ui-store";
 import { useWallets } from "@/hooks/use-wallets";
 import { useCategories, useCategoryUsage } from "@/hooks/use-categories";
 import { useCreateTransaction, useUpdateTransaction } from "@/hooks/use-transactions";
+import { CategoryBadge, CategoryPicker } from "@/components/transaction/category-picker";
 import { loadPetState } from "@/hooks/use-pet";
 import { usePetPrefs } from "@/hooks/use-pet-prefs";
 import { parseAmountExpression } from "@/lib/calculator";
@@ -42,6 +43,7 @@ import {
   Keyboard,
   Tag,
   X,
+  LayoutGrid,
 } from "lucide-react";
 import type { TransactionType } from "@/lib/supabase/types";
 import { compressImage } from "@/lib/image";
@@ -58,7 +60,6 @@ import { computeBudgetUsage, findApplicableBudget } from "@/lib/budget-usage";
 import { useHousehold } from "@/components/providers/household-provider";
 import type { HierarchicalCategory } from "@/hooks/use-categories";
 
-import { iconMap } from "@/lib/icons";
 
 // 4x4 keypad. "÷" and parentheses are rare for entering amounts and stay
 // available on a physical keyboard; the Save button replaces "OK".
@@ -68,21 +69,6 @@ const keypadKeys = [
   "1", "2", "3", "-",
   "000", "0", "C", "+",
 ];
-
-/** A category's icon: a mapped lucide icon name, else the stored emoji. */
-function CategoryIcon({
-  icon,
-  className,
-  fallback = "🏷️",
-}: {
-  icon: string | null | undefined;
-  className?: string;
-  fallback?: string;
-}) {
-  const Icon = icon ? iconMap[icon] : undefined;
-  if (Icon) return <Icon className={className} />;
-  return <span className="text-sm select-none leading-none">{icon || fallback}</span>;
-}
 
 /**
  * Budget feedback for the toast after saving an expense, e.g. "Sisa budget
@@ -224,7 +210,8 @@ function QuickAddForm() {
   // days, subcategories included), topped up with parents in catalog order.
   // Previously these were just the first six parents, so the most common
   // picks (e.g. "Belanja Dapur", "Jajan & Kopi") always needed the dropdown.
-  const QUICK_CHIP_COUNT = 8;
+  // Six, now that chips are 40px tall: about two rows, the rest is in "Semua".
+  const QUICK_CHIP_COUNT = 6;
   const rankedCategories = React.useMemo(() => {
     if (type === "transfer") return [];
     const flat = categoriesTree
@@ -247,6 +234,15 @@ function QuickAddForm() {
     return picked;
   }, [type, categoriesTree, rankedCategories]);
 
+  // Chips shown in the form: the quick picks, with the current choice put
+  // first when it came from the full picker so it stays visible.
+  const [pickerOpen, setPickerOpen] = React.useState(false);
+  const parentColor = React.useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const p of categoriesTree) for (const c of p.subcategories) map.set(c.id, p.color);
+    return map;
+  }, [categoriesTree]);
+
   // Compute active default selections purely during render — eliminates cascading render set-state-in-effect errors
   const activeWalletId = selectedWalletId || lastWalletId || wallets[0]?.id || "";
 
@@ -262,7 +258,7 @@ function QuickAddForm() {
   }, [selectedCategoryId, categoriesTree, type, lastCategoryId, rankedCategories]);
 
   // The chips only list the most-used categories; when the pick came from
-  // the full list, the "Lainnya" chip shows it instead.
+  // the full picker, it is shown as the first chip so the choice stays visible.
   const activeCategory = React.useMemo(
     () =>
       categoriesTree
@@ -271,6 +267,10 @@ function QuickAddForm() {
     [categoriesTree, activeCategoryId]
   );
   const activeIsChip = activeCategories.some((c) => c.id === activeCategoryId);
+  const chipCategories =
+    activeCategory && !activeIsChip
+      ? [activeCategory, ...activeCategories.slice(0, QUICK_CHIP_COUNT - 1)]
+      : activeCategories;
 
   // Date shortcuts (Jakarta calendar days).
   const todayKey = todayJakarta();
@@ -793,13 +793,14 @@ function QuickAddForm() {
             )}
           </div>
 
-          {/* Category chips — the most-used ones, plus a "Lainnya" chip that
-              opens the full list (one picker instead of chips + a dropdown). */}
+          {/* Category: big chips for the most-used picks, and "Semua" opens a
+              full-height picker (search, grid, sub-categories) instead of the
+              old cramped dropdown. */}
           {type !== "transfer" && (
             <div className="space-y-2">
               <Label className="text-xs font-semibold text-muted-foreground">Kategori</Label>
               <div className="flex flex-wrap gap-2">
-                {activeCategories.map((cat) => {
+                {chipCategories.map((cat) => {
                   const isActive = activeCategoryId === cat.id;
                   return (
                     <button
@@ -810,74 +811,45 @@ function QuickAddForm() {
                         setSelectedCategoryId(cat.id);
                         setShowKeypad(false);
                       }}
-                      className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all active:scale-95 ${
+                      className={`flex h-10 items-center gap-1.5 rounded-full border pl-1 pr-3.5 text-sm font-medium transition-all active:scale-95 ${
                         isActive
-                          ? "bg-mint-soft text-mint-strong border-mint-strong/30"
+                          ? "bg-mint-soft text-mint-strong border-mint-strong"
                           : "bg-card text-foreground hover:bg-muted"
                       }`}
                     >
                       {isActive ? (
-                        <Check className="size-3" />
+                        <span className="grid size-7 place-items-center rounded-full bg-mint-strong text-on-mint">
+                          <Check className="size-4" />
+                        </span>
                       ) : (
-                        <CategoryIcon icon={cat.icon} className="size-3" />
+                        <CategoryBadge category={cat} size="sm" fallbackColor={parentColor.get(cat.id)} />
                       )}
                       <span>{cat.name}</span>
                     </button>
                   );
                 })}
 
-                <Select
-                  value={activeCategoryId}
-                  onValueChange={(val) => {
-                    // Radix fires onValueChange("") on mount (its hidden native
-                    // <select>); no item has an empty value, so ignore it.
-                    if (!val) return;
-                    setSelectedCategoryId(val);
-                    setShowKeypad(false);
-                  }}
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(true)}
+                  className="flex h-10 items-center gap-1.5 rounded-full border border-dashed border-mint-strong/50 px-3.5 text-sm font-semibold text-mint-strong transition-all hover:bg-mint-soft active:scale-95"
                 >
-                  <SelectTrigger
-                    aria-label="Pilih kategori lain"
-                    className={`h-auto! rounded-full px-3 py-1.5 text-xs font-medium ${
-                      activeCategory && !activeIsChip
-                        ? "bg-mint-soft text-mint-strong border-mint-strong/30"
-                        : "bg-card text-foreground border-dashed"
-                    }`}
-                  >
-                    {activeCategory && !activeIsChip ? (
-                      <span className="flex items-center gap-1.5">
-                        <Check className="size-3" />
-                        {activeCategory.name}
-                      </span>
-                    ) : (
-                      <span>Lainnya…</span>
-                    )}
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="max-h-72">
-                    {categoriesTree
-                      .filter((p) => p.kind === type)
-                      .map((parent) => (
-                        <React.Fragment key={parent.id}>
-                          <SelectItem value={parent.id} className="font-semibold text-foreground">
-                            <span className="flex items-center gap-1.5">
-                              <CategoryIcon icon={parent.icon} className="size-4" fallback="📁" />
-                              <span>{parent.name}</span>
-                            </span>
-                          </SelectItem>
-                          {parent.subcategories.map((child) => (
-                            <SelectItem key={child.id} value={child.id} className="pl-6 text-xs text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <span>↳</span>
-                                <CategoryIcon icon={child.icon} className="size-3" />
-                                <span>{child.name}</span>
-                              </span>
-                            </SelectItem>
-                          ))}
-                        </React.Fragment>
-                      ))}
-                  </SelectContent>
-                </Select>
+                  <LayoutGrid className="size-4" aria-hidden />
+                  Semua kategori
+                </button>
               </div>
+
+              <CategoryPicker
+                open={pickerOpen}
+                onOpenChange={setPickerOpen}
+                categories={categoriesTree.filter((p) => p.kind === type)}
+                recent={rankedCategories.slice(0, 8)}
+                selectedId={activeCategoryId}
+                onSelect={(id) => {
+                  setSelectedCategoryId(id);
+                  setShowKeypad(false);
+                }}
+              />
             </div>
           )}
 
