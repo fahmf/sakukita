@@ -33,6 +33,10 @@ export const viewport: Viewport = {
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
     { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
   ],
+  // <meta name="color-scheme" content="light dark">: tells browsers and OS
+  // force-dark features that the app ships its own dark theme. Some (e.g.
+  // vendor "dark mode for apps") read only the meta tag, not CSS.
+  colorScheme: "light dark",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
