@@ -6,6 +6,8 @@ import { useWallets } from "@/hooks/use-wallets";
 import { useCategories, useCategoryUsage } from "@/hooks/use-categories";
 import { useCreateTransaction, useUpdateTransaction } from "@/hooks/use-transactions";
 import { CategoryBadge, CategoryPicker } from "@/components/transaction/category-picker";
+import { VoiceEntry } from "@/components/transaction/voice-entry";
+import { parseVoiceTransaction } from "@/lib/voice-transaction";
 import { loadPetState } from "@/hooks/use-pet";
 import { usePetPrefs } from "@/hooks/use-pet-prefs";
 import { parseAmountExpression } from "@/lib/calculator";
@@ -36,6 +38,7 @@ import {
   ArrowRightLeft,
   Check,
   Camera,
+  Mic,
   Loader2,
   ChevronDown,
   ChevronUp,
@@ -157,6 +160,8 @@ function QuickAddForm() {
   const createTx = useCreateTransaction();
   const updateTx = useUpdateTransaction();
 
+  const [voiceOpen, setVoiceOpen] = React.useState(false);
+
   // Local form states initialized directly on mount
   const [type, setType] = React.useState<TransactionType>(() =>
     editingTransaction ? editingTransaction.type : quickAddType
@@ -164,13 +169,13 @@ function QuickAddForm() {
   const [amountExpr, setAmountExpr] = React.useState(() =>
     editingTransaction ? String(editingTransaction.amount) : ""
   );
-  const [selectedWalletId, setSelectedWalletId] = React.useState(() =>
+  const [selectedWalletId, setSelectedWalletId] = React.useState<string | null>(() =>
     editingTransaction ? editingTransaction.wallet_id : ""
   );
   const [selectedToWalletId, setSelectedToWalletId] = React.useState(() =>
     editingTransaction ? (editingTransaction.to_wallet_id || "") : ""
   );
-  const [selectedCategoryId, setSelectedCategoryId] = React.useState(() =>
+  const [selectedCategoryId, setSelectedCategoryId] = React.useState<string | null>(() =>
     editingTransaction ? (editingTransaction.category_id || "") : ""
   );
   const [occurredAt, setOccurredAt] = React.useState(() =>
@@ -244,10 +249,11 @@ function QuickAddForm() {
   }, [categoriesTree]);
 
   // Compute active default selections purely during render — eliminates cascading render set-state-in-effect errors
-  const activeWalletId = selectedWalletId || lastWalletId || wallets[0]?.id || "";
+  const defaultWalletId = wallets.find(w => w.id === lastWalletId)?.id || wallets[0]?.id || "";
+  const activeWalletId = selectedWalletId === null ? "" : selectedWalletId || defaultWalletId;
 
   const activeCategoryId = React.useMemo(() => {
-    if (type === "transfer") return "";
+    if (type === "transfer" || selectedCategoryId === null) return "";
     if (selectedCategoryId) return selectedCategoryId;
     const flatCategories = categoriesTree.flatMap((p) => [p, ...p.subcategories]);
     const available = flatCategories.filter((c) => c.kind === type);
@@ -328,6 +334,7 @@ function QuickAddForm() {
 
   // Capture physical keyboard inputs when amount input is focused or captured globally
   React.useEffect(() => {
+    if (voiceOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement as HTMLElement | null;
       const activeTag = activeEl?.tagName;
@@ -364,7 +371,7 @@ function QuickAddForm() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [closeQuickAdd]);
+  }, [closeQuickAdd, voiceOpen]);
 
   // Adjust categories automatically when transaction type changes
   const handleTypeChange = (newType: TransactionType) => {
@@ -559,6 +566,23 @@ function QuickAddForm() {
     });
   };
 
+  function applyVoiceEntry(transcript: string) {
+    const draft = parseVoiceTransaction(transcript, categoriesTree, wallets, todayJakarta(), type);
+    setType(draft.type);
+    setAmountExpr(draft.amount === null ? "" : String(draft.amount));
+    setSelectedCategoryId(draft.categoryId ?? null);
+    setSelectedWalletId(draft.walletId ?? (draft.needsWallet ? null : activeWalletId));
+    setSelectedToWalletId(draft.toWalletId === draft.walletId ? "" : draft.toWalletId ?? "");
+    setOccurredAt(draft.date);
+    setNote(draft.note);
+    setTags(draft.tags);
+    setTagInput("");
+    setShowKeypad(draft.amount === null);
+    setVoiceOpen(false);
+    if (draft.amount === null) toast.info("Periksa nominal dan masukkan jumlah transaksi.");
+    else if (!draft.categoryId && draft.type !== "transfer") toast.info("Pilih kategori yang sesuai.");
+  }
+
   // Submit transaction
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -667,6 +691,15 @@ function QuickAddForm() {
     }
   };
 
+  if (voiceOpen) {
+    return (
+      <>
+        <DrawerHeader><DrawerTitle>Catat dengan suara</DrawerTitle></DrawerHeader>
+        <VoiceEntry onApply={applyVoiceEntry} onCancel={() => setVoiceOpen(false)} />
+      </>
+    );
+  }
+
   return (
     <>
       <DrawerHeader className="relative px-0 flex-shrink-0">
@@ -687,6 +720,13 @@ function QuickAddForm() {
       <form ref={formRef} onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Scrollable area above keypad */}
         <div className="flex-1 overflow-y-auto pr-0.5 space-y-4 pb-4 scrollbar-thin">
+          {!editingTransaction && !scannedItems?.length && (
+            <button type="button" disabled={isScanning || createTx.isPending}
+              onClick={() => setVoiceOpen(true)}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-mint-strong/40 bg-mint-soft text-sm font-semibold text-mint-strong disabled:opacity-50">
+              <Mic className="size-4" /> Catat dengan suara
+            </button>
+          )}
           {/* Quick-toggle Type Buttons */}
           <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">
             <button
